@@ -1,236 +1,425 @@
-import { useState } from "react";
-import { Plus, Check, ChevronRight, Dumbbell, Apple, Droplets, Moon } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Plus, Check, ChevronRight, Dumbbell, Apple, Droplets, Moon, X, Trash2 } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
 import { Avatar, AvatarFallback } from "../components/ui/avatar";
 import { Progress } from "../components/ui/progress";
+import { supabase } from "../lib/supabase";
+import { useAuth } from "../context/AuthContext";
+import type { DiaryTask, Exercise } from "../lib/types";
 
-interface Task {
-  id: number;
-  text: string;
-  done: boolean;
-  category: string;
+const today = new Date().toISOString().slice(0, 10);
+
+const categoryOptions = ["Hidratação", "Treino", "Nutrição", "Descanso", "Geral"];
+const workoutTypes = ["Superior A", "Superior B", "Inferior A", "Inferior B", "Full Body", "Cardio"];
+
+function initials(name: string) {
+  return name.split(" ").slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("");
 }
 
-const initialTasks: Task[] = [
-  { id: 1, text: "Tomar 2.5L de água", done: true, category: "Hidratação" },
-  { id: 2, text: "Fazer 30 min de cardio", done: true, category: "Treino" },
-  { id: 3, text: "Registrar café da manhã", done: true, category: "Nutrição" },
-  { id: 4, text: "Treino de força - superior", done: false, category: "Treino" },
-  { id: 5, text: "Registrar almoço", done: false, category: "Nutrição" },
-  { id: 6, text: "Alongamento 15 min", done: false, category: "Treino" },
-  { id: 7, text: "Dormir 8 horas", done: false, category: "Descanso" },
-];
-
-const exercises = [
-  { name: "Supino Reto", sets: "4x12", weight: "80 kg", done: true },
-  { name: "Remada Curvada", sets: "3x10", weight: "70 kg", done: true },
-  { name: "Desenvolvimento", sets: "3x12", weight: "50 kg", done: false },
-  { name: "Rosca Direta", sets: "3x15", weight: "30 kg", done: false },
-  { name: "Tríceps Pulley", sets: "4x12", weight: "35 kg", done: false },
-];
-
-const dailyStats = [
-  { icon: Droplets, label: "Água", value: "1.2L / 2.5L", progress: 48, color: "bg-blue-500", iconColor: "text-blue-500", bg: "bg-blue-50" },
-  { icon: Apple, label: "Calorias", value: "1840 / 2400", progress: 77, color: "bg-orange-400", iconColor: "text-orange-500", bg: "bg-orange-50" },
-  { icon: Dumbbell, label: "Treino", value: "2 / 3 exerc.", progress: 67, color: "bg-violet-500", iconColor: "text-violet-500", bg: "bg-violet-50" },
-  { icon: Moon, label: "Sono", value: "7h / 8h", progress: 88, color: "bg-indigo-500", iconColor: "text-indigo-500", bg: "bg-indigo-50" },
-];
-
 export function Diary() {
-  const [tasks, setTasks] = useState<Task[]>(initialTasks);
+  const { profile, user } = useAuth();
+  const [tasks, setTasks] = useState<DiaryTask[]>([]);
+  const [exercises, setExercises] = useState<Exercise[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  function toggleTask(id: number) {
-    setTasks((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, done: !t.done } : t))
-    );
+  const [showTaskModal, setShowTaskModal] = useState(false);
+  const [taskText, setTaskText] = useState("");
+  const [taskCategory, setTaskCategory] = useState("Geral");
+
+  const [showExModal, setShowExModal] = useState(false);
+  const [exForm, setExForm] = useState({ name: "", sets: "3x12", weight_kg: "", workout_type: "Superior A" });
+  const [saving, setSaving] = useState(false);
+
+  const displayName = profile?.full_name || user?.email?.split("@")[0] || "Usuário";
+  const height = profile?.height_cm;
+  const weight = profile?.weight_kg;
+  const bmi = height && weight ? (weight / ((height / 100) ** 2)).toFixed(1) : null;
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  async function loadData() {
+    setLoading(true);
+    const [tasksRes, exRes] = await Promise.all([
+      supabase.from("diary_tasks").select("*").eq("task_date", today).order("sort_order").order("created_at"),
+      supabase.from("exercises").select("*").eq("exercise_date", today).order("created_at"),
+    ]);
+    if (tasksRes.data) setTasks(tasksRes.data);
+    if (exRes.data) setExercises(exRes.data);
+    setLoading(false);
+  }
+
+  async function toggleTask(task: DiaryTask) {
+    const { data } = await supabase
+      .from("diary_tasks")
+      .update({ done: !task.done })
+      .eq("id", task.id)
+      .select()
+      .single();
+    if (data) setTasks((prev) => prev.map((t) => (t.id === task.id ? data : t)));
+  }
+
+  async function deleteTask(id: string) {
+    await supabase.from("diary_tasks").delete().eq("id", id);
+    setTasks((prev) => prev.filter((t) => t.id !== id));
+  }
+
+  async function addTask() {
+    if (!taskText.trim()) return;
+    setSaving(true);
+    const { data } = await supabase
+      .from("diary_tasks")
+      .insert({ text: taskText, category: taskCategory, task_date: today, sort_order: tasks.length })
+      .select()
+      .single();
+    if (data) setTasks((prev) => [...prev, data]);
+    setTaskText("");
+    setTaskCategory("Geral");
+    setShowTaskModal(false);
+    setSaving(false);
+  }
+
+  async function toggleExercise(ex: Exercise) {
+    const { data } = await supabase
+      .from("exercises")
+      .update({ done: !ex.done })
+      .eq("id", ex.id)
+      .select()
+      .single();
+    if (data) setExercises((prev) => prev.map((e) => (e.id === ex.id ? data : e)));
+  }
+
+  async function addExercise() {
+    if (!exForm.name.trim()) return;
+    setSaving(true);
+    const { data } = await supabase
+      .from("exercises")
+      .insert({
+        name: exForm.name,
+        sets: exForm.sets,
+        weight_kg: exForm.weight_kg ? parseFloat(exForm.weight_kg) : null,
+        workout_type: exForm.workout_type,
+        exercise_date: today,
+      })
+      .select()
+      .single();
+    if (data) setExercises((prev) => [...prev, data]);
+    setExForm({ name: "", sets: "3x12", weight_kg: "", workout_type: "Superior A" });
+    setShowExModal(false);
+    setSaving(false);
   }
 
   const done = tasks.filter((t) => t.done).length;
+
+  const dailyStats = [
+    { icon: Droplets, label: "Água", value: "–", progress: 0, color: "bg-blue-500", iconColor: "text-blue-500", bg: "bg-blue-50" },
+    { icon: Apple, label: "Calorias", value: "–", progress: 0, color: "bg-orange-400", iconColor: "text-orange-500", bg: "bg-orange-50" },
+    { icon: Dumbbell, label: "Treino", value: `${exercises.filter((e) => e.done).length} / ${exercises.length}`, progress: exercises.length > 0 ? (exercises.filter((e) => e.done).length / exercises.length) * 100 : 0, color: "bg-violet-500", iconColor: "text-violet-500", bg: "bg-violet-50" },
+    { icon: Moon, label: "Tarefas", value: `${done} / ${tasks.length}`, progress: tasks.length > 0 ? (done / tasks.length) * 100 : 0, color: "bg-indigo-500", iconColor: "text-indigo-500", bg: "bg-indigo-50" },
+  ];
 
   return (
     <div className="flex flex-col gap-6 p-8">
       <header className="flex items-end justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Diário</h1>
-          <p className="mt-0.5 text-sm text-slate-500">Quinta-feira, 24 de Outubro</p>
+          <p className="mt-0.5 text-sm text-slate-500">
+            {new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })}
+          </p>
         </div>
-        <Button className="gap-2">
+        <Button className="gap-2" onClick={() => setShowTaskModal(true)}>
           <Plus className="h-4 w-4" />
-          Nova Entrada
+          Nova Tarefa
         </Button>
       </header>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-        {/* Left column */}
-        <div className="flex flex-col gap-4 xl:col-span-2">
-          {/* Tasks */}
-          <Card>
-            <CardContent className="p-5">
-              <div className="mb-4 flex items-center justify-between">
-                <div>
-                  <h2 className="text-base font-semibold text-slate-900">Tarefas</h2>
-                  <p className="text-xs text-slate-500">{done} de {tasks.length} concluídas</p>
+      {loading ? (
+        <div className="flex h-64 items-center justify-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+          <div className="flex flex-col gap-4 xl:col-span-2">
+            {/* Tasks */}
+            <Card>
+              <CardContent className="p-5">
+                <div className="mb-4 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-base font-semibold text-slate-900">Tarefas</h2>
+                    <p className="text-xs text-slate-500">{done} de {tasks.length} concluídas</p>
+                  </div>
+                  <button
+                    onClick={() => setShowTaskModal(true)}
+                    className="text-sm font-medium text-blue-600 hover:text-blue-700"
+                  >
+                    + Adicionar
+                  </button>
                 </div>
-                <button className="text-sm font-medium text-blue-600 hover:text-blue-700">
-                  + Adicionar
-                </button>
-              </div>
-              <div className="mb-3 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-                <div
-                  className="h-full rounded-full bg-blue-500 transition-all"
-                  style={{ width: `${(done / tasks.length) * 100}%` }}
+                {tasks.length > 0 && (
+                  <Progress
+                    value={tasks.length > 0 ? (done / tasks.length) * 100 : 0}
+                    className="mb-4"
+                  />
+                )}
+                {tasks.length === 0 ? (
+                  <div className="flex flex-col items-center py-8 text-center">
+                    <Check className="mb-2 h-8 w-8 text-slate-200" />
+                    <p className="text-sm text-slate-400">Nenhuma tarefa para hoje</p>
+                    <button
+                      onClick={() => setShowTaskModal(true)}
+                      className="mt-2 text-sm font-medium text-blue-600 hover:text-blue-700"
+                    >
+                      Adicionar primeira tarefa
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-1">
+                    {tasks.map((task) => (
+                      <div
+                        key={task.id}
+                        className="group flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-slate-50"
+                      >
+                        <button
+                          onClick={() => toggleTask(task)}
+                          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+                            task.done ? "border-blue-600 bg-blue-600" : "border-slate-300 bg-white"
+                          }`}
+                        >
+                          {task.done && <Check className="h-3 w-3 text-white" />}
+                        </button>
+                        <div className="flex-1 min-w-0">
+                          <span className={`text-sm font-medium ${task.done ? "text-slate-400 line-through" : "text-slate-900"}`}>
+                            {task.text}
+                          </span>
+                        </div>
+                        <span className="text-xs text-slate-400">{task.category}</span>
+                        <button
+                          onClick={() => deleteTask(task.id)}
+                          className="hidden text-slate-300 hover:text-red-500 group-hover:block"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Exercises */}
+            <Card>
+              <CardContent className="p-5">
+                <div className="mb-4 flex items-center justify-between">
+                  <h2 className="text-base font-semibold text-slate-900">Treino de Hoje</h2>
+                  <button
+                    onClick={() => setShowExModal(true)}
+                    className="text-sm font-medium text-blue-600 hover:text-blue-700"
+                  >
+                    + Adicionar
+                  </button>
+                </div>
+                {exercises.length === 0 ? (
+                  <div className="flex flex-col items-center py-8 text-center">
+                    <Dumbbell className="mb-2 h-8 w-8 text-slate-200" />
+                    <p className="text-sm text-slate-400">Nenhum exercício registrado</p>
+                    <button
+                      onClick={() => setShowExModal(true)}
+                      className="mt-2 text-sm font-medium text-blue-600 hover:text-blue-700"
+                    >
+                      Adicionar exercício
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {exercises.map((ex) => (
+                      <div
+                        key={ex.id}
+                        className="flex items-center justify-between rounded-xl border border-slate-100 px-4 py-3 transition-colors hover:bg-slate-50"
+                      >
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={() => toggleExercise(ex)}
+                            className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${
+                              ex.done ? "bg-blue-600" : "bg-slate-100"
+                            }`}
+                          >
+                            <Dumbbell className={`h-4 w-4 ${ex.done ? "text-white" : "text-slate-400"}`} />
+                          </button>
+                          <div>
+                            <p className="text-sm font-medium text-slate-900">{ex.name}</p>
+                            <p className="text-xs text-slate-500">{ex.sets}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {ex.weight_kg && (
+                            <span className="text-sm font-semibold text-slate-700">{ex.weight_kg} kg</span>
+                          )}
+                          <ChevronRight className="h-4 w-4 text-slate-300" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Right column */}
+          <div className="flex flex-col gap-4">
+            <Card>
+              <CardContent className="flex flex-col items-center p-6 text-center">
+                <Avatar className="h-20 w-20">
+                  <AvatarFallback className="bg-blue-50 text-2xl font-bold text-blue-700">
+                    {initials(displayName)}
+                  </AvatarFallback>
+                </Avatar>
+                <h3 className="mt-3 text-lg font-bold text-slate-900">{displayName}</h3>
+                <p className="text-sm text-slate-500">{profile?.plan === "pro" ? "Plano Pro" : "Plano Free"}</p>
+                <div className="mt-5 grid w-full grid-cols-3 gap-2 border-t border-slate-100 pt-4">
+                  <div className="flex flex-col items-center">
+                    <span className="text-lg font-bold text-slate-900">{weight ?? "–"}</span>
+                    <span className="text-xs text-slate-500">kg</span>
+                  </div>
+                  <div className="flex flex-col items-center border-x border-slate-100">
+                    <span className="text-lg font-bold text-slate-900">{height ?? "–"}</span>
+                    <span className="text-xs text-slate-500">cm</span>
+                  </div>
+                  <div className="flex flex-col items-center">
+                    <span className="text-lg font-bold text-slate-900">{bmi ?? "–"}</span>
+                    <span className="text-xs text-slate-500">IMC</span>
+                  </div>
+                </div>
+                {profile?.health_goal && (
+                  <div className="mt-4 w-full rounded-xl bg-blue-50 px-4 py-3 text-left">
+                    <p className="text-xs font-medium text-blue-700">Objetivo Principal</p>
+                    <p className="mt-0.5 text-sm font-semibold text-slate-900">{profile.health_goal}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-5">
+                <h3 className="mb-4 text-base font-semibold text-slate-900">Progresso do Dia</h3>
+                <div className="flex flex-col gap-4">
+                  {dailyStats.map((stat) => (
+                    <div key={stat.label} className="flex flex-col gap-1.5">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className={`flex h-6 w-6 items-center justify-center rounded-lg ${stat.bg}`}>
+                            <stat.icon className={`h-3.5 w-3.5 ${stat.iconColor}`} />
+                          </div>
+                          <span className="text-sm text-slate-600">{stat.label}</span>
+                        </div>
+                        <span className="text-xs font-medium text-slate-700">{stat.value}</span>
+                      </div>
+                      <Progress value={stat.progress} indicatorClassName={stat.color} />
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {/* Task Modal */}
+      {showTaskModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+            <div className="mb-5 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-slate-900">Nova Tarefa</h2>
+              <button onClick={() => setShowTaskModal(false)} className="text-slate-400 hover:text-slate-600">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm font-medium text-slate-700">Descrição *</label>
+                <Input
+                  className="mt-1"
+                  placeholder="Ex: Beber 2.5L de água"
+                  value={taskText}
+                  onChange={(e) => setTaskText(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && addTask()}
+                  autoFocus
                 />
               </div>
-              <div className="mt-4 flex flex-col gap-2">
-                {tasks.map((task) => (
-                  <button
-                    key={task.id}
-                    onClick={() => toggleTask(task.id)}
-                    className="flex items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-slate-50"
-                  >
-                    <div
-                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
-                        task.done
-                          ? "border-blue-600 bg-blue-600"
-                          : "border-slate-300 bg-white"
-                      }`}
-                    >
-                      {task.done && <Check className="h-3 w-3 text-white" />}
-                    </div>
-                    <div className="flex-1">
-                      <span
-                        className={`text-sm font-medium ${
-                          task.done ? "text-slate-400 line-through" : "text-slate-900"
-                        }`}
-                      >
-                        {task.text}
-                      </span>
-                    </div>
-                    <span className="text-xs text-slate-400">{task.category}</span>
-                  </button>
-                ))}
+              <div>
+                <label className="text-sm font-medium text-slate-700">Categoria</label>
+                <select
+                  className="mt-1 flex h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  value={taskCategory}
+                  onChange={(e) => setTaskCategory(e.target.value)}
+                >
+                  {categoryOptions.map((c) => <option key={c}>{c}</option>)}
+                </select>
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Exercises */}
-          <Card>
-            <CardContent className="p-5">
-              <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-base font-semibold text-slate-900">Treino de Hoje</h2>
-                <span className="rounded-full bg-blue-50 px-3 py-0.5 text-xs font-medium text-blue-600">
-                  Superior A
-                </span>
-              </div>
-              <div className="flex flex-col gap-2">
-                {exercises.map((ex) => (
-                  <div
-                    key={ex.name}
-                    className="flex items-center justify-between rounded-xl border border-slate-100 px-4 py-3"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`flex h-8 w-8 items-center justify-center rounded-lg ${
-                          ex.done ? "bg-blue-600" : "bg-slate-100"
-                        }`}
-                      >
-                        <Dumbbell
-                          className={`h-4 w-4 ${ex.done ? "text-white" : "text-slate-400"}`}
-                        />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-slate-900">{ex.name}</p>
-                        <p className="text-xs text-slate-500">{ex.sets}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-slate-700">{ex.weight}</span>
-                      <ChevronRight className="h-4 w-4 text-slate-300" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+            </div>
+            <div className="mt-5 flex gap-3">
+              <Button variant="outline" className="flex-1" onClick={() => setShowTaskModal(false)}>Cancelar</Button>
+              <Button className="flex-1" onClick={addTask} disabled={saving || !taskText.trim()}>
+                {saving ? "Salvando..." : "Adicionar"}
+              </Button>
+            </div>
+          </div>
         </div>
+      )}
 
-        {/* Right column - profile + daily stats */}
-        <div className="flex flex-col gap-4">
-          {/* Profile card */}
-          <Card>
-            <CardContent className="flex flex-col items-center p-6 text-center">
-              <Avatar className="h-20 w-20">
-                <AvatarFallback className="bg-blue-50 text-2xl font-bold text-blue-700">
-                  LS
-                </AvatarFallback>
-              </Avatar>
-              <h3 className="mt-3 text-lg font-bold text-slate-900">Lucas Silva</h3>
-              <p className="text-sm text-slate-500">Plano Pro</p>
-
-              <div className="mt-5 grid w-full grid-cols-3 gap-2 border-t border-slate-100 pt-4">
-                <div className="flex flex-col items-center">
-                  <span className="text-lg font-bold text-slate-900">75</span>
-                  <span className="text-xs text-slate-500">kg</span>
+      {/* Exercise Modal */}
+      {showExModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+            <div className="mb-5 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-slate-900">Adicionar Exercício</h2>
+              <button onClick={() => setShowExModal(false)} className="text-slate-400 hover:text-slate-600">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm font-medium text-slate-700">Exercício *</label>
+                <Input
+                  className="mt-1"
+                  placeholder="Ex: Supino Reto"
+                  value={exForm.name}
+                  onChange={(e) => setExForm({ ...exForm, name: e.target.value })}
+                  autoFocus
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm font-medium text-slate-700">Séries x Reps</label>
+                  <Input className="mt-1" placeholder="3x12" value={exForm.sets} onChange={(e) => setExForm({ ...exForm, sets: e.target.value })} />
                 </div>
-                <div className="flex flex-col items-center border-x border-slate-100">
-                  <span className="text-lg font-bold text-slate-900">178</span>
-                  <span className="text-xs text-slate-500">cm</span>
-                </div>
-                <div className="flex flex-col items-center">
-                  <span className="text-lg font-bold text-slate-900">23.6</span>
-                  <span className="text-xs text-slate-500">IMC</span>
+                <div>
+                  <label className="text-sm font-medium text-slate-700">Carga (kg)</label>
+                  <Input className="mt-1" type="number" placeholder="0" value={exForm.weight_kg} onChange={(e) => setExForm({ ...exForm, weight_kg: e.target.value })} />
                 </div>
               </div>
-
-              <div className="mt-4 w-full rounded-xl bg-blue-50 px-4 py-3 text-left">
-                <p className="text-xs font-medium text-blue-700">Objetivo Principal</p>
-                <p className="mt-0.5 text-sm font-semibold text-slate-900">Hipertrofia Muscular</p>
+              <div>
+                <label className="text-sm font-medium text-slate-700">Tipo de treino</label>
+                <select
+                  className="mt-1 flex h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  value={exForm.workout_type}
+                  onChange={(e) => setExForm({ ...exForm, workout_type: e.target.value })}
+                >
+                  {workoutTypes.map((t) => <option key={t}>{t}</option>)}
+                </select>
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Daily stats */}
-          <Card>
-            <CardContent className="p-5">
-              <h3 className="mb-4 text-base font-semibold text-slate-900">Progresso do Dia</h3>
-              <div className="flex flex-col gap-4">
-                {dailyStats.map((stat) => (
-                  <div key={stat.label} className="flex flex-col gap-1.5">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className={`flex h-6 w-6 items-center justify-center rounded-lg ${stat.bg}`}>
-                          <stat.icon className={`h-3.5 w-3.5 ${stat.iconColor}`} />
-                        </div>
-                        <span className="text-sm text-slate-600">{stat.label}</span>
-                      </div>
-                      <span className="text-xs font-medium text-slate-700">{stat.value}</span>
-                    </div>
-                    <Progress value={stat.progress} indicatorClassName={stat.color} />
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Notifications */}
-          <Card>
-            <CardContent className="p-5">
-              <h3 className="mb-3 text-base font-semibold text-slate-900">Notificações</h3>
-              <div className="flex flex-col gap-2">
-                <div className="flex items-start gap-3 rounded-lg bg-blue-50 p-3">
-                  <div className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-blue-500" />
-                  <p className="text-xs text-slate-700">Hora do lanche! Não esqueça de registrar.</p>
-                </div>
-                <div className="flex items-start gap-3 rounded-lg bg-slate-50 p-3">
-                  <div className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-slate-400" />
-                  <p className="text-xs text-slate-700">Treino de pernas amanhã às 07:00.</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+            </div>
+            <div className="mt-5 flex gap-3">
+              <Button variant="outline" className="flex-1" onClick={() => setShowExModal(false)}>Cancelar</Button>
+              <Button className="flex-1" onClick={addExercise} disabled={saving || !exForm.name.trim()}>
+                {saving ? "Salvando..." : "Adicionar"}
+              </Button>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

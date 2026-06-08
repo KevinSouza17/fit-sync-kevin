@@ -1,4 +1,4 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   BookOpen,
@@ -8,9 +8,11 @@ import {
   Activity,
   Users,
   Target,
+  LogOut,
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { Avatar, AvatarFallback } from "../ui/avatar";
+import { useAuth } from "../../context/AuthContext";
 
 const navItems = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -22,7 +24,26 @@ const navItems = [
   { to: "/settings", label: "Configurações", icon: Settings },
 ];
 
+function initials(name: string) {
+  return name
+    .split(" ")
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? "")
+    .join("");
+}
+
 export function Sidebar() {
+  const { profile, user, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  const displayName = profile?.full_name || user?.email?.split("@")[0] || "Usuário";
+  const plan = profile?.plan === "pro" ? "Plano Pro" : "Plano Free";
+
+  async function handleSignOut() {
+    await signOut();
+    navigate("/login");
+  }
+
   return (
     <aside className="flex h-screen w-64 shrink-0 flex-col border-r border-slate-200 bg-white px-4 py-4">
       <header className="flex items-center gap-2.5 px-2 pb-6 pt-1">
@@ -58,15 +79,22 @@ export function Sidebar() {
           className="flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-slate-50"
         >
           <Avatar className="h-9 w-9">
-            <AvatarFallback className="bg-blue-50 text-sm font-bold text-blue-700">
-              LS
+            <AvatarFallback className="bg-blue-50 text-xs font-bold text-blue-700">
+              {initials(displayName)}
             </AvatarFallback>
           </Avatar>
-          <div className="flex flex-col">
-            <span className="text-sm font-medium text-slate-900">Lucas Silva</span>
-            <span className="text-xs text-slate-500">Plano Pro</span>
+          <div className="flex min-w-0 flex-1 flex-col">
+            <span className="truncate text-sm font-medium text-slate-900">{displayName}</span>
+            <span className="text-xs text-slate-500">{plan}</span>
           </div>
         </NavLink>
+        <button
+          onClick={handleSignOut}
+          className="mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-500 transition-colors hover:bg-red-50 hover:text-red-600"
+        >
+          <LogOut className="h-4 w-4" />
+          Sair
+        </button>
       </footer>
     </aside>
   );
