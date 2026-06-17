@@ -20,7 +20,7 @@ const navItems = [
   { to: "/goals", label: "Metas", icon: Target },
   { to: "/team", label: "Equipe", icon: Users },
   { to: "/progress", label: "Progresso", icon: TrendingUp },
-  { to: "/recipes", label: "Receitas", icon: UtensilsCrossed },
+  { to: "/recipes", label: "Alimentos", icon: UtensilsCrossed },
   { to: "/settings", label: "Configurações", icon: Settings },
 ];
 
