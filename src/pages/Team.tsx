@@ -1,289 +1,278 @@
-import { UserPlus, MessageCircle, Calendar, Star, MapPin } from "lucide-react";
+import { useEffect, useState } from "react";
+import { UserPlus, MessageCircle, Calendar, Star, MapPin, Search, Award } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Avatar, AvatarFallback } from "../components/ui/avatar";
+import { supabase } from "../lib/supabase";
 
-const connections = [
-  { name: "Ana Beatriz", role: "Amiga • Fitsync", initials: "AB", active: true },
-  { name: "Carlos Mota", role: "Parceiro de treino", initials: "CM", active: true },
-  { name: "Fernanda Lima", role: "Amiga • Fitsync", initials: "FL", active: false },
-  { name: "Ricardo Souza", role: "Colega de academia", initials: "RS", active: true },
-];
+interface Professional {
+  id: string;
+  full_name: string;
+  professional_role: string;
+  specialty: string;
+  credentials: string;
+  location_city: string;
+  bio: string;
+  available_for_booking: boolean;
+  rating_avg: number;
+  rating_count: number;
+}
 
-const professionals = [
-  {
-    name: "Dra. Mariana Costa",
-    role: "Nutricionista",
-    specialty: "Nutrição Esportiva",
-    rating: 4.9,
-    reviews: 127,
-    location: "São Paulo, SP",
-    initials: "MC",
-    bg: "bg-rose-50",
-    text: "text-rose-700",
-    available: true,
-  },
-  {
-    name: "Dr. Felipe Andrade",
-    role: "Personal Trainer",
-    specialty: "Hipertrofia e Força",
-    rating: 4.8,
-    reviews: 94,
-    location: "São Paulo, SP",
-    initials: "FA",
-    bg: "bg-blue-50",
-    text: "text-blue-700",
-    available: true,
-  },
-  {
-    name: "Dr. Roberto Lima",
-    role: "Médico do Esporte",
-    specialty: "Performance Atlética",
-    rating: 4.7,
-    reviews: 213,
-    location: "Campinas, SP",
-    initials: "RL",
-    bg: "bg-green-50",
-    text: "text-green-700",
-    available: false,
-  },
-  {
-    name: "Dra. Camila Torres",
-    role: "Psicóloga",
-    specialty: "Bem-estar Mental",
-    rating: 5.0,
-    reviews: 68,
-    location: "Rio de Janeiro, RJ",
-    initials: "CT",
-    bg: "bg-violet-50",
-    text: "text-violet-700",
-    available: true,
-  },
-];
+const roleColors: Record<string, { bg: string; text: string }> = {
+  "Nutricionista": { bg: "bg-rose-50", text: "text-rose-700" },
+  "Personal Trainer": { bg: "bg-blue-50", text: "text-blue-700" },
+  "Médico do Esporte": { bg: "bg-green-50", text: "text-green-700" },
+  "Fisioterapeuta": { bg: "bg-teal-50", text: "text-teal-700" },
+  "Psicóloga(o)": { bg: "bg-violet-50", text: "text-violet-700" },
+  "Endocrinologista": { bg: "bg-amber-50", text: "text-amber-700" },
+  "Coach de Saúde": { bg: "bg-cyan-50", text: "text-cyan-700" },
+};
 
-const suggestedPros = [
-  {
-    name: "Dr. André Santos",
-    role: "Endocrinologista",
-    rating: 4.6,
-    initials: "AS",
-    bg: "bg-amber-50",
-    text: "text-amber-700",
-  },
-  {
-    name: "Dra. Juliana Rocha",
-    role: "Fisioterapeuta",
-    rating: 4.9,
-    initials: "JR",
-    bg: "bg-teal-50",
-    text: "text-teal-700",
-  },
-];
+function initials(name: string) {
+  return name.split(" ").slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("");
+}
 
 export function Team() {
+  const [professionals, setProfessionals] = useState<Professional[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState<string | null>(null);
+  const [selectedPro, setSelectedPro] = useState<Professional | null>(null);
+
+  useEffect(() => {
+    loadProfessionals();
+  }, []);
+
+  async function loadProfessionals() {
+    setLoading(true);
+    const { data } = await supabase
+      .from("profiles")
+      .select("id, full_name, professional_role, specialty, credentials, location_city, bio, available_for_booking, rating_avg, rating_count")
+      .eq("is_professional", true)
+      .order("rating_avg", { ascending: false });
+    if (data) setProfessionals(data as Professional[]);
+    setLoading(false);
+  }
+
+  const filtered = professionals.filter((p) => {
+    const matchesSearch = !search.trim() ||
+      p.full_name.toLowerCase().includes(search.toLowerCase()) ||
+      p.professional_role?.toLowerCase().includes(search.toLowerCase()) ||
+      p.specialty?.toLowerCase().includes(search.toLowerCase());
+    const matchesRole = !roleFilter || p.professional_role === roleFilter;
+    return matchesSearch && matchesRole;
+  });
+
+  const uniqueRoles = [...new Set(professionals.map((p) => p.professional_role).filter(Boolean))];
+
   return (
     <div className="flex flex-col gap-6 p-8">
       <header className="flex items-end justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Minha Equipe</h1>
-          <p className="mt-0.5 text-sm text-slate-500">Sua rede de suporte profissional e social</p>
+          <p className="mt-0.5 text-sm text-slate-500">Encontre profissionais de saúde e fitness</p>
         </div>
-        <Button className="gap-2">
-          <UserPlus className="h-4 w-4" />
-          Adicionar Membro
-        </Button>
       </header>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-        {/* Main professionals */}
-        <div className="flex flex-col gap-4 xl:col-span-2">
-          <Card>
-            <CardContent className="p-5">
-              <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-base font-semibold text-slate-900">Profissionais Experts</h2>
-                <button className="text-sm font-medium text-blue-600 hover:text-blue-700">
-                  Explorar mais
-                </button>
-              </div>
-              <div className="flex flex-col gap-3">
-                {professionals.map((pro) => (
-                  <div
-                    key={pro.name}
-                    className="flex items-center gap-4 rounded-xl border border-slate-100 p-4 transition-colors hover:bg-slate-50"
-                  >
+      {/* Search and filters */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            className="flex h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+            placeholder="Buscar por nome, função ou especialidade..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setRoleFilter(null)}
+            className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+              !roleFilter ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            Todos
+          </button>
+          {uniqueRoles.map((role) => (
+            <button
+              key={role}
+              onClick={() => setRoleFilter(role === roleFilter ? null : role)}
+              className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                role === roleFilter ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
+            >
+              {role}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="flex h-64 items-center justify-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+        </div>
+      ) : filtered.length === 0 ? (
+        <Card>
+          <CardContent className="flex flex-col items-center py-16 text-center">
+            <UserPlus className="mb-3 h-12 w-12 text-slate-200" />
+            <h3 className="text-base font-semibold text-slate-700">
+              {professionals.length === 0 ? "Nenhum profissional cadastrado ainda" : "Nenhum profissional encontrado"}
+            </h3>
+            <p className="mt-1 text-sm text-slate-400">
+              {professionals.length === 0 ? "Profissionais aparecerão aqui quando se cadastrarem" : "Tente outro termo de busca"}
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {filtered.map((pro) => {
+            const color = roleColors[pro.professional_role ?? ""] ?? { bg: "bg-slate-50", text: "text-slate-700" };
+            return (
+              <Card
+                key={pro.id}
+                className="cursor-pointer transition-all hover:shadow-md hover:-translate-y-0.5"
+                onClick={() => setSelectedPro(pro)}
+              >
+                <CardContent className="p-5">
+                  <div className="mb-3 flex items-start gap-3">
                     <Avatar className="h-12 w-12">
-                      <AvatarFallback className={`text-sm font-bold ${pro.bg} ${pro.text}`}>
-                        {pro.initials}
+                      <AvatarFallback className={`text-sm font-bold ${color.bg} ${color.text}`}>
+                        {initials(pro.full_name)}
                       </AvatarFallback>
                     </Avatar>
-
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className="text-sm font-semibold text-slate-900">{pro.name}</p>
-                        {pro.available && (
-                          <span className="rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-600">
+                        <p className="text-sm font-semibold text-slate-900 truncate">{pro.full_name}</p>
+                        {pro.available_for_booking && (
+                          <span className="shrink-0 rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-medium text-green-600">
                             Disponível
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-slate-500">{pro.role} • {pro.specialty}</p>
-                      <div className="mt-1.5 flex items-center gap-3">
-                        <div className="flex items-center gap-1">
-                          <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-                          <span className="text-xs font-medium text-slate-700">{pro.rating}</span>
-                          <span className="text-xs text-slate-400">({pro.reviews})</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <MapPin className="h-3 w-3 text-slate-400" />
-                          <span className="text-xs text-slate-500">{pro.location}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex shrink-0 gap-2">
-                      <button className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:border-blue-300 hover:text-blue-600">
-                        <MessageCircle className="h-4 w-4" />
-                      </button>
-                      <Button size="sm" className="h-8 gap-1.5 px-3">
-                        <Calendar className="h-3.5 w-3.5" />
-                        Agendar
-                      </Button>
+                      <p className="text-xs text-slate-500">{pro.professional_role}</p>
                     </div>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
 
-          {/* Suggested professionals */}
-          <Card>
-            <CardContent className="p-5">
-              <h2 className="mb-4 text-base font-semibold text-slate-900">Profissionais Sugeridos</h2>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {suggestedPros.map((pro) => (
-                  <div
-                    key={pro.name}
-                    className="flex items-center gap-3 rounded-xl border border-slate-100 p-4"
-                  >
-                    <Avatar className="h-10 w-10">
-                      <AvatarFallback className={`text-sm font-bold ${pro.bg} ${pro.text}`}>
-                        {pro.initials}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-slate-900">{pro.name}</p>
-                      <p className="text-xs text-slate-500">{pro.role}</p>
-                      <div className="mt-1 flex items-center gap-1">
-                        <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-                        <span className="text-xs font-medium text-slate-700">{pro.rating}</span>
-                      </div>
+                  {pro.specialty && (
+                    <p className="mb-2 text-xs text-slate-600">
+                      <span className="font-medium">Especialidade:</span> {pro.specialty}
+                    </p>
+                  )}
+
+                  {pro.credentials && (
+                    <div className="mb-2 flex items-center gap-1 text-xs text-slate-500">
+                      <Award className="h-3 w-3" />
+                      {pro.credentials}
                     </div>
-                    <Button size="sm" variant="outline" className="shrink-0">
-                      Conectar
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+                  )}
 
-        {/* Right column */}
-        <div className="flex flex-col gap-4">
-          {/* Connections */}
-          <Card>
-            <CardContent className="p-5">
-              <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-base font-semibold text-slate-900">Minhas Conexões</h2>
-                <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-600">
-                  {connections.length}
-                </span>
-              </div>
-              <div className="flex flex-col gap-2">
-                {connections.map((conn) => (
-                  <div
-                    key={conn.name}
-                    className="flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-slate-50"
-                  >
-                    <div className="relative">
-                      <Avatar className="h-9 w-9">
-                        <AvatarFallback className="bg-slate-100 text-xs font-semibold text-slate-700">
-                          {conn.initials}
-                        </AvatarFallback>
-                      </Avatar>
-                      {conn.active && (
-                        <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white bg-green-500" />
+                  {pro.location_city && (
+                    <div className="mb-3 flex items-center gap-1 text-xs text-slate-500">
+                      <MapPin className="h-3 w-3" />
+                      {pro.location_city}
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1">
+                      <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                      <span className="text-xs font-medium text-slate-700">{pro.rating_avg > 0 ? pro.rating_avg : "Novo"}</span>
+                      {pro.rating_count > 0 && (
+                        <span className="text-xs text-slate-400">({pro.rating_count})</span>
                       )}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-900">{conn.name}</p>
-                      <p className="text-xs text-slate-500">{conn.role}</p>
-                    </div>
-                    <button className="text-slate-400 hover:text-blue-600">
-                      <MessageCircle className="h-4 w-4" />
-                    </button>
+                    <Button size="sm" className="h-7 gap-1.5 px-3 text-xs">
+                      <Calendar className="h-3 w-3" />
+                      Agendar
+                    </Button>
                   </div>
-                ))}
-              </div>
-              <button className="mt-3 w-full rounded-lg border border-dashed border-slate-200 py-2.5 text-sm text-slate-500 transition-colors hover:border-blue-300 hover:text-blue-600">
-                + Convidar amigos
-              </button>
-            </CardContent>
-          </Card>
-
-          {/* Next appointment */}
-          <Card>
-            <CardContent className="p-5">
-              <h2 className="mb-4 text-base font-semibold text-slate-900">Próximo Agendamento</h2>
-              <div className="rounded-xl bg-blue-50 p-4">
-                <div className="flex items-center gap-3">
-                  <Avatar className="h-10 w-10">
-                    <AvatarFallback className="bg-blue-100 text-sm font-bold text-blue-700">
-                      MC
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900">Dra. Mariana Costa</p>
-                    <p className="text-xs text-slate-500">Nutricionista</p>
-                  </div>
-                </div>
-                <div className="mt-3 flex items-center gap-2 text-xs text-slate-600">
-                  <Calendar className="h-3.5 w-3.5 text-blue-500" />
-                  <span>Seg, 28 Out 2024 • 14:00</span>
-                </div>
-                <Button variant="outline" size="sm" className="mt-3 w-full">
-                  Ver Detalhes
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Stats */}
-          <Card>
-            <CardContent className="p-5">
-              <h2 className="mb-4 text-base font-semibold text-slate-900">Estatísticas</h2>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-xl bg-slate-50 p-3 text-center">
-                  <p className="text-xl font-bold text-slate-900">4</p>
-                  <p className="mt-0.5 text-xs text-slate-500">Profissionais</p>
-                </div>
-                <div className="rounded-xl bg-slate-50 p-3 text-center">
-                  <p className="text-xl font-bold text-slate-900">4</p>
-                  <p className="mt-0.5 text-xs text-slate-500">Conexões</p>
-                </div>
-                <div className="rounded-xl bg-slate-50 p-3 text-center">
-                  <p className="text-xl font-bold text-slate-900">8</p>
-                  <p className="mt-0.5 text-xs text-slate-500">Consultas</p>
-                </div>
-                <div className="rounded-xl bg-slate-50 p-3 text-center">
-                  <p className="text-xl font-bold text-slate-900">12</p>
-                  <p className="mt-0.5 text-xs text-slate-500">Meses ativo</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
-      </div>
+      )}
+
+      {/* Professional detail modal */}
+      {selectedPro && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <div className="mb-4 flex items-start justify-between">
+              <div className="flex items-start gap-3">
+                <Avatar className="h-14 w-14">
+                  <AvatarFallback className={`text-base font-bold ${roleColors[selectedPro.professional_role ?? ""]?.bg ?? "bg-slate-50"} ${roleColors[selectedPro.professional_role ?? ""]?.text ?? "text-slate-700"}`}>
+                    {initials(selectedPro.full_name)}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900">{selectedPro.full_name}</h2>
+                  <p className="text-sm text-slate-500">{selectedPro.professional_role}</p>
+                  {selectedPro.available_for_booking && (
+                    <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-medium text-green-600">
+                      Disponível para agendamento
+                    </span>
+                  )}
+                </div>
+              </div>
+              <button onClick={() => setSelectedPro(null)} className="text-slate-400 hover:text-slate-600">
+                <span className="text-lg">&times;</span>
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {selectedPro.specialty && (
+                <div className="rounded-xl bg-slate-50 p-3">
+                  <p className="text-xs text-slate-500">Especialidade</p>
+                  <p className="text-sm font-medium text-slate-900">{selectedPro.specialty}</p>
+                </div>
+              )}
+              {selectedPro.credentials && (
+                <div className="flex items-center gap-2 rounded-xl bg-slate-50 p-3">
+                  <Award className="h-4 w-4 text-slate-500" />
+                  <div>
+                    <p className="text-xs text-slate-500">Registro Profissional</p>
+                    <p className="text-sm font-medium text-slate-900">{selectedPro.credentials}</p>
+                  </div>
+                </div>
+              )}
+              {selectedPro.location_city && (
+                <div className="flex items-center gap-2 rounded-xl bg-slate-50 p-3">
+                  <MapPin className="h-4 w-4 text-slate-500" />
+                  <p className="text-sm text-slate-700">{selectedPro.location_city}</p>
+                </div>
+              )}
+              {selectedPro.bio && (
+                <div className="rounded-xl border border-slate-100 p-3">
+                  <p className="text-xs text-slate-500 mb-1">Sobre</p>
+                  <p className="text-sm text-slate-700 leading-relaxed">{selectedPro.bio}</p>
+                </div>
+              )}
+
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
+                  <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                  <span className="text-sm font-medium text-slate-900">{selectedPro.rating_avg > 0 ? selectedPro.rating_avg : "Novo"}</span>
+                  {selectedPro.rating_count > 0 && (
+                    <span className="text-xs text-slate-400">({selectedPro.rating_count} avaliações)</span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-5 flex gap-3">
+              <Button variant="outline" className="flex-1 gap-2">
+                <MessageCircle className="h-4 w-4" />
+                Mensagem
+              </Button>
+              <Button className="flex-1 gap-2" disabled={!selectedPro.available_for_booking}>
+                <Calendar className="h-4 w-4" />
+                Agendar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -9,6 +9,7 @@ import {
   Users,
   Target,
   LogOut,
+  Briefcase,
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { Avatar, AvatarFallback } from "../ui/avatar";
@@ -38,6 +39,7 @@ export function Sidebar() {
 
   const displayName = profile?.full_name || user?.email?.split("@")[0] || "Usuário";
   const plan = profile?.plan === "pro" ? "Plano Pro" : "Plano Free";
+  const isPro = profile?.is_professional;
 
   async function handleSignOut() {
     await signOut();
@@ -85,7 +87,15 @@ export function Sidebar() {
           </Avatar>
           <div className="flex min-w-0 flex-1 flex-col">
             <span className="truncate text-sm font-medium text-slate-900">{displayName}</span>
-            <span className="text-xs text-slate-500">{plan}</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-slate-500">{plan}</span>
+              {isPro && (
+                <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
+                  <Briefcase className="h-2.5 w-2.5" />
+                  PRO
+                </span>
+              )}
+            </div>
           </div>
         </NavLink>
         <button

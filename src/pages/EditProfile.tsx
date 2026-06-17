@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Camera, Save, Check } from "lucide-react";
+import { Camera, Save, Check, Briefcase, GraduationCap, Award, MapPin } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -33,7 +33,37 @@ interface FormState {
   daily_calorie_goal: string;
   daily_water_goal_liters: string;
   activity_level: string;
+  is_professional: boolean;
+  professional_role: string;
+  specialty: string;
+  bio: string;
+  credentials: string;
+  location_city: string;
+  available_for_booking: boolean;
 }
+
+const professionalRoles = [
+  "Nutricionista",
+  "Personal Trainer",
+  "Médico do Esporte",
+  "Fisioterapeuta",
+  "Psicóloga(o)",
+  "Endocrinologista",
+  "Coach de Saúde",
+  "Outro",
+];
+
+const specialtiesList = [
+  "Nutrição Esportiva",
+  "Hipertrofia e Força",
+  "Performance Atlética",
+  "Bem-estar Mental",
+  "Reabilitação",
+  "Emagrecimento",
+  "Nutrição Clínica",
+  "Treinamento Funcional",
+  "Outro",
+];
 
 function initials(name: string) {
   return name.split(" ").slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("");
@@ -50,6 +80,13 @@ export function EditProfile() {
     daily_calorie_goal: "2400",
     daily_water_goal_liters: "2.5",
     activity_level: "Moderadamente ativo",
+    is_professional: false,
+    professional_role: "",
+    specialty: "",
+    bio: "",
+    credentials: "",
+    location_city: "",
+    available_for_booking: false,
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -66,11 +103,18 @@ export function EditProfile() {
         daily_calorie_goal: String(profile.daily_calorie_goal ?? 2400),
         daily_water_goal_liters: String(profile.daily_water_goal_liters ?? 2.5),
         activity_level: profile.activity_level ?? "Moderadamente ativo",
+        is_professional: profile.is_professional ?? false,
+        professional_role: profile.professional_role ?? "",
+        specialty: profile.specialty ?? "",
+        bio: profile.bio ?? "",
+        credentials: profile.credentials ?? "",
+        location_city: profile.location_city ?? "",
+        available_for_booking: profile.available_for_booking ?? false,
       });
     }
   }, [profile]);
 
-  function set(key: keyof FormState, value: string) {
+  function setField(key: keyof FormState, value: string | boolean) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
@@ -87,6 +131,13 @@ export function EditProfile() {
       daily_calorie_goal: parseInt(form.daily_calorie_goal) || 2400,
       daily_water_goal_liters: parseFloat(form.daily_water_goal_liters) || 2.5,
       activity_level: form.activity_level,
+      is_professional: form.is_professional,
+      professional_role: form.is_professional ? form.professional_role : null,
+      specialty: form.is_professional ? form.specialty : null,
+      bio: form.is_professional ? form.bio : null,
+      credentials: form.is_professional ? form.credentials : null,
+      location_city: form.is_professional ? form.location_city : null,
+      available_for_booking: form.is_professional ? form.available_for_booking : false,
       updated_at: new Date().toISOString(),
     };
     const { error: err } = await supabase
@@ -137,6 +188,12 @@ export function EditProfile() {
               </div>
               <h3 className="mt-4 text-lg font-bold text-slate-900">{displayName}</h3>
               <p className="text-sm text-slate-500">{user?.email}</p>
+              {form.is_professional && (
+                <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                  <Briefcase className="h-3 w-3" />
+                  {form.professional_role || "Profissional"}
+                </span>
+              )}
             </CardContent>
           </Card>
 
@@ -149,7 +206,7 @@ export function EditProfile() {
                   <select
                     className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
                     value={form.activity_level}
-                    onChange={(e) => set("activity_level", e.target.value)}
+                    onChange={(e) => setField("activity_level", e.target.value)}
                   >
                     {activityLevels.map((l) => <option key={l}>{l}</option>)}
                   </select>
@@ -163,7 +220,7 @@ export function EditProfile() {
                     max="10"
                     className="mt-1"
                     value={form.daily_water_goal_liters}
-                    onChange={(e) => set("daily_water_goal_liters", e.target.value)}
+                    onChange={(e) => setField("daily_water_goal_liters", e.target.value)}
                   />
                 </div>
                 <div>
@@ -173,7 +230,7 @@ export function EditProfile() {
                     step="50"
                     className="mt-1"
                     value={form.daily_calorie_goal}
-                    onChange={(e) => set("daily_calorie_goal", e.target.value)}
+                    onChange={(e) => setField("daily_calorie_goal", e.target.value)}
                   />
                 </div>
               </div>
@@ -192,7 +249,7 @@ export function EditProfile() {
                   <Input
                     type="text"
                     value={form.full_name}
-                    onChange={(e) => set("full_name", e.target.value)}
+                    onChange={(e) => setField("full_name", e.target.value)}
                     placeholder="Seu nome completo"
                   />
                 </div>
@@ -219,33 +276,15 @@ export function EditProfile() {
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium text-slate-700">Altura (cm)</label>
-                  <Input
-                    type="number"
-                    step="0.1"
-                    placeholder="178"
-                    value={form.height_cm}
-                    onChange={(e) => set("height_cm", e.target.value)}
-                  />
+                  <Input type="number" step="0.1" placeholder="178" value={form.height_cm} onChange={(e) => setField("height_cm", e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium text-slate-700">Peso atual (kg)</label>
-                  <Input
-                    type="number"
-                    step="0.1"
-                    placeholder="75.0"
-                    value={form.weight_kg}
-                    onChange={(e) => set("weight_kg", e.target.value)}
-                  />
+                  <Input type="number" step="0.1" placeholder="75.0" value={form.weight_kg} onChange={(e) => setField("weight_kg", e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium text-slate-700">Peso meta (kg)</label>
-                  <Input
-                    type="number"
-                    step="0.1"
-                    placeholder="70.0"
-                    value={form.goal_weight_kg}
-                    onChange={(e) => set("goal_weight_kg", e.target.value)}
-                  />
+                  <Input type="number" step="0.1" placeholder="70.0" value={form.goal_weight_kg} onChange={(e) => setField("goal_weight_kg", e.target.value)} />
                 </div>
               </div>
             </CardContent>
@@ -258,7 +297,7 @@ export function EditProfile() {
                 {healthGoals.map((goal) => (
                   <button
                     key={goal}
-                    onClick={() => set("health_goal", goal)}
+                    onClick={() => setField("health_goal", goal)}
                     className={`rounded-xl border px-4 py-3 text-left text-sm font-medium transition-colors ${
                       form.health_goal === goal
                         ? "border-blue-600 bg-blue-50 text-blue-700"
@@ -269,6 +308,130 @@ export function EditProfile() {
                   </button>
                 ))}
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Professional account section */}
+          <Card>
+            <CardContent className="p-5">
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="flex items-center gap-2 text-base font-semibold text-slate-900">
+                  <Briefcase className="h-5 w-5 text-emerald-600" />
+                  Conta Profissional
+                </h2>
+                <label className="flex cursor-pointer items-center gap-2">
+                  <span className="text-sm text-slate-600">Ativar</span>
+                  <button
+                    role="switch"
+                    aria-checked={form.is_professional}
+                    onClick={() => setField("is_professional", !form.is_professional)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      form.is_professional ? "bg-emerald-600" : "bg-slate-200"
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        form.is_professional ? "translate-x-6" : "translate-x-1"
+                      }`}
+                    />
+                  </button>
+                </label>
+              </div>
+              {!form.is_professional ? (
+                <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center">
+                  <Briefcase className="mx-auto mb-2 h-8 w-8 text-slate-300" />
+                  <p className="text-sm text-slate-500">Ative sua conta profissional para oferecer serviços e aparecer na busca de profissionais</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium text-slate-700">Função</label>
+                    <div className="relative">
+                      <Briefcase className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <select
+                        value={form.professional_role}
+                        onChange={(e) => setField("professional_role", e.target.value)}
+                        className="flex h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 py-2 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                      >
+                        <option value="">Selecione sua função</option>
+                        {professionalRoles.map((r) => (
+                          <option key={r} value={r}>{r}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium text-slate-700">Especialidade</label>
+                    <div className="relative">
+                      <GraduationCap className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <select
+                        value={form.specialty}
+                        onChange={(e) => setField("specialty", e.target.value)}
+                        className="flex h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 py-2 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                      >
+                        <option value="">Selecione sua especialidade</option>
+                        {specialtiesList.map((s) => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium text-slate-700">Registro Profissional</label>
+                    <div className="relative">
+                      <Award className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <Input
+                        placeholder="Ex: CRN-3 12345"
+                        value={form.credentials}
+                        onChange={(e) => setField("credentials", e.target.value)}
+                        className="pl-9"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium text-slate-700">Cidade</label>
+                    <div className="relative">
+                      <MapPin className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <Input
+                        placeholder="Ex: São Paulo, SP"
+                        value={form.location_city}
+                        onChange={(e) => setField("location_city", e.target.value)}
+                        className="pl-9"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium text-slate-700">Bio Profissional</label>
+                    <textarea
+                      rows={3}
+                      placeholder="Descreva sua experiência e abordagem profissional..."
+                      value={form.bio}
+                      onChange={(e) => setField("bio", e.target.value)}
+                      className="flex w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between rounded-xl bg-emerald-50 p-3">
+                    <div>
+                      <p className="text-sm font-medium text-slate-900">Disponível para agendamentos</p>
+                      <p className="text-xs text-slate-500">Alunos poderão encontrar e agendar com você</p>
+                    </div>
+                    <button
+                      role="switch"
+                      aria-checked={form.available_for_booking}
+                      onClick={() => setField("available_for_booking", !form.available_for_booking)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        form.available_for_booking ? "bg-emerald-600" : "bg-slate-200"
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          form.available_for_booking ? "translate-x-6" : "translate-x-1"
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

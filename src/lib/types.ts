@@ -13,6 +13,15 @@ export interface Database {
           daily_water_goal_liters: number;
           activity_level: string;
           plan: string;
+          is_professional: boolean;
+          professional_role: string | null;
+          specialty: string | null;
+          bio: string | null;
+          credentials: string | null;
+          location_city: string | null;
+          available_for_booking: boolean;
+          rating_avg: number;
+          rating_count: number;
           created_at: string;
           updated_at: string;
         };
