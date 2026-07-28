@@ -11,6 +11,7 @@ import {
   LogOut,
   Briefcase,
   UserCircle,
+  MessageCircle,
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { Avatar, AvatarFallback } from "../ui/avatar";
@@ -22,6 +23,7 @@ const navItems = [
   { to: "/goals", label: "Metas", icon: Target },
   { to: "/team", label: "Equipe", icon: Users },
   { to: "/professional-profile", label: "Perfil Profissional", icon: UserCircle },
+  { to: "/messages", label: "Mensagens", icon: MessageCircle },
   { to: "/progress", label: "Progresso", icon: TrendingUp },
   { to: "/recipes", label: "Alimentos", icon: UtensilsCrossed },
   { to: "/settings", label: "Configurações", icon: Settings },
@@ -55,7 +57,7 @@ export function Sidebar() {
   return (
     <aside className="flex h-screen w-64 shrink-0 flex-col border-r border-slate-200 bg-white px-4 py-4">
       <header className="flex items-center gap-2.5 px-2 pb-6 pt-1">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-600">
           <Activity className="h-5 w-5 text-white" />
         </div>
         <span className="text-xl font-bold text-slate-900">FitSync</span>
@@ -70,7 +72,7 @@ export function Sidebar() {
               cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                 isActive
-                  ? "bg-blue-50 text-blue-600"
+                  ? "bg-primary-50 text-primary-600"
                   : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
               )
             }
@@ -87,7 +89,7 @@ export function Sidebar() {
           className="flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-slate-50"
         >
           <Avatar className="h-9 w-9">
-            <AvatarFallback className="bg-blue-50 text-xs font-bold text-blue-700">
+            <AvatarFallback className="bg-primary-50 text-xs font-bold text-primary-700">
               {initials(displayName)}
             </AvatarFallback>
           </Avatar>

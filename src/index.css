@@ -2,6 +2,32 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Default theme: user (blue) ── */
+:root {
+  --primary-50:  239 246 255;   /* blue-50  */
+  --primary-100: 219 234 254;   /* blue-100 */
+  --primary-200: 191 219 254;   /* blue-200 */
+  --primary-300: 147 197 253;   /* blue-300 */
+  --primary-400: 96  165 250;   /* blue-400 */
+  --primary-500: 59  130 246;   /* blue-500 */
+  --primary-600: 37  99  235;   /* blue-600 */
+  --primary-700: 29  78  216;   /* blue-700 */
+  --primary-800: 30  64  175;   /* blue-800 */
+}
+
+/* ── Professional theme: green ── */
+.theme-pro {
+  --primary-50:  240 253 244;   /* green-50  */
+  --primary-100: 220 252 231;   /* green-100 */
+  --primary-200: 187 247 208;   /* green-200 */
+  --primary-300: 134 239 172;   /* green-300 */
+  --primary-400: 74  222 128;   /* green-400 */
+  --primary-500: 34  197 94;    /* green-500 */
+  --primary-600: 22  163 74;    /* green-600 */
+  --primary-700: 21  128 61;    /* green-700 */
+  --primary-800: 22  101 52;    /* green-800 */
+}
+
 @layer base {
   html {
     font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;

@@ -135,15 +135,15 @@ function FakeQR() {
 function PlanCard({ plan }: { plan: Plan }) {
   if (plan.popular) {
     return (
-      <div className="relative flex flex-col rounded-2xl bg-blue-600 p-6 text-white shadow-xl">
+      <div className="relative flex flex-col rounded-2xl bg-primary-600 p-6 text-white shadow-xl">
         <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-slate-900 px-4 py-1 text-xs font-bold text-white">
           Mais Popular
         </span>
         <h3 className="text-lg font-bold">{plan.name}</h3>
-        <p className="mt-1 text-xs text-blue-100">{plan.tagline}</p>
+        <p className="mt-1 text-xs text-primary-100">{plan.tagline}</p>
         <div className="my-5 flex items-baseline gap-1">
           <span className="text-4xl font-black">R$ {plan.price}</span>
-          <span className="text-sm text-blue-200">/mês</span>
+          <span className="text-sm text-primary-200">/mês</span>
         </div>
         <ul className="flex flex-1 flex-col gap-2.5">
           {plan.features.map((f) => (
@@ -155,11 +155,11 @@ function PlanCard({ plan }: { plan: Plan }) {
                   <X className="h-2.5 w-2.5 text-white/40" />
                 )}
               </span>
-              <span className={f.included ? "text-white" : "text-blue-200/60 line-through decoration-white/30"}>{f.label}</span>
+              <span className={f.included ? "text-white" : "text-primary-200/60 line-through decoration-white/30"}>{f.label}</span>
             </li>
           ))}
         </ul>
-        <button className="mt-6 w-full rounded-xl bg-white py-2.5 text-sm font-semibold text-blue-600 transition-colors hover:bg-blue-50">
+        <button className="mt-6 w-full rounded-xl bg-white py-2.5 text-sm font-semibold text-primary-600 transition-colors hover:bg-primary-50">
           Assinar Agora
         </button>
       </div>
@@ -169,7 +169,7 @@ function PlanCard({ plan }: { plan: Plan }) {
   return (
     <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
       <h3 className="text-lg font-bold text-slate-900">{plan.name}</h3>
-      <p className="mt-1 text-xs text-blue-600">{plan.tagline}</p>
+      <p className="mt-1 text-xs text-primary-600">{plan.tagline}</p>
       <div className="my-5 flex items-baseline gap-1">
         <span className="text-4xl font-black text-slate-900">R$ {plan.price}</span>
         <span className="text-sm text-slate-400">/mês</span>
@@ -177,9 +177,9 @@ function PlanCard({ plan }: { plan: Plan }) {
       <ul className="flex flex-1 flex-col gap-2.5">
         {plan.features.map((f) => (
           <li key={f.label} className="flex items-center gap-2 text-sm">
-            <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full ${f.included ? "bg-blue-50" : "bg-slate-100"}`}>
+            <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full ${f.included ? "bg-primary-50" : "bg-slate-100"}`}>
               {f.included ? (
-                <Check className="h-2.5 w-2.5 text-blue-600" />
+                <Check className="h-2.5 w-2.5 text-primary-600" />
               ) : (
                 <X className="h-2.5 w-2.5 text-slate-300" />
               )}
@@ -188,7 +188,7 @@ function PlanCard({ plan }: { plan: Plan }) {
           </li>
         ))}
       </ul>
-      <button className="mt-6 w-full rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
+      <button className="mt-6 w-full rounded-xl bg-primary-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-700">
         Assinar Agora
       </button>
     </div>
@@ -226,7 +226,7 @@ export function ProfessionalProfile() {
   return (
     <div className="flex flex-col gap-0 pb-10">
       {/* ── Hero banner ── */}
-      <div className="relative h-48 w-full overflow-hidden bg-gradient-to-br from-blue-700 via-blue-500 to-blue-400">
+      <div className="relative h-48 w-full overflow-hidden bg-gradient-to-br from-primary-700 via-primary-500 to-primary-400">
         {/* decorative wave shapes */}
         <svg
           className="absolute bottom-0 left-0 h-full w-full opacity-20"
@@ -256,7 +256,7 @@ export function ProfessionalProfile() {
             </Avatar>
             <div>
               <h1 className="text-2xl font-bold text-slate-900">{name}</h1>
-              <p className="text-sm text-blue-600 font-medium">
+              <p className="text-sm text-primary-600 font-medium">
                 {role}{credentials ? ` · ${credentials}` : ""}
               </p>
               <div className="mt-1.5 flex flex-wrap items-center gap-3 text-xs text-slate-500">
@@ -318,7 +318,7 @@ export function ProfessionalProfile() {
               </div>
               <div className="mt-4 text-center">
                 <p className="text-xs text-slate-500">Chave Pix</p>
-                <p className="mt-0.5 text-sm font-semibold text-blue-600">{pixKey}</p>
+                <p className="mt-0.5 text-sm font-semibold text-primary-600">{pixKey}</p>
               </div>
               <button
                 onClick={handleCopy}
@@ -343,7 +343,7 @@ export function ProfessionalProfile() {
                 {tags.map((tag) => (
                   <span
                     key={tag}
-                    className="rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700"
+                    className="rounded-full border border-primary-100 bg-primary-50 px-3 py-1 text-xs font-medium text-primary-700"
                   >
                     {tag}
                   </span>
@@ -357,11 +357,11 @@ export function ProfessionalProfile() {
             <CardContent className="p-5">
               <h3 className="mb-3 text-sm font-semibold text-slate-900">Contato</h3>
               <ul className="flex flex-col gap-2.5">
-                <li className="flex items-center gap-2 text-sm text-blue-600">
+                <li className="flex items-center gap-2 text-sm text-primary-600">
                   <Mail className="h-4 w-4 shrink-0 text-slate-400" />
                   {pixKey}
                 </li>
-                <li className="flex items-center gap-2 text-sm text-blue-600">
+                <li className="flex items-center gap-2 text-sm text-primary-600">
                   <Instagram className="h-4 w-4 shrink-0 text-slate-400" />
                   @dra.amandafit
                 </li>

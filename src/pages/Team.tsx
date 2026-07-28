@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { UserPlus, MessageCircle, Calendar, Star, MapPin, Search, Award } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Avatar, AvatarFallback } from "../components/ui/avatar";
 import { supabase } from "../lib/supabase";
+import { useAuth } from "../context/AuthContext";
 
 interface Professional {
   id: string;
@@ -33,6 +35,8 @@ function initials(name: string) {
 }
 
 export function Team() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -52,6 +56,34 @@ export function Team() {
       .order("rating_avg", { ascending: false });
     if (data) setProfessionals(data as Professional[]);
     setLoading(false);
+  }
+
+  async function startConversation(pro: Professional) {
+    if (!user) return;
+    const me = user.id;
+    const them = pro.id;
+    const userA = me < them ? me : them;
+    const userB = me < them ? them : me;
+
+    const { data: existing } = await supabase
+      .from("conversations")
+      .select("id")
+      .eq("user_a_id", userA)
+      .eq("user_b_id", userB)
+      .maybeSingle();
+
+    let convId = existing?.id;
+    if (!convId) {
+      const { data: created } = await supabase
+        .from("conversations")
+        .insert({ user_a_id: userA, user_b_id: userB })
+        .select("id")
+        .single();
+      convId = created?.id;
+    }
+    if (convId) {
+      navigate(`/messages?c=${convId}`);
+    }
   }
 
   const filtered = professionals.filter((p) => {
@@ -79,7 +111,7 @@ export function Team() {
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
-            className="flex h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+            className="flex h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
             placeholder="Buscar por nome, função ou especialidade..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -89,7 +121,7 @@ export function Team() {
           <button
             onClick={() => setRoleFilter(null)}
             className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-              !roleFilter ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              !roleFilter ? "bg-primary-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
             }`}
           >
             Todos
@@ -99,7 +131,7 @@ export function Team() {
               key={role}
               onClick={() => setRoleFilter(role === roleFilter ? null : role)}
               className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-                role === roleFilter ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                role === roleFilter ? "bg-primary-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               }`}
             >
               {role}
@@ -110,7 +142,7 @@ export function Team() {
 
       {loading ? (
         <div className="flex h-64 items-center justify-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-600 border-t-transparent" />
         </div>
       ) : filtered.length === 0 ? (
         <Card>
@@ -261,7 +293,7 @@ export function Team() {
             </div>
 
             <div className="mt-5 flex gap-3">
-              <Button variant="outline" className="flex-1 gap-2">
+              <Button variant="outline" className="flex-1 gap-2" onClick={() => startConversation(selectedPro)}>
                 <MessageCircle className="h-4 w-4" />
                 Mensagem
               </Button>

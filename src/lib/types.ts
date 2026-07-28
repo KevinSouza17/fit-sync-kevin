@@ -135,6 +135,39 @@ export interface Database {
         };
         Update: Partial<Database["public"]["Tables"]["goals"]["Row"]>;
       };
+      conversations: {
+        Row: {
+          id: string;
+          user_a_id: string;
+          user_b_id: string;
+          last_message_at: string;
+          created_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["conversations"]["Row"], "id" | "created_at"> & {
+          id?: string;
+          user_a_id?: string;
+          user_b_id?: string;
+          last_message_at?: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["conversations"]["Row"]>;
+      };
+      messages: {
+        Row: {
+          id: string;
+          conversation_id: string;
+          sender_id: string;
+          content: string;
+          read: boolean;
+          created_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["messages"]["Row"], "id" | "sender_id" | "created_at"> & {
+          id?: string;
+          sender_id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["messages"]["Row"]>;
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
@@ -149,3 +182,5 @@ export type Exercise = Database["public"]["Tables"]["exercises"]["Row"];
 export type WaterLog = Database["public"]["Tables"]["water_logs"]["Row"];
 export type WeightLog = Database["public"]["Tables"]["weight_logs"]["Row"];
 export type Goal = Database["public"]["Tables"]["goals"]["Row"];
+export type Conversation = Database["public"]["Tables"]["conversations"]["Row"];
+export type Message = Database["public"]["Tables"]["messages"]["Row"];
