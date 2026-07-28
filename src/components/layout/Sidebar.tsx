@@ -43,6 +43,10 @@ export function Sidebar() {
   const plan = profile?.plan === "pro" ? "Plano Pro" : "Plano Free";
   const isPro = profile?.is_professional;
 
+  const visibleNavItems = navItems.filter(
+    (item) => item.to !== "/professional-profile" || isPro
+  );
+
   async function handleSignOut() {
     await signOut();
     navigate("/login");
@@ -58,7 +62,7 @@ export function Sidebar() {
       </header>
 
       <nav className="flex flex-1 flex-col gap-1">
-        {navItems.map(({ to, label, icon: Icon }) => (
+        {visibleNavItems.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}
