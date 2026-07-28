@@ -67,17 +67,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) return { error: error.message };
     if (data.user) {
-      await supabase.from("profiles").insert({
-        id: data.user.id,
-        full_name: fullName,
-        daily_calorie_goal: 2400,
-        daily_water_goal_liters: 2.5,
-        is_professional: !!professional,
-        professional_role: professional?.role ?? null,
-        specialty: professional?.specialty ?? null,
-        credentials: professional?.credentials ?? null,
-        available_for_booking: !!professional,
-      });
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .upsert({
+          id: data.user.id,
+          full_name: fullName,
+          daily_calorie_goal: 2400,
+          daily_water_goal_liters: 2.5,
+          is_professional: !!professional,
+          professional_role: professional?.role ?? null,
+          specialty: professional?.specialty ?? null,
+          credentials: professional?.credentials ?? null,
+          available_for_booking: !!professional,
+        }, { onConflict: "id" });
+      if (profileError) return { error: profileError.message };
     }
     return { error: null };
   }
