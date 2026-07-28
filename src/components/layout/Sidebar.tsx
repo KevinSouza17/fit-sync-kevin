@@ -10,6 +10,7 @@ import {
   Target,
   LogOut,
   Briefcase,
+  UserCircle,
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { Avatar, AvatarFallback } from "../ui/avatar";
@@ -20,6 +21,7 @@ const navItems = [
   { to: "/diary", label: "Diário", icon: BookOpen },
   { to: "/goals", label: "Metas", icon: Target },
   { to: "/team", label: "Equipe", icon: Users },
+  { to: "/professional-profile", label: "Perfil Profissional", icon: UserCircle },
   { to: "/progress", label: "Progresso", icon: TrendingUp },
   { to: "/recipes", label: "Alimentos", icon: UtensilsCrossed },
   { to: "/settings", label: "Configurações", icon: Settings },

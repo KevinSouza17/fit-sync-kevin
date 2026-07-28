@@ -10,6 +10,7 @@ import { Progress } from "./pages/Progress";
 import { Recipes } from "./pages/Recipes";
 import { Settings } from "./pages/Settings";
 import { EditProfile } from "./pages/EditProfile";
+import { ProfessionalProfile } from "./pages/ProfessionalProfile";
 import { DashboardLayout } from "./components/layout/DashboardLayout";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -57,6 +58,7 @@ export default function App() {
           <Route path="/recipes" element={<Recipes />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/profile" element={<EditProfile />} />
+          <Route path="/professional-profile" element={<ProfessionalProfile />} />
         </Route>
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
