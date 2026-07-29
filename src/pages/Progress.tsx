@@ -50,13 +50,13 @@ export function Progress() {
   return (
     <div className="flex flex-col gap-6 p-8">
       <header>
-        <h1 className="text-2xl font-bold text-slate-900">Progresso</h1>
-        <p className="mt-0.5 text-sm text-slate-500">Acompanhe sua evolução ao longo do tempo</p>
+        <h1 className="text-2xl font-bold text-content-strong">Progresso</h1>
+        <p className="mt-0.5 text-sm text-content-muted">Acompanhe sua evolução ao longo do tempo</p>
       </header>
 
       {loading ? (
         <div className="flex h-64 items-center justify-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-600 border-t-transparent" />
         </div>
       ) : (
         <>
@@ -89,10 +89,10 @@ export function Progress() {
             ].map((s) => (
               <Card key={s.label}>
                 <CardContent className="p-5">
-                  <p className="text-xs text-slate-500">{s.label}</p>
-                  <p className="mt-1 text-2xl font-bold text-slate-900">{s.value}</p>
+                  <p className="text-xs text-content-muted">{s.label}</p>
+                  <p className="mt-1 text-2xl font-bold text-content-strong">{s.value}</p>
                   {s.diff && (
-                    <div className={`mt-1 flex items-center gap-1 text-xs font-medium ${s.up ? "text-green-600" : "text-blue-600"}`}>
+                    <div className={`mt-1 flex items-center gap-1 text-xs font-medium ${s.up ? "text-green-600" : "text-primary-600"}`}>
                       {typeof s.up === "boolean" && s.diff.startsWith("+") && <ArrowUp className="h-3 w-3" />}
                       {typeof s.up === "boolean" && s.diff.startsWith("-") && <ArrowDown className="h-3 w-3" />}
                       {s.diff}
@@ -107,25 +107,27 @@ export function Progress() {
             {/* Weight chart */}
             <Card>
               <CardContent className="p-5">
-                <h2 className="mb-4 text-base font-semibold text-slate-900">Histórico de Peso</h2>
+                <h2 className="mb-4 text-base font-semibold text-content-strong">Histórico de Peso</h2>
                 {weightLogs.length === 0 ? (
                   <div className="flex flex-col items-center py-8 text-center">
                     <Scale className="mb-2 h-10 w-10 text-slate-200" />
-                    <p className="text-sm text-slate-400">Nenhum peso registrado ainda</p>
-                    <p className="mt-1 text-xs text-slate-400">Registre seu peso no Dashboard para ver o gráfico</p>
+                    <p className="text-sm text-content-muted">Nenhum peso registrado ainda</p>
+                    <p className="mt-1 text-xs text-content-muted">Registre seu peso no Dashboard para ver o gráfico</p>
                   </div>
                 ) : (
                   <div className="relative">
-                    <div className="flex items-end gap-1 h-40">
+                    <div className="flex items-end gap-1.5" style={{ height: "160px" }}>
                       {weightLogs.slice(-14).map((log, i) => {
-                        const h = Math.max(8, ((Number(log.weight_kg) - minWeight) / range) * 100 + 10);
+                        const chartH = 130;
+                        const h = Math.max(8, ((Number(log.weight_kg) - minWeight) / range) * chartH + 16);
+                        const isLast = i === weightLogs.slice(-14).length - 1;
                         return (
-                          <div key={log.id} className="group relative flex flex-1 flex-col items-center gap-1">
+                          <div key={log.id} className="group relative flex flex-1 flex-col items-center justify-end">
                             <div
-                              className={`w-full rounded-t-md transition-all ${i === weightLogs.slice(-14).length - 1 ? "bg-blue-600" : "bg-blue-200"}`}
-                              style={{ height: `${h}%` }}
+                              className={`w-full rounded-t-md transition-all ${isLast ? "bg-primary-600" : "bg-primary-200"}`}
+                              style={{ height: `${h}px` }}
                             />
-                            <span className="text-[10px] text-slate-400 rotate-45 origin-left truncate">
+                            <span className="mt-1 text-[10px] text-content-muted truncate" style={{ writingMode: "vertical-rl" }}>
                               {new Date(log.logged_date).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
                             </span>
                             <div className="absolute bottom-full mb-1 hidden rounded bg-slate-900 px-2 py-1 text-xs text-white group-hover:block whitespace-nowrap">
@@ -143,24 +145,24 @@ export function Progress() {
             {/* Weight history list */}
             <Card>
               <CardContent className="p-5">
-                <h2 className="mb-4 text-base font-semibold text-slate-900">Registros Recentes</h2>
+                <h2 className="mb-4 text-base font-semibold text-content-strong">Registros Recentes</h2>
                 {weightLogs.length === 0 ? (
-                  <p className="py-4 text-center text-sm text-slate-400">Nenhum registro encontrado</p>
+                  <p className="py-4 text-center text-sm text-content-muted">Nenhum registro encontrado</p>
                 ) : (
                   <div className="flex flex-col gap-2 max-h-64 overflow-y-auto">
                     {[...weightLogs].reverse().map((log, i) => {
                       const prev = [...weightLogs].reverse()[i + 1];
                       const diff = prev ? (Number(log.weight_kg) - Number(prev.weight_kg)).toFixed(1) : null;
                       return (
-                        <div key={log.id} className="flex items-center justify-between rounded-lg px-3 py-2.5 hover:bg-slate-50">
+                        <div key={log.id} className="flex items-center justify-between rounded-lg px-3 py-2.5 hover:bg-surface-base">
                           <div>
-                            <p className="text-sm font-medium text-slate-900">{log.weight_kg} kg</p>
-                            <p className="text-xs text-slate-500">
+                            <p className="text-sm font-medium text-content-strong">{log.weight_kg} kg</p>
+                            <p className="text-xs text-content-muted">
                               {new Date(log.logged_date).toLocaleDateString("pt-BR", { weekday: "short", day: "numeric", month: "short" })}
                             </p>
                           </div>
                           {diff !== null && (
-                            <span className={`flex items-center gap-1 text-xs font-medium ${Number(diff) > 0 ? "text-red-500" : Number(diff) < 0 ? "text-green-600" : "text-slate-400"}`}>
+                            <span className={`flex items-center gap-1 text-xs font-medium ${Number(diff) > 0 ? "text-red-500" : Number(diff) < 0 ? "text-green-600" : "text-content-muted"}`}>
                               {Number(diff) > 0 ? <ArrowUp className="h-3 w-3" /> : Number(diff) < 0 ? <ArrowDown className="h-3 w-3" /> : null}
                               {Number(diff) !== 0 ? `${Number(diff) > 0 ? "+" : ""}${diff} kg` : "Igual"}
                             </span>
@@ -177,19 +179,19 @@ export function Progress() {
           {/* Milestones */}
           <Card>
             <CardContent className="p-5">
-              <h2 className="mb-4 text-base font-semibold text-slate-900">Conquistas</h2>
+              <h2 className="mb-4 text-base font-semibold text-content-strong">Conquistas</h2>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {milestones.map((m) => (
                   <div
                     key={m.text}
-                    className={`flex items-center gap-3 rounded-xl p-3 ${m.done ? "bg-blue-50" : "bg-slate-50"}`}
+                    className={`flex items-center gap-3 rounded-xl p-3 ${m.done ? "bg-primary-50" : "bg-surface-base"}`}
                   >
                     <div
-                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${m.done ? "bg-blue-600" : "bg-slate-200"}`}
+                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${m.done ? "bg-primary-600" : "bg-slate-200"}`}
                     >
-                      <TrendingUp className={`h-3.5 w-3.5 ${m.done ? "text-white" : "text-slate-400"}`} />
+                      <TrendingUp className={`h-3.5 w-3.5 ${m.done ? "text-white" : "text-content-muted"}`} />
                     </div>
-                    <p className={`text-sm ${m.done ? "font-medium text-slate-900" : "text-slate-400"}`}>
+                    <p className={`text-sm ${m.done ? "font-medium text-content-strong" : "text-content-muted"}`}>
                       {m.text}
                     </p>
                   </div>

@@ -9,7 +9,7 @@ interface AuthContextValue {
   profile: Profile | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
-  signUp: (email: string, password: string, fullName: string) => Promise<{ error: string | null }>;
+  signUp: (email: string, password: string, fullName: string, professional?: { role: string; specialty: string; credentials: string }) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -63,16 +63,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error: null };
   }
 
-  async function signUp(email: string, password: string, fullName: string) {
+  async function signUp(email: string, password: string, fullName: string, professional?: { role: string; specialty: string; credentials: string }) {
     const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) return { error: error.message };
     if (data.user) {
-      await supabase.from("profiles").insert({
-        id: data.user.id,
-        full_name: fullName,
-        daily_calorie_goal: 2400,
-        daily_water_goal_liters: 2.5,
-      });
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .upsert({
+          id: data.user.id,
+          full_name: fullName,
+          daily_calorie_goal: 2400,
+          daily_water_goal_liters: 2.5,
+          is_professional: !!professional,
+          professional_role: professional?.role ?? null,
+          specialty: professional?.specialty ?? null,
+          credentials: professional?.credentials ?? null,
+          available_for_booking: !!professional,
+        }, { onConflict: "id" });
+      if (profileError) return { error: profileError.message };
     }
     return { error: null };
   }

@@ -115,7 +115,7 @@ export function Diary() {
   const done = tasks.filter((t) => t.done).length;
 
   const dailyStats = [
-    { icon: Droplets, label: "Água", value: "–", progress: 0, color: "bg-blue-500", iconColor: "text-blue-500", bg: "bg-blue-50" },
+    { icon: Droplets, label: "Água", value: "–", progress: 0, color: "bg-primary-500", iconColor: "text-primary-500", bg: "bg-primary-50" },
     { icon: Apple, label: "Calorias", value: "–", progress: 0, color: "bg-orange-400", iconColor: "text-orange-500", bg: "bg-orange-50" },
     { icon: Dumbbell, label: "Treino", value: `${exercises.filter((e) => e.done).length} / ${exercises.length}`, progress: exercises.length > 0 ? (exercises.filter((e) => e.done).length / exercises.length) * 100 : 0, color: "bg-violet-500", iconColor: "text-violet-500", bg: "bg-violet-50" },
     { icon: Moon, label: "Tarefas", value: `${done} / ${tasks.length}`, progress: tasks.length > 0 ? (done / tasks.length) * 100 : 0, color: "bg-indigo-500", iconColor: "text-indigo-500", bg: "bg-indigo-50" },
@@ -125,8 +125,8 @@ export function Diary() {
     <div className="flex flex-col gap-6 p-8">
       <header className="flex items-end justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Diário</h1>
-          <p className="mt-0.5 text-sm text-slate-500">
+          <h1 className="text-2xl font-bold text-content-strong">Diário</h1>
+          <p className="mt-0.5 text-sm text-content-muted">
             {new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })}
           </p>
         </div>
@@ -138,7 +138,7 @@ export function Diary() {
 
       {loading ? (
         <div className="flex h-64 items-center justify-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-600 border-t-transparent" />
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
@@ -148,12 +148,12 @@ export function Diary() {
               <CardContent className="p-5">
                 <div className="mb-4 flex items-center justify-between">
                   <div>
-                    <h2 className="text-base font-semibold text-slate-900">Tarefas</h2>
-                    <p className="text-xs text-slate-500">{done} de {tasks.length} concluídas</p>
+                    <h2 className="text-base font-semibold text-content-strong">Tarefas</h2>
+                    <p className="text-xs text-content-muted">{done} de {tasks.length} concluídas</p>
                   </div>
                   <button
                     onClick={() => setShowTaskModal(true)}
-                    className="text-sm font-medium text-blue-600 hover:text-blue-700"
+                    className="text-sm font-medium text-primary-600 hover:text-primary-700"
                   >
                     + Adicionar
                   </button>
@@ -167,10 +167,10 @@ export function Diary() {
                 {tasks.length === 0 ? (
                   <div className="flex flex-col items-center py-8 text-center">
                     <Check className="mb-2 h-8 w-8 text-slate-200" />
-                    <p className="text-sm text-slate-400">Nenhuma tarefa para hoje</p>
+                    <p className="text-sm text-content-muted">Nenhuma tarefa para hoje</p>
                     <button
                       onClick={() => setShowTaskModal(true)}
-                      className="mt-2 text-sm font-medium text-blue-600 hover:text-blue-700"
+                      className="mt-2 text-sm font-medium text-primary-600 hover:text-primary-700"
                     >
                       Adicionar primeira tarefa
                     </button>
@@ -180,22 +180,22 @@ export function Diary() {
                     {tasks.map((task) => (
                       <div
                         key={task.id}
-                        className="group flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-slate-50"
+                        className="group flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-surface-base"
                       >
                         <button
                           onClick={() => toggleTask(task)}
                           className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
-                            task.done ? "border-blue-600 bg-blue-600" : "border-slate-300 bg-white"
+                            task.done ? "border-primary-600 bg-primary-600" : "border-edge-base bg-surface-card"
                           }`}
                         >
                           {task.done && <Check className="h-3 w-3 text-white" />}
                         </button>
                         <div className="flex-1 min-w-0">
-                          <span className={`text-sm font-medium ${task.done ? "text-slate-400 line-through" : "text-slate-900"}`}>
+                          <span className={`text-sm font-medium ${task.done ? "text-content-muted line-through" : "text-content-strong"}`}>
                             {task.text}
                           </span>
                         </div>
-                        <span className="text-xs text-slate-400">{task.category}</span>
+                        <span className="text-xs text-content-muted">{task.category}</span>
                         <button
                           onClick={() => deleteTask(task.id)}
                           className="hidden text-slate-300 hover:text-red-500 group-hover:block"
@@ -213,10 +213,10 @@ export function Diary() {
             <Card>
               <CardContent className="p-5">
                 <div className="mb-4 flex items-center justify-between">
-                  <h2 className="text-base font-semibold text-slate-900">Treino de Hoje</h2>
+                  <h2 className="text-base font-semibold text-content-strong">Treino de Hoje</h2>
                   <button
                     onClick={() => setShowExModal(true)}
-                    className="text-sm font-medium text-blue-600 hover:text-blue-700"
+                    className="text-sm font-medium text-primary-600 hover:text-primary-700"
                   >
                     + Adicionar
                   </button>
@@ -224,10 +224,10 @@ export function Diary() {
                 {exercises.length === 0 ? (
                   <div className="flex flex-col items-center py-8 text-center">
                     <Dumbbell className="mb-2 h-8 w-8 text-slate-200" />
-                    <p className="text-sm text-slate-400">Nenhum exercício registrado</p>
+                    <p className="text-sm text-content-muted">Nenhum exercício registrado</p>
                     <button
                       onClick={() => setShowExModal(true)}
-                      className="mt-2 text-sm font-medium text-blue-600 hover:text-blue-700"
+                      className="mt-2 text-sm font-medium text-primary-600 hover:text-primary-700"
                     >
                       Adicionar exercício
                     </button>
@@ -237,25 +237,25 @@ export function Diary() {
                     {exercises.map((ex) => (
                       <div
                         key={ex.id}
-                        className="flex items-center justify-between rounded-xl border border-slate-100 px-4 py-3 transition-colors hover:bg-slate-50"
+                        className="flex items-center justify-between rounded-xl border border-edge-base px-4 py-3 transition-colors hover:bg-surface-base"
                       >
                         <div className="flex items-center gap-3">
                           <button
                             onClick={() => toggleExercise(ex)}
                             className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${
-                              ex.done ? "bg-blue-600" : "bg-slate-100"
+                              ex.done ? "bg-primary-600" : "bg-surface-subtle"
                             }`}
                           >
-                            <Dumbbell className={`h-4 w-4 ${ex.done ? "text-white" : "text-slate-400"}`} />
+                            <Dumbbell className={`h-4 w-4 ${ex.done ? "text-white" : "text-content-muted"}`} />
                           </button>
                           <div>
-                            <p className="text-sm font-medium text-slate-900">{ex.name}</p>
-                            <p className="text-xs text-slate-500">{ex.sets}</p>
+                            <p className="text-sm font-medium text-content-strong">{ex.name}</p>
+                            <p className="text-xs text-content-muted">{ex.sets}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
                           {ex.weight_kg && (
-                            <span className="text-sm font-semibold text-slate-700">{ex.weight_kg} kg</span>
+                            <span className="text-sm font-semibold text-content-body">{ex.weight_kg} kg</span>
                           )}
                           <ChevronRight className="h-4 w-4 text-slate-300" />
                         </div>
@@ -272,30 +272,30 @@ export function Diary() {
             <Card>
               <CardContent className="flex flex-col items-center p-6 text-center">
                 <Avatar className="h-20 w-20">
-                  <AvatarFallback className="bg-blue-50 text-2xl font-bold text-blue-700">
+                  <AvatarFallback className="bg-primary-50 text-2xl font-bold text-primary-700">
                     {initials(displayName)}
                   </AvatarFallback>
                 </Avatar>
-                <h3 className="mt-3 text-lg font-bold text-slate-900">{displayName}</h3>
-                <p className="text-sm text-slate-500">{profile?.plan === "pro" ? "Plano Pro" : "Plano Free"}</p>
-                <div className="mt-5 grid w-full grid-cols-3 gap-2 border-t border-slate-100 pt-4">
+                <h3 className="mt-3 text-lg font-bold text-content-strong">{displayName}</h3>
+                <p className="text-sm text-content-muted">{profile?.plan === "pro" ? "Plano Pro" : "Plano Free"}</p>
+                <div className="mt-5 grid w-full grid-cols-3 gap-2 border-t border-edge-base pt-4">
                   <div className="flex flex-col items-center">
-                    <span className="text-lg font-bold text-slate-900">{weight ?? "–"}</span>
-                    <span className="text-xs text-slate-500">kg</span>
+                    <span className="text-lg font-bold text-content-strong">{weight ?? "–"}</span>
+                    <span className="text-xs text-content-muted">kg</span>
                   </div>
-                  <div className="flex flex-col items-center border-x border-slate-100">
-                    <span className="text-lg font-bold text-slate-900">{height ?? "–"}</span>
-                    <span className="text-xs text-slate-500">cm</span>
+                  <div className="flex flex-col items-center border-x border-edge-base">
+                    <span className="text-lg font-bold text-content-strong">{height ?? "–"}</span>
+                    <span className="text-xs text-content-muted">cm</span>
                   </div>
                   <div className="flex flex-col items-center">
-                    <span className="text-lg font-bold text-slate-900">{bmi ?? "–"}</span>
-                    <span className="text-xs text-slate-500">IMC</span>
+                    <span className="text-lg font-bold text-content-strong">{bmi ?? "–"}</span>
+                    <span className="text-xs text-content-muted">IMC</span>
                   </div>
                 </div>
                 {profile?.health_goal && (
-                  <div className="mt-4 w-full rounded-xl bg-blue-50 px-4 py-3 text-left">
-                    <p className="text-xs font-medium text-blue-700">Objetivo Principal</p>
-                    <p className="mt-0.5 text-sm font-semibold text-slate-900">{profile.health_goal}</p>
+                  <div className="mt-4 w-full rounded-xl bg-primary-50 px-4 py-3 text-left">
+                    <p className="text-xs font-medium text-primary-700">Objetivo Principal</p>
+                    <p className="mt-0.5 text-sm font-semibold text-content-strong">{profile.health_goal}</p>
                   </div>
                 )}
               </CardContent>
@@ -303,7 +303,7 @@ export function Diary() {
 
             <Card>
               <CardContent className="p-5">
-                <h3 className="mb-4 text-base font-semibold text-slate-900">Progresso do Dia</h3>
+                <h3 className="mb-4 text-base font-semibold text-content-strong">Progresso do Dia</h3>
                 <div className="flex flex-col gap-4">
                   {dailyStats.map((stat) => (
                     <div key={stat.label} className="flex flex-col gap-1.5">
@@ -312,9 +312,9 @@ export function Diary() {
                           <div className={`flex h-6 w-6 items-center justify-center rounded-lg ${stat.bg}`}>
                             <stat.icon className={`h-3.5 w-3.5 ${stat.iconColor}`} />
                           </div>
-                          <span className="text-sm text-slate-600">{stat.label}</span>
+                          <span className="text-sm text-content-body">{stat.label}</span>
                         </div>
-                        <span className="text-xs font-medium text-slate-700">{stat.value}</span>
+                        <span className="text-xs font-medium text-content-body">{stat.value}</span>
                       </div>
                       <Progress value={stat.progress} indicatorClassName={stat.color} />
                     </div>
@@ -329,16 +329,16 @@ export function Diary() {
       {/* Task Modal */}
       {showTaskModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+          <div className="w-full max-w-sm rounded-2xl bg-surface-card p-6 shadow-xl">
             <div className="mb-5 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-slate-900">Nova Tarefa</h2>
-              <button onClick={() => setShowTaskModal(false)} className="text-slate-400 hover:text-slate-600">
+              <h2 className="text-lg font-bold text-content-strong">Nova Tarefa</h2>
+              <button onClick={() => setShowTaskModal(false)} className="text-content-muted hover:text-content-body">
                 <X className="h-5 w-5" />
               </button>
             </div>
             <div className="space-y-3">
               <div>
-                <label className="text-sm font-medium text-slate-700">Descrição *</label>
+                <label className="text-sm font-medium text-content-body">Descrição *</label>
                 <Input
                   className="mt-1"
                   placeholder="Ex: Beber 2.5L de água"
@@ -349,9 +349,9 @@ export function Diary() {
                 />
               </div>
               <div>
-                <label className="text-sm font-medium text-slate-700">Categoria</label>
+                <label className="text-sm font-medium text-content-body">Categoria</label>
                 <select
-                  className="mt-1 flex h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  className="mt-1 flex h-10 w-full rounded-lg border border-edge-base bg-surface-card px-3 py-2 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
                   value={taskCategory}
                   onChange={(e) => setTaskCategory(e.target.value)}
                 >
@@ -372,16 +372,16 @@ export function Diary() {
       {/* Exercise Modal */}
       {showExModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+          <div className="w-full max-w-sm rounded-2xl bg-surface-card p-6 shadow-xl">
             <div className="mb-5 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-slate-900">Adicionar Exercício</h2>
-              <button onClick={() => setShowExModal(false)} className="text-slate-400 hover:text-slate-600">
+              <h2 className="text-lg font-bold text-content-strong">Adicionar Exercício</h2>
+              <button onClick={() => setShowExModal(false)} className="text-content-muted hover:text-content-body">
                 <X className="h-5 w-5" />
               </button>
             </div>
             <div className="space-y-3">
               <div>
-                <label className="text-sm font-medium text-slate-700">Exercício *</label>
+                <label className="text-sm font-medium text-content-body">Exercício *</label>
                 <Input
                   className="mt-1"
                   placeholder="Ex: Supino Reto"
@@ -392,18 +392,18 @@ export function Diary() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-sm font-medium text-slate-700">Séries x Reps</label>
+                  <label className="text-sm font-medium text-content-body">Séries x Reps</label>
                   <Input className="mt-1" placeholder="3x12" value={exForm.sets} onChange={(e) => setExForm({ ...exForm, sets: e.target.value })} />
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-slate-700">Carga (kg)</label>
+                  <label className="text-sm font-medium text-content-body">Carga (kg)</label>
                   <Input className="mt-1" type="number" placeholder="0" value={exForm.weight_kg} onChange={(e) => setExForm({ ...exForm, weight_kg: e.target.value })} />
                 </div>
               </div>
               <div>
-                <label className="text-sm font-medium text-slate-700">Tipo de treino</label>
+                <label className="text-sm font-medium text-content-body">Tipo de treino</label>
                 <select
-                  className="mt-1 flex h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  className="mt-1 flex h-10 w-full rounded-lg border border-edge-base bg-surface-card px-3 py-2 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
                   value={exForm.workout_type}
                   onChange={(e) => setExForm({ ...exForm, workout_type: e.target.value })}
                 >

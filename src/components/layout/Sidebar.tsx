@@ -9,9 +9,12 @@ import {
   Users,
   Target,
   LogOut,
+  Briefcase,
+  UserCircle,
+  MessageCircle,
 } from "lucide-react";
 import { cn } from "../../lib/utils";
-import { Avatar, AvatarFallback } from "../ui/avatar";
+import { Avatar, AvatarImage, AvatarFallback } from "../ui/avatar";
 import { useAuth } from "../../context/AuthContext";
 
 const navItems = [
@@ -19,6 +22,8 @@ const navItems = [
   { to: "/diary", label: "Diário", icon: BookOpen },
   { to: "/goals", label: "Metas", icon: Target },
   { to: "/team", label: "Equipe", icon: Users },
+  { to: "/professional-profile", label: "Perfil Profissional", icon: UserCircle },
+  { to: "/messages", label: "Mensagens", icon: MessageCircle },
   { to: "/progress", label: "Progresso", icon: TrendingUp },
   { to: "/recipes", label: "Alimentos", icon: UtensilsCrossed },
   { to: "/settings", label: "Configurações", icon: Settings },
@@ -38,6 +43,11 @@ export function Sidebar() {
 
   const displayName = profile?.full_name || user?.email?.split("@")[0] || "Usuário";
   const plan = profile?.plan === "pro" ? "Plano Pro" : "Plano Free";
+  const isPro = profile?.is_professional;
+
+  const visibleNavItems = navItems.filter(
+    (item) => item.to !== "/professional-profile" || isPro
+  );
 
   async function handleSignOut() {
     await signOut();
@@ -45,16 +55,16 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="flex h-screen w-64 shrink-0 flex-col border-r border-slate-200 bg-white px-4 py-4">
+    <aside className="flex h-screen w-64 shrink-0 flex-col border-r border-edge-base bg-surface-card px-4 py-4">
       <header className="flex items-center gap-2.5 px-2 pb-6 pt-1">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-600">
           <Activity className="h-5 w-5 text-white" />
         </div>
-        <span className="text-xl font-bold text-slate-900">FitSync</span>
+        <span className="text-xl font-bold text-content-strong">FitSync</span>
       </header>
 
       <nav className="flex flex-1 flex-col gap-1">
-        {navItems.map(({ to, label, icon: Icon }) => (
+        {visibleNavItems.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}
@@ -62,8 +72,8 @@ export function Sidebar() {
               cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                 isActive
-                  ? "bg-blue-50 text-blue-600"
-                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                  ? "bg-primary-50 text-primary-600"
+                  : "text-content-body hover:bg-surface-subtle hover:text-content-strong"
               )
             }
           >
@@ -73,24 +83,36 @@ export function Sidebar() {
         ))}
       </nav>
 
-      <footer className="border-t border-slate-200 pt-4">
+      <footer className="border-t border-edge-base pt-4">
         <NavLink
           to="/profile"
-          className="flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-slate-50"
+          className="flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-surface-subtle"
         >
           <Avatar className="h-9 w-9">
-            <AvatarFallback className="bg-blue-50 text-xs font-bold text-blue-700">
-              {initials(displayName)}
-            </AvatarFallback>
+            {profile?.avatar_url ? (
+              <AvatarImage src={profile.avatar_url} alt={displayName} />
+            ) : (
+              <AvatarFallback className="bg-primary-50 text-xs font-bold text-primary-700">
+                {initials(displayName)}
+              </AvatarFallback>
+            )}
           </Avatar>
           <div className="flex min-w-0 flex-1 flex-col">
-            <span className="truncate text-sm font-medium text-slate-900">{displayName}</span>
-            <span className="text-xs text-slate-500">{plan}</span>
+            <span className="truncate text-sm font-medium text-content-strong">{displayName}</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-content-muted">{plan}</span>
+              {isPro && (
+                <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
+                  <Briefcase className="h-2.5 w-2.5" />
+                  PRO
+                </span>
+              )}
+            </div>
           </div>
         </NavLink>
         <button
           onClick={handleSignOut}
-          className="mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-500 transition-colors hover:bg-red-50 hover:text-red-600"
+          className="mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-content-muted transition-colors hover:bg-red-50 hover:text-red-600"
         >
           <LogOut className="h-4 w-4" />
           Sair

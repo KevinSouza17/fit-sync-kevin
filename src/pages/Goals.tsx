@@ -9,7 +9,7 @@ import type { Goal } from "../lib/types";
 
 const categories = ["Força", "Cardio", "Peso", "Nutrição", "Composição", "Saúde", "Geral"];
 const colorOptions = [
-  { label: "Azul", value: "bg-blue-500" },
+  { label: "Azul", value: "bg-primary-500" },
   { label: "Verde", value: "bg-green-500" },
   { label: "Laranja", value: "bg-orange-400" },
   { label: "Roxo", value: "bg-violet-500" },
@@ -18,7 +18,7 @@ const colorOptions = [
 ];
 
 const colorDotMap: Record<string, string> = {
-  "bg-blue-500": "bg-blue-500",
+  "bg-primary-500": "bg-primary-500",
   "bg-green-500": "bg-green-500",
   "bg-orange-400": "bg-orange-400",
   "bg-violet-500": "bg-violet-500",
@@ -43,7 +43,7 @@ const emptyForm: GoalForm = {
   target_value: "100",
   unit: "",
   deadline: "",
-  color: "bg-blue-500",
+  color: "bg-primary-500",
 };
 
 export function Goals() {
@@ -130,8 +130,8 @@ export function Goals() {
     <div className="flex flex-col gap-6 p-8">
       <header className="flex items-end justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Minhas Metas</h1>
-          <p className="mt-0.5 text-sm text-slate-500">Acompanhe seu progresso e objetivos</p>
+          <h1 className="text-2xl font-bold text-content-strong">Minhas Metas</h1>
+          <p className="mt-0.5 text-sm text-content-muted">Acompanhe seu progresso e objetivos</p>
         </div>
         <Button className="gap-2" onClick={openNew}>
           <Plus className="h-4 w-4" />
@@ -141,14 +141,14 @@ export function Goals() {
 
       {loading ? (
         <div className="flex h-64 items-center justify-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-600 border-t-transparent" />
         </div>
       ) : goals.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center py-16 text-center">
             <Target className="mb-3 h-12 w-12 text-slate-200" />
-            <h3 className="text-base font-semibold text-slate-700">Nenhuma meta criada</h3>
-            <p className="mt-1 text-sm text-slate-400">Crie sua primeira meta para começar a acompanhar seu progresso</p>
+            <h3 className="text-base font-semibold text-content-body">Nenhuma meta criada</h3>
+            <p className="mt-1 text-sm text-content-muted">Crie sua primeira meta para começar a acompanhar seu progresso</p>
             <Button className="mt-4" onClick={openNew}>
               <Plus className="mr-2 h-4 w-4" />
               Criar Meta
@@ -167,12 +167,12 @@ export function Goals() {
             ].map((s) => (
               <Card key={s.label}>
                 <CardContent className="flex items-center gap-4 p-5">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50">
-                    <s.icon className="h-5 w-5 text-blue-600" />
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-50">
+                    <s.icon className="h-5 w-5 text-primary-600" />
                   </div>
                   <div>
-                    <p className="text-xl font-bold text-slate-900">{s.value}</p>
-                    <p className="text-xs text-slate-500">{s.label}</p>
+                    <p className="text-xl font-bold text-content-strong">{s.value}</p>
+                    <p className="text-xs text-content-muted">{s.label}</p>
                   </div>
                 </CardContent>
               </Card>
@@ -189,13 +189,13 @@ export function Goals() {
                   <CardContent className="flex flex-col gap-4 p-5">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-2">
-                        <div className={`h-3 w-3 shrink-0 rounded-full ${colorDotMap[goal.color] ?? "bg-blue-500"}`} />
-                        <h3 className="text-sm font-semibold text-slate-900 leading-tight">{goal.title}</h3>
+                        <div className={`h-3 w-3 shrink-0 rounded-full ${colorDotMap[goal.color] ?? "bg-primary-500"}`} />
+                        <h3 className="text-sm font-semibold text-content-strong leading-tight">{goal.title}</h3>
                       </div>
                       <div className="flex shrink-0 gap-1">
                         <button
                           onClick={() => openEdit(goal)}
-                          className="text-slate-300 hover:text-blue-500"
+                          className="text-slate-300 hover:text-primary-500"
                         >
                           <Pencil className="h-3.5 w-3.5" />
                         </button>
@@ -210,14 +210,14 @@ export function Goals() {
 
                     <div className="flex flex-col gap-1.5">
                       <div className="flex items-center justify-between text-xs">
-                        <span className="text-slate-500">Progresso</span>
+                        <span className="text-content-muted">Progresso</span>
                         <div className="flex items-center gap-2">
                           {editingProgress?.id === goal.id ? (
                             <div className="flex items-center gap-1">
                               <input
                                 type="number"
                                 step="any"
-                                className="w-16 rounded border border-blue-400 px-1 py-0.5 text-xs text-slate-900 focus:outline-none"
+                                className="w-16 rounded border border-primary-400 px-1 py-0.5 text-xs text-content-strong focus:outline-none"
                                 value={editingProgress.value}
                                 onChange={(e) => setEditingProgress({ id: goal.id, value: e.target.value })}
                                 onKeyDown={(e) => {
@@ -236,20 +236,20 @@ export function Goals() {
                           ) : (
                             <button
                               onClick={() => setEditingProgress({ id: goal.id, value: String(goal.current_value) })}
-                              className="font-semibold text-slate-900 hover:text-blue-600"
+                              className="font-semibold text-content-strong hover:text-primary-600"
                             >
                               {goal.current_value}{goal.unit}
                             </button>
                           )}
-                          <span className="text-slate-400">/ {goal.target_value}{goal.unit}</span>
-                          <span className={`font-bold ${done ? "text-green-600" : "text-slate-700"}`}>{pct}%</span>
+                          <span className="text-content-muted">/ {goal.target_value}{goal.unit}</span>
+                          <span className={`font-bold ${done ? "text-green-600" : "text-content-body"}`}>{pct}%</span>
                         </div>
                       </div>
-                      <Progress value={pct} indicatorClassName={done ? "bg-green-500" : colorDotMap[goal.color] ?? "bg-blue-500"} />
+                      <Progress value={pct} indicatorClassName={done ? "bg-green-500" : colorDotMap[goal.color] ?? "bg-primary-500"} />
                     </div>
 
-                    <div className="flex items-center justify-between text-xs text-slate-400">
-                      <span className="rounded-full bg-slate-100 px-2 py-0.5">{goal.category}</span>
+                    <div className="flex items-center justify-between text-xs text-content-muted">
+                      <span className="rounded-full bg-surface-subtle px-2 py-0.5">{goal.category}</span>
                       {goal.deadline && (
                         <div className="flex items-center gap-1">
                           <Target className="h-3 w-3" />
@@ -271,25 +271,25 @@ export function Goals() {
       {/* Goal Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+          <div className="w-full max-w-md rounded-2xl bg-surface-card p-6 shadow-xl">
             <div className="mb-5 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-slate-900">
+              <h2 className="text-lg font-bold text-content-strong">
                 {editingGoal ? "Editar Meta" : "Nova Meta"}
               </h2>
-              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => setShowModal(false)} className="text-content-muted hover:text-content-body">
                 <X className="h-5 w-5" />
               </button>
             </div>
             <div className="space-y-3">
               <div>
-                <label className="text-sm font-medium text-slate-700">Título *</label>
+                <label className="text-sm font-medium text-content-body">Título *</label>
                 <Input className="mt-1" placeholder="Ex: Correr 5km sem parar" value={form.title} onChange={(e) => setF("title", e.target.value)} autoFocus />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-sm font-medium text-slate-700">Categoria</label>
+                  <label className="text-sm font-medium text-content-body">Categoria</label>
                   <select
-                    className="mt-1 flex h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    className="mt-1 flex h-10 w-full rounded-lg border border-edge-base bg-surface-card px-3 py-2 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
                     value={form.category}
                     onChange={(e) => setF("category", e.target.value)}
                   >
@@ -297,24 +297,24 @@ export function Goals() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-slate-700">Unidade</label>
+                  <label className="text-sm font-medium text-content-body">Unidade</label>
                   <Input className="mt-1" placeholder="kg, km, min…" value={form.unit} onChange={(e) => setF("unit", e.target.value)} />
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-slate-700">Valor atual</label>
+                  <label className="text-sm font-medium text-content-body">Valor atual</label>
                   <Input className="mt-1" type="number" step="any" value={form.current_value} onChange={(e) => setF("current_value", e.target.value)} />
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-slate-700">Meta *</label>
+                  <label className="text-sm font-medium text-content-body">Meta *</label>
                   <Input className="mt-1" type="number" step="any" value={form.target_value} onChange={(e) => setF("target_value", e.target.value)} />
                 </div>
               </div>
               <div>
-                <label className="text-sm font-medium text-slate-700">Prazo (opcional)</label>
+                <label className="text-sm font-medium text-content-body">Prazo (opcional)</label>
                 <Input className="mt-1" type="date" value={form.deadline} onChange={(e) => setF("deadline", e.target.value)} />
               </div>
               <div>
-                <label className="text-sm font-medium text-slate-700">Cor</label>
+                <label className="text-sm font-medium text-content-body">Cor</label>
                 <div className="mt-2 flex gap-2">
                   {colorOptions.map((c) => (
                     <button

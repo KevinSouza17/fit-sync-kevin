@@ -244,8 +244,8 @@ export function Dashboard() {
       value: `${waterTotal.toFixed(2).replace(/\.?0+$/, "")}L`,
       subtitle: `Meta: ${waterGoal}L`,
       icon: Droplets,
-      iconBg: "bg-blue-50",
-      iconColor: "text-blue-500",
+      iconBg: "bg-primary-50",
+      iconColor: "text-primary-500",
       onClick: () => setShowWaterModal(true),
     },
     {
@@ -269,7 +269,7 @@ export function Dashboard() {
   ];
 
   const macros = [
-    { name: "Proteína", current: totalProtein, goal: proteinGoal, unit: "g", color: "bg-blue-500" },
+    { name: "Proteína", current: totalProtein, goal: proteinGoal, unit: "g", color: "bg-primary-500" },
     { name: "Carboidratos", current: totalCarbs, goal: carbsGoal, unit: "g", color: "bg-orange-400" },
     { name: "Gordura", current: totalFat, goal: fatGoal, unit: "g", color: "bg-violet-500" },
   ];
@@ -278,8 +278,8 @@ export function Dashboard() {
     <div className="flex flex-col gap-6 p-8">
       <header className="flex items-end justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Resumo do Dia</h1>
-          <p className="mt-0.5 text-sm text-slate-500">
+          <h1 className="text-2xl font-bold text-content-strong">Resumo do Dia</h1>
+          <p className="mt-0.5 text-sm text-content-muted">
             {new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })}
           </p>
         </div>
@@ -291,7 +291,7 @@ export function Dashboard() {
 
       {loading ? (
         <div className="flex h-64 items-center justify-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-600 border-t-transparent" />
         </div>
       ) : (
         <>
@@ -304,14 +304,14 @@ export function Dashboard() {
               >
                 <CardContent className="flex flex-col gap-4 p-5">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-slate-500">{card.title}</span>
+                    <span className="text-sm font-medium text-content-muted">{card.title}</span>
                     <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${card.iconBg}`}>
                       <card.icon className={`h-5 w-5 ${card.iconColor}`} />
                     </div>
                   </div>
                   <div>
-                    <p className="text-3xl font-bold text-slate-900">{card.value}</p>
-                    <p className="mt-0.5 text-xs text-slate-500">{card.subtitle}</p>
+                    <p className="text-3xl font-bold text-content-strong">{card.value}</p>
+                    <p className="mt-0.5 text-xs text-content-muted">{card.subtitle}</p>
                   </div>
                 </CardContent>
               </Card>
@@ -332,20 +332,20 @@ export function Dashboard() {
                       />
                     </svg>
                     <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <span className="text-3xl font-bold text-slate-900">{totalCalories}</span>
-                      <span className="mt-0.5 text-xs text-slate-500">de {calGoal} kcal</span>
+                      <span className="text-3xl font-bold text-content-strong">{totalCalories}</span>
+                      <span className="mt-0.5 text-xs text-content-muted">de {calGoal} kcal</span>
                     </div>
                   </div>
                 </div>
                 <div className="flex flex-1 flex-col gap-5">
-                  <h3 className="text-lg font-semibold text-slate-900">Macronutrientes</h3>
+                  <h3 className="text-lg font-semibold text-content-strong">Macronutrientes</h3>
                   {macros.map((m) => (
                     <div key={m.name} className="flex flex-col gap-2">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-slate-600">{m.name}</span>
+                        <span className="text-sm text-content-body">{m.name}</span>
                         <div className="flex items-baseline gap-1">
-                          <span className="text-sm font-semibold text-slate-900">{Math.round(m.current)}{m.unit}</span>
-                          <span className="text-xs text-slate-400">/ {m.goal}{m.unit}</span>
+                          <span className="text-sm font-semibold text-content-strong">{Math.round(m.current)}{m.unit}</span>
+                          <span className="text-xs text-content-muted">/ {m.goal}{m.unit}</span>
                         </div>
                       </div>
                       <Progress
@@ -361,10 +361,10 @@ export function Dashboard() {
             <Card>
               <CardContent className="flex flex-col p-5">
                 <div className="mb-5 flex items-center justify-between">
-                  <h3 className="text-base font-semibold text-slate-900">Refeições</h3>
+                  <h3 className="text-base font-semibold text-content-strong">Refeições</h3>
                   <button
                     onClick={openMealModal}
-                    className="text-sm font-medium text-blue-600 hover:text-blue-700"
+                    className="text-sm font-medium text-primary-600 hover:text-primary-700"
                   >
                     + Adicionar
                   </button>
@@ -372,7 +372,7 @@ export function Dashboard() {
                 {meals.length === 0 ? (
                   <div className="flex flex-1 flex-col items-center justify-center py-8 text-center">
                     <Flame className="mb-2 h-8 w-8 text-slate-200" />
-                    <p className="text-sm text-slate-400">Nenhuma refeição registrada hoje</p>
+                    <p className="text-sm text-content-muted">Nenhuma refeição registrada hoje</p>
                   </div>
                 ) : (
                   <div className="flex flex-col">
@@ -380,20 +380,20 @@ export function Dashboard() {
                       <div
                         key={meal.id}
                         className={`group flex items-start justify-between py-3.5 ${
-                          i < meals.length - 1 ? "border-b border-slate-100" : ""
+                          i < meals.length - 1 ? "border-b border-edge-base" : ""
                         }`}
                       >
                         <div>
-                          <p className="text-sm font-medium text-slate-900">{meal.name}</p>
-                          <p className="mt-0.5 text-xs text-slate-500">
+                          <p className="text-sm font-medium text-content-strong">{meal.name}</p>
+                          <p className="mt-0.5 text-xs text-content-muted">
                             {mealTypeLabels[meal.meal_type] ?? meal.meal_type}
-                            <span className="ml-2 text-slate-400">
+                            <span className="ml-2 text-content-muted">
                               P:{Math.round(Number(meal.protein_g))}g C:{Math.round(Number(meal.carbs_g))}g G:{Math.round(Number(meal.fat_g))}g
                             </span>
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="text-sm text-slate-700">{meal.calories} kcal</span>
+                          <span className="text-sm text-content-body">{meal.calories} kcal</span>
                           <button
                             onClick={() => deleteMeal(meal.id)}
                             className="hidden text-slate-300 hover:text-red-500 group-hover:block"
@@ -414,10 +414,10 @@ export function Dashboard() {
       {/* Meal Modal */}
       {showMealModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+          <div className="w-full max-w-md rounded-2xl bg-surface-card p-6 shadow-xl">
             <div className="mb-5 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-slate-900">Registrar Refeição</h2>
-              <button onClick={() => setShowMealModal(false)} className="text-slate-400 hover:text-slate-600">
+              <h2 className="text-lg font-bold text-content-strong">Registrar Refeição</h2>
+              <button onClick={() => setShowMealModal(false)} className="text-content-muted hover:text-content-body">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -427,7 +427,7 @@ export function Dashboard() {
               <button
                 onClick={() => { setCustomEntry(false); setSelectedFood(null); setForm(emptyForm); setFoodSearch(""); }}
                 className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                  !customEntry ? "bg-blue-50 text-blue-700" : "text-slate-500 hover:bg-slate-50"
+                  !customEntry ? "bg-primary-50 text-primary-700" : "text-content-muted hover:bg-surface-base"
                 }`}
               >
                 <Search className="h-4 w-4" />
@@ -436,7 +436,7 @@ export function Dashboard() {
               <button
                 onClick={() => { setCustomEntry(true); setSelectedFood(null); setFoodResults([]); setForm(emptyForm); }}
                 className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                  customEntry ? "bg-blue-50 text-blue-700" : "text-slate-500 hover:bg-slate-50"
+                  customEntry ? "bg-primary-50 text-primary-700" : "text-content-muted hover:bg-surface-base"
                 }`}
               >
                 <UtensilsCrossed className="h-4 w-4" />
@@ -448,9 +448,9 @@ export function Dashboard() {
               {/* Food search */}
               {!customEntry && (
                 <div ref={searchRef} className="relative">
-                  <label className="text-sm font-medium text-slate-700">Buscar alimento *</label>
+                  <label className="text-sm font-medium text-content-body">Buscar alimento *</label>
                   <div className="relative mt-1">
-                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-content-muted" />
                     <Input
                       className="pl-9"
                       placeholder="Ex: Frango, Arroz, Banana..."
@@ -460,25 +460,25 @@ export function Dashboard() {
                     />
                     {searching && (
                       <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-600 border-t-transparent" />
                       </div>
                     )}
                   </div>
                   {foodResults.length > 0 && (
-                    <div className="absolute left-0 right-0 top-full z-10 mt-1 max-h-56 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg">
+                    <div className="absolute left-0 right-0 top-full z-10 mt-1 max-h-56 overflow-y-auto rounded-xl border border-edge-base bg-surface-card shadow-lg">
                       {foodResults.map((food) => (
                         <button
                           key={food.id}
                           onClick={() => selectFood(food)}
-                          className="flex w-full items-center justify-between px-4 py-2.5 text-left transition-colors hover:bg-blue-50 first:rounded-t-xl last:rounded-b-xl"
+                          className="flex w-full items-center justify-between px-4 py-2.5 text-left transition-colors hover:bg-primary-50 first:rounded-t-xl last:rounded-b-xl"
                         >
                           <div className="min-w-0">
-                            <p className="text-sm font-medium text-slate-900 truncate">{food.name}</p>
-                            <p className="text-xs text-slate-500">{food.category} · {food.serving_size}</p>
+                            <p className="text-sm font-medium text-content-strong truncate">{food.name}</p>
+                            <p className="text-xs text-content-muted">{food.category} · {food.serving_size}</p>
                           </div>
                           <div className="shrink-0 text-right">
-                            <p className="text-sm font-semibold text-slate-700">{food.calories} kcal</p>
-                            <p className="text-[10px] text-slate-400">
+                            <p className="text-sm font-semibold text-content-body">{food.calories} kcal</p>
+                            <p className="text-[10px] text-content-muted">
                               P:{food.protein_g}g C:{food.carbs_g}g G:{food.fat_g}g
                             </p>
                           </div>
@@ -487,53 +487,53 @@ export function Dashboard() {
                     </div>
                   )}
                   {foodSearch.trim().length > 2 && foodResults.length === 0 && !searching && (
-                    <p className="mt-1.5 text-xs text-slate-400">Nenhum alimento encontrado. Tente outro termo ou insira manualmente.</p>
+                    <p className="mt-1.5 text-xs text-content-muted">Nenhum alimento encontrado. Tente outro termo ou insira manualmente.</p>
                   )}
                 </div>
               )}
 
               {/* Selected food info */}
               {selectedFood && !customEntry && (
-                <div className="rounded-xl border border-blue-200 bg-blue-50 p-3">
+                <div className="rounded-xl border border-primary-200 bg-primary-50 p-3">
                   <div className="flex items-start justify-between">
                     <div>
-                      <p className="text-sm font-semibold text-slate-900">{selectedFood.name}</p>
-                      <p className="text-xs text-slate-500">{selectedFood.category} · Porção: {selectedFood.serving_size}</p>
+                      <p className="text-sm font-semibold text-content-strong">{selectedFood.name}</p>
+                      <p className="text-xs text-content-muted">{selectedFood.category} · Porção: {selectedFood.serving_size}</p>
                     </div>
                     <button
                       onClick={() => { setSelectedFood(null); setFoodSearch(""); setForm(emptyForm); }}
-                      className="text-slate-400 hover:text-slate-600"
+                      className="text-content-muted hover:text-content-body"
                     >
                       <X className="h-4 w-4" />
                     </button>
                   </div>
                   <div className="mt-2 flex items-center gap-2">
-                    <label className="text-xs font-medium text-slate-600">Qtd de porções:</label>
+                    <label className="text-xs font-medium text-content-body">Qtd de porções:</label>
                     <input
                       type="number"
                       step="0.5"
                       min="0.25"
                       value={servings}
                       onChange={(e) => updateServings(e.target.value)}
-                      className="w-20 rounded-lg border border-blue-300 bg-white px-2 py-1 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-200"
+                      className="w-20 rounded-lg border border-primary-300 bg-surface-card px-2 py-1 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-200"
                     />
                   </div>
                   <div className="mt-2 grid grid-cols-4 gap-2 text-center">
-                    <div className="rounded-lg bg-white px-2 py-1">
-                      <p className="text-sm font-bold text-slate-900">{form.calories}</p>
-                      <p className="text-[10px] text-slate-500">kcal</p>
+                    <div className="rounded-lg bg-surface-card px-2 py-1">
+                      <p className="text-sm font-bold text-content-strong">{form.calories}</p>
+                      <p className="text-[10px] text-content-muted">kcal</p>
                     </div>
-                    <div className="rounded-lg bg-white px-2 py-1">
-                      <p className="text-sm font-bold text-blue-600">{form.protein_g}</p>
-                      <p className="text-[10px] text-slate-500">Prot (g)</p>
+                    <div className="rounded-lg bg-surface-card px-2 py-1">
+                      <p className="text-sm font-bold text-primary-600">{form.protein_g}</p>
+                      <p className="text-[10px] text-content-muted">Prot (g)</p>
                     </div>
-                    <div className="rounded-lg bg-white px-2 py-1">
+                    <div className="rounded-lg bg-surface-card px-2 py-1">
                       <p className="text-sm font-bold text-orange-600">{form.carbs_g}</p>
-                      <p className="text-[10px] text-slate-500">Carb (g)</p>
+                      <p className="text-[10px] text-content-muted">Carb (g)</p>
                     </div>
-                    <div className="rounded-lg bg-white px-2 py-1">
+                    <div className="rounded-lg bg-surface-card px-2 py-1">
                       <p className="text-sm font-bold text-amber-600">{form.fat_g}</p>
-                      <p className="text-[10px] text-slate-500">Gord (g)</p>
+                      <p className="text-[10px] text-content-muted">Gord (g)</p>
                     </div>
                   </div>
                 </div>
@@ -541,9 +541,9 @@ export function Dashboard() {
 
               {/* Meal type */}
               <div>
-                <label className="text-sm font-medium text-slate-700">Tipo de refeição</label>
+                <label className="text-sm font-medium text-content-body">Tipo de refeição</label>
                 <select
-                  className="mt-1 flex h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  className="mt-1 flex h-10 w-full rounded-lg border border-edge-base bg-surface-card px-3 py-2 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
                   value={form.meal_type}
                   onChange={(e) => setForm({ ...form, meal_type: e.target.value })}
                 >
@@ -557,7 +557,7 @@ export function Dashboard() {
               {customEntry && (
                 <>
                   <div>
-                    <label className="text-sm font-medium text-slate-700">Nome *</label>
+                    <label className="text-sm font-medium text-content-body">Nome *</label>
                     <Input
                       className="mt-1"
                       placeholder="Ex: Frango com arroz"
@@ -567,19 +567,19 @@ export function Dashboard() {
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-sm font-medium text-slate-700">Calorias (kcal) *</label>
+                      <label className="text-sm font-medium text-content-body">Calorias (kcal) *</label>
                       <Input className="mt-1" type="number" placeholder="0" value={form.calories} onChange={(e) => setForm({ ...form, calories: e.target.value })} />
                     </div>
                     <div>
-                      <label className="text-sm font-medium text-slate-700">Proteína (g)</label>
+                      <label className="text-sm font-medium text-content-body">Proteína (g)</label>
                       <Input className="mt-1" type="number" placeholder="0" value={form.protein_g} onChange={(e) => setForm({ ...form, protein_g: e.target.value })} />
                     </div>
                     <div>
-                      <label className="text-sm font-medium text-slate-700">Carboidratos (g)</label>
+                      <label className="text-sm font-medium text-content-body">Carboidratos (g)</label>
                       <Input className="mt-1" type="number" placeholder="0" value={form.carbs_g} onChange={(e) => setForm({ ...form, carbs_g: e.target.value })} />
                     </div>
                     <div>
-                      <label className="text-sm font-medium text-slate-700">Gordura (g)</label>
+                      <label className="text-sm font-medium text-content-body">Gordura (g)</label>
                       <Input className="mt-1" type="number" placeholder="0" value={form.fat_g} onChange={(e) => setForm({ ...form, fat_g: e.target.value })} />
                     </div>
                   </div>
@@ -604,10 +604,10 @@ export function Dashboard() {
       {/* Water Modal */}
       {showWaterModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+          <div className="w-full max-w-sm rounded-2xl bg-surface-card p-6 shadow-xl">
             <div className="mb-5 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-slate-900">Registrar Água</h2>
-              <button onClick={() => setShowWaterModal(false)} className="text-slate-400 hover:text-slate-600">
+              <h2 className="text-lg font-bold text-content-strong">Registrar Água</h2>
+              <button onClick={() => setShowWaterModal(false)} className="text-content-muted hover:text-content-body">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -617,7 +617,7 @@ export function Dashboard() {
                   key={v}
                   onClick={() => setWaterAmount(v)}
                   className={`flex-1 rounded-lg border py-2 text-sm font-medium transition-colors ${
-                    waterAmount === v ? "border-blue-600 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                    waterAmount === v ? "border-primary-600 bg-primary-50 text-primary-700" : "border-edge-base text-content-body hover:bg-surface-base"
                   }`}
                 >
                   {v}L
@@ -625,7 +625,7 @@ export function Dashboard() {
               ))}
             </div>
             <div>
-              <label className="text-sm font-medium text-slate-700">Quantidade personalizada (L)</label>
+              <label className="text-sm font-medium text-content-body">Quantidade personalizada (L)</label>
               <Input
                 className="mt-1"
                 type="number"
@@ -635,7 +635,7 @@ export function Dashboard() {
                 onChange={(e) => setWaterAmount(e.target.value)}
               />
             </div>
-            <p className="mt-2 text-xs text-slate-500">
+            <p className="mt-2 text-xs text-content-muted">
               Total hoje: {waterTotal.toFixed(2)}L / {waterGoal}L
             </p>
             <div className="mt-5 flex gap-3">
@@ -651,15 +651,15 @@ export function Dashboard() {
       {/* Weight Modal */}
       {showWeightModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+          <div className="w-full max-w-sm rounded-2xl bg-surface-card p-6 shadow-xl">
             <div className="mb-5 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-slate-900">Registrar Peso</h2>
-              <button onClick={() => setShowWeightModal(false)} className="text-slate-400 hover:text-slate-600">
+              <h2 className="text-lg font-bold text-content-strong">Registrar Peso</h2>
+              <button onClick={() => setShowWeightModal(false)} className="text-content-muted hover:text-content-body">
                 <X className="h-5 w-5" />
               </button>
             </div>
             <div>
-              <label className="text-sm font-medium text-slate-700">Peso (kg)</label>
+              <label className="text-sm font-medium text-content-body">Peso (kg)</label>
               <Input
                 className="mt-1"
                 type="number"
