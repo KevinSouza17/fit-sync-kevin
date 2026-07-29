@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { UserPlus, MessageCircle, Calendar, Star, MapPin, Search, Award } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
-import { Avatar, AvatarFallback } from "../components/ui/avatar";
+import { Avatar, AvatarImage, AvatarFallback } from "../components/ui/avatar";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
 
@@ -18,6 +18,7 @@ interface Professional {
   available_for_booking: boolean;
   rating_avg: number;
   rating_count: number;
+  avatar_url: string | null;
 }
 
 const roleColors: Record<string, { bg: string; text: string }> = {
@@ -51,7 +52,7 @@ export function Team() {
     setLoading(true);
     const { data } = await supabase
       .from("profiles")
-      .select("id, full_name, professional_role, specialty, credentials, location_city, bio, available_for_booking, rating_avg, rating_count")
+      .select("id, full_name, professional_role, specialty, credentials, location_city, bio, available_for_booking, rating_avg, rating_count, avatar_url")
       .eq("is_professional", true)
       .order("rating_avg", { ascending: false });
     if (data) setProfessionals(data as Professional[]);
@@ -169,9 +170,13 @@ export function Team() {
                 <CardContent className="p-5">
                   <div className="mb-3 flex items-start gap-3">
                     <Avatar className="h-12 w-12">
-                      <AvatarFallback className={`text-sm font-bold ${color.bg} ${color.text}`}>
-                        {initials(pro.full_name)}
-                      </AvatarFallback>
+                      {pro.avatar_url ? (
+                        <AvatarImage src={pro.avatar_url} alt={pro.full_name} />
+                      ) : (
+                        <AvatarFallback className={`text-sm font-bold ${color.bg} ${color.text}`}>
+                          {initials(pro.full_name)}
+                        </AvatarFallback>
+                      )}
                     </Avatar>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
@@ -233,9 +238,13 @@ export function Team() {
             <div className="mb-4 flex items-start justify-between">
               <div className="flex items-start gap-3">
                 <Avatar className="h-14 w-14">
-                  <AvatarFallback className={`text-base font-bold ${roleColors[selectedPro.professional_role ?? ""]?.bg ?? "bg-slate-50"} ${roleColors[selectedPro.professional_role ?? ""]?.text ?? "text-slate-700"}`}>
-                    {initials(selectedPro.full_name)}
-                  </AvatarFallback>
+                  {selectedPro.avatar_url ? (
+                    <AvatarImage src={selectedPro.avatar_url} alt={selectedPro.full_name} />
+                  ) : (
+                    <AvatarFallback className={`text-base font-bold ${roleColors[selectedPro.professional_role ?? ""]?.bg ?? "bg-slate-50"} ${roleColors[selectedPro.professional_role ?? ""]?.text ?? "text-slate-700"}`}>
+                      {initials(selectedPro.full_name)}
+                    </AvatarFallback>
+                  )}
                 </Avatar>
                 <div>
                   <h2 className="text-lg font-bold text-slate-900">{selectedPro.full_name}</h2>

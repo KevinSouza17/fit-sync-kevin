@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { Plus, Check, ChevronRight, Dumbbell, Apple, Droplets, Moon, X, Trash2 } from "lucide-react";
+import { Plus, Check, ChevronRight, Dumbbell, Apple, Droplets, Moon, X, Trash2, Pencil } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
-import { Avatar, AvatarFallback } from "../components/ui/avatar";
+import { Avatar, AvatarImage, AvatarFallback } from "../components/ui/avatar";
 import { Progress } from "../components/ui/progress";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
@@ -29,6 +29,7 @@ export function Diary() {
   const [taskCategory, setTaskCategory] = useState("Geral");
 
   const [showExModal, setShowExModal] = useState(false);
+  const [editingEx, setEditingEx] = useState<Exercise | null>(null);
   const [exForm, setExForm] = useState({ name: "", sets: "3x12", weight_kg: "", workout_type: "Superior A" });
   const [saving, setSaving] = useState(false);
 
@@ -92,24 +93,57 @@ export function Diary() {
     if (data) setExercises((prev) => prev.map((e) => (e.id === ex.id ? data : e)));
   }
 
-  async function addExercise() {
+  async function saveExercise() {
     if (!exForm.name.trim()) return;
     setSaving(true);
-    const { data } = await supabase
-      .from("exercises")
-      .insert({
-        name: exForm.name,
-        sets: exForm.sets,
-        weight_kg: exForm.weight_kg ? parseFloat(exForm.weight_kg) : null,
-        workout_type: exForm.workout_type,
-        exercise_date: today,
-      })
-      .select()
-      .single();
-    if (data) setExercises((prev) => [...prev, data]);
+    if (editingEx) {
+      const { data } = await supabase
+        .from("exercises")
+        .update({
+          name: exForm.name,
+          sets: exForm.sets,
+          weight_kg: exForm.weight_kg ? parseFloat(exForm.weight_kg) : null,
+          workout_type: exForm.workout_type,
+        })
+        .eq("id", editingEx.id)
+        .select()
+        .single();
+      if (data) setExercises((prev) => prev.map((e) => (e.id === data.id ? data : e)));
+    } else {
+      const { data } = await supabase
+        .from("exercises")
+        .insert({
+          name: exForm.name,
+          sets: exForm.sets,
+          weight_kg: exForm.weight_kg ? parseFloat(exForm.weight_kg) : null,
+          workout_type: exForm.workout_type,
+          exercise_date: today,
+        })
+        .select()
+        .single();
+      if (data) setExercises((prev) => [...prev, data]);
+    }
     setExForm({ name: "", sets: "3x12", weight_kg: "", workout_type: "Superior A" });
+    setEditingEx(null);
     setShowExModal(false);
     setSaving(false);
+  }
+
+  function openEditExercise(ex: Exercise) {
+    setEditingEx(ex);
+    setExForm({ name: ex.name, sets: ex.sets, weight_kg: ex.weight_kg ? String(ex.weight_kg) : "", workout_type: ex.workout_type });
+    setShowExModal(true);
+  }
+
+  function openAddExercise() {
+    setEditingEx(null);
+    setExForm({ name: "", sets: "3x12", weight_kg: "", workout_type: "Superior A" });
+    setShowExModal(true);
+  }
+
+  async function deleteExercise(id: string) {
+    await supabase.from("exercises").delete().eq("id", id);
+    setExercises((prev) => prev.filter((e) => e.id !== id));
   }
 
   const done = tasks.filter((t) => t.done).length;
@@ -226,7 +260,7 @@ export function Diary() {
                     <Dumbbell className="mb-2 h-8 w-8 text-slate-200" />
                     <p className="text-sm text-content-muted">Nenhum exercício registrado</p>
                     <button
-                      onClick={() => setShowExModal(true)}
+                      onClick={openAddExercise}
                       className="mt-2 text-sm font-medium text-primary-600 hover:text-primary-700"
                     >
                       Adicionar exercício
@@ -237,7 +271,7 @@ export function Diary() {
                     {exercises.map((ex) => (
                       <div
                         key={ex.id}
-                        className="flex items-center justify-between rounded-xl border border-edge-base px-4 py-3 transition-colors hover:bg-surface-base"
+                        className="group flex items-center justify-between rounded-xl border border-edge-base px-4 py-3 transition-colors hover:bg-surface-base"
                       >
                         <div className="flex items-center gap-3">
                           <button
@@ -248,16 +282,24 @@ export function Diary() {
                           >
                             <Dumbbell className={`h-4 w-4 ${ex.done ? "text-white" : "text-content-muted"}`} />
                           </button>
-                          <div>
+                          <div className="cursor-pointer" onClick={() => openEditExercise(ex)}>
                             <p className="text-sm font-medium text-content-strong">{ex.name}</p>
-                            <p className="text-xs text-content-muted">{ex.sets}</p>
+                            <p className="text-xs text-content-muted">{ex.sets}{ex.weight_kg ? ` · ${ex.weight_kg} kg` : ""}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          {ex.weight_kg && (
-                            <span className="text-sm font-semibold text-content-body">{ex.weight_kg} kg</span>
-                          )}
-                          <ChevronRight className="h-4 w-4 text-slate-300" />
+                          <button
+                            onClick={() => openEditExercise(ex)}
+                            className="hidden text-content-muted hover:text-primary-600 group-hover:block"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            onClick={() => deleteExercise(ex.id)}
+                            className="hidden text-slate-300 hover:text-red-500 group-hover:block"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
                         </div>
                       </div>
                     ))}
@@ -272,9 +314,13 @@ export function Diary() {
             <Card>
               <CardContent className="flex flex-col items-center p-6 text-center">
                 <Avatar className="h-20 w-20">
-                  <AvatarFallback className="bg-primary-50 text-2xl font-bold text-primary-700">
-                    {initials(displayName)}
-                  </AvatarFallback>
+                  {profile?.avatar_url ? (
+                    <AvatarImage src={profile.avatar_url} alt={displayName} />
+                  ) : (
+                    <AvatarFallback className="bg-primary-50 text-2xl font-bold text-primary-700">
+                      {initials(displayName)}
+                    </AvatarFallback>
+                  )}
                 </Avatar>
                 <h3 className="mt-3 text-lg font-bold text-content-strong">{displayName}</h3>
                 <p className="text-sm text-content-muted">{profile?.plan === "pro" ? "Plano Pro" : "Plano Free"}</p>
@@ -374,8 +420,8 @@ export function Diary() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-sm rounded-2xl bg-surface-card p-6 shadow-xl">
             <div className="mb-5 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-content-strong">Adicionar Exercício</h2>
-              <button onClick={() => setShowExModal(false)} className="text-content-muted hover:text-content-body">
+              <h2 className="text-lg font-bold text-content-strong">{editingEx ? "Editar Exercício" : "Adicionar Exercício"}</h2>
+              <button onClick={() => { setShowExModal(false); setEditingEx(null); }} className="text-content-muted hover:text-content-body">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -413,8 +459,8 @@ export function Diary() {
             </div>
             <div className="mt-5 flex gap-3">
               <Button variant="outline" className="flex-1" onClick={() => setShowExModal(false)}>Cancelar</Button>
-              <Button className="flex-1" onClick={addExercise} disabled={saving || !exForm.name.trim()}>
-                {saving ? "Salvando..." : "Adicionar"}
+              <Button className="flex-1" onClick={saveExercise} disabled={saving || !exForm.name.trim()}>
+                {saving ? "Salvando..." : editingEx ? "Salvar" : "Adicionar"}
               </Button>
             </div>
           </div>

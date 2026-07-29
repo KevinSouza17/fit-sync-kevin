@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
-import { Avatar, AvatarFallback } from "../components/ui/avatar";
+import { Avatar, AvatarImage, AvatarFallback } from "../components/ui/avatar";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 
@@ -250,9 +250,13 @@ export function ProfessionalProfile() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">
             <Avatar className="h-20 w-20 shrink-0 ring-4 ring-white shadow">
-              <AvatarFallback className="bg-rose-50 text-2xl font-bold text-rose-600">
-                {initials(name)}
-              </AvatarFallback>
+              {profile?.avatar_url ? (
+                <AvatarImage src={profile.avatar_url} alt={name} />
+              ) : (
+                <AvatarFallback className="bg-rose-50 text-2xl font-bold text-rose-600">
+                  {initials(name)}
+                </AvatarFallback>
+              )}
             </Avatar>
             <div>
               <h1 className="text-2xl font-bold text-slate-900">{name}</h1>

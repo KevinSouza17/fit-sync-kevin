@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { Send, Search, ArrowLeft, MessageCircle, UserCircle } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
-import { Avatar, AvatarFallback } from "../components/ui/avatar";
+import { Avatar, AvatarImage, AvatarFallback } from "../components/ui/avatar";
 
 interface ConversationRow {
   id: string;
@@ -13,6 +13,7 @@ interface ConversationRow {
   otherName: string;
   otherRole: string;
   otherId: string;
+  otherAvatar: string | null;
   lastContent: string;
   unread: number;
 }
@@ -70,7 +71,7 @@ export function Messages() {
         const otherId = c.user_a_id === user.id ? c.user_b_id : c.user_a_id;
         const { data: other } = await supabase
           .from("profiles")
-          .select("full_name, professional_role, is_professional")
+          .select("full_name, professional_role, is_professional, avatar_url")
           .eq("id", otherId)
           .maybeSingle();
 
@@ -97,6 +98,7 @@ export function Messages() {
           otherId,
           otherName: other?.full_name ?? "Usuário",
           otherRole: other?.is_professional ? other.professional_role ?? "Profissional" : "Paciente",
+          otherAvatar: other?.avatar_url ?? null,
           lastContent: lastMsg?.content ?? "",
           unread: count ?? 0,
         };
@@ -228,9 +230,13 @@ export function Messages() {
                 }`}
               >
                 <Avatar className="h-11 w-11 shrink-0">
-                  <AvatarFallback className="bg-primary-100 text-sm font-bold text-primary-700">
-                    {initials(c.otherName)}
-                  </AvatarFallback>
+                  {c.otherAvatar ? (
+                    <AvatarImage src={c.otherAvatar} alt={c.otherName} />
+                  ) : (
+                    <AvatarFallback className="bg-primary-100 text-sm font-bold text-primary-700">
+                      {initials(c.otherName)}
+                    </AvatarFallback>
+                  )}
                 </Avatar>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
@@ -266,9 +272,13 @@ export function Messages() {
               <ArrowLeft className="h-5 w-5" />
             </button>
             <Avatar className="h-10 w-10">
-              <AvatarFallback className="bg-primary-100 text-sm font-bold text-primary-700">
-                {initials(activeName)}
-              </AvatarFallback>
+              {activeConv.otherAvatar ? (
+                <AvatarImage src={activeConv.otherAvatar} alt={activeName} />
+              ) : (
+                <AvatarFallback className="bg-primary-100 text-sm font-bold text-primary-700">
+                  {initials(activeName)}
+                </AvatarFallback>
+              )}
             </Avatar>
             <div className="flex-1">
               <p className="text-sm font-semibold text-slate-900">{activeName}</p>
