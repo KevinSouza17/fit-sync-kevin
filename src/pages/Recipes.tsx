@@ -25,9 +25,9 @@ const categoryColors: Record<string, { bg: string; text: string }> = {
   "Verduras e Legumes": { bg: "bg-emerald-50", text: "text-emerald-600" },
   "Oleaginosas": { bg: "bg-orange-50", text: "text-orange-600" },
   "Açúcares": { bg: "bg-pink-50", text: "text-pink-600" },
-  "Bebidas": { bg: "bg-blue-50", text: "text-blue-600" },
+  "Bebidas": { bg: "bg-primary-50", text: "text-primary-600" },
   "Preparações": { bg: "bg-violet-50", text: "text-violet-600" },
-  "Condimentos": { bg: "bg-slate-50", text: "text-slate-600" },
+  "Condimentos": { bg: "bg-surface-base", text: "text-content-body" },
   "Suplementos": { bg: "bg-teal-50", text: "text-teal-600" },
 };
 
@@ -146,17 +146,17 @@ export function Recipes() {
   return (
     <div className="flex flex-col gap-6 p-8">
       <header>
-        <h1 className="text-2xl font-bold text-slate-900">Catálogo de Alimentos</h1>
-        <p className="mt-0.5 text-sm text-slate-500">
+        <h1 className="text-2xl font-bold text-content-strong">Catálogo de Alimentos</h1>
+        <p className="mt-0.5 text-sm text-content-muted">
           Pesquise e selecione alimentos para registrar automaticamente calorias e nutrientes
         </p>
       </header>
 
       {/* Search bar */}
       <div className="relative">
-        <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+        <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-content-muted" />
         <input
-          className="flex h-12 w-full rounded-xl border border-slate-200 bg-white pl-12 pr-4 text-base text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+          className="flex h-12 w-full rounded-xl border border-edge-base bg-surface-card pl-12 pr-4 text-base text-content-strong placeholder:text-content-muted focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
           placeholder="Buscar alimento por nome ou categoria..."
           value={search}
           onChange={(e) => handleSearch(e.target.value)}
@@ -168,14 +168,14 @@ export function Recipes() {
         <button
           onClick={() => handleCategoryFilter(null)}
           className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-            !activeCategory ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            !activeCategory ? "bg-primary-600 text-white" : "bg-surface-subtle text-content-body hover:bg-slate-200"
           }`}
         >
           Todos ({totalFoods})
         </button>
         {categories.map((cat) => {
           const count = foods.filter((f) => f.category === cat).length;
-          const color = categoryColors[cat] ?? { bg: "bg-slate-100", text: "text-slate-600" };
+          const color = categoryColors[cat] ?? { bg: "bg-surface-subtle", text: "text-content-body" };
           return (
             <button
               key={cat}
@@ -183,7 +183,7 @@ export function Recipes() {
               className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
                 activeCategory === cat
                   ? `${color.bg} ${color.text} ring-2 ring-offset-1 ring-current`
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  : "bg-surface-subtle text-content-body hover:bg-slate-200"
               }`}
             >
               {cat} ({count})
@@ -194,20 +194,20 @@ export function Recipes() {
 
       {loading ? (
         <div className="flex h-64 items-center justify-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-600 border-t-transparent" />
         </div>
       ) : filtered.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center py-16 text-center">
             <UtensilsCrossed className="mb-3 h-12 w-12 text-slate-200" />
-            <h3 className="text-base font-semibold text-slate-700">Nenhum alimento encontrado</h3>
-            <p className="mt-1 text-sm text-slate-400">Tente outro termo de busca ou selecione outra categoria</p>
+            <h3 className="text-base font-semibold text-content-body">Nenhum alimento encontrado</h3>
+            <p className="mt-1 text-sm text-content-muted">Tente outro termo de busca ou selecione outra categoria</p>
           </CardContent>
         </Card>
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {filtered.map((food) => {
-            const color = categoryColors[food.category] ?? { bg: "bg-slate-50", text: "text-slate-600" };
+            const color = categoryColors[food.category] ?? { bg: "bg-surface-base", text: "text-content-body" };
             return (
               <Card
                 key={food.id}
@@ -216,28 +216,28 @@ export function Recipes() {
               >
                 <CardContent className="p-4">
                   <div className="mb-2 flex items-start justify-between gap-2">
-                    <h3 className="text-sm font-semibold text-slate-900 leading-tight">{food.name}</h3>
+                    <h3 className="text-sm font-semibold text-content-strong leading-tight">{food.name}</h3>
                     <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${color.bg} ${color.text}`}>
                       {food.category}
                     </span>
                   </div>
-                  <p className="mb-3 text-xs text-slate-500">Porção: {food.serving_size}</p>
+                  <p className="mb-3 text-xs text-content-muted">Porção: {food.serving_size}</p>
                   <div className="grid grid-cols-4 gap-1 text-center">
-                    <div className="rounded-lg bg-slate-50 px-1 py-1.5">
-                      <p className="text-sm font-bold text-slate-900">{food.calories}</p>
-                      <p className="text-[9px] text-slate-500">kcal</p>
+                    <div className="rounded-lg bg-surface-base px-1 py-1.5">
+                      <p className="text-sm font-bold text-content-strong">{food.calories}</p>
+                      <p className="text-[9px] text-content-muted">kcal</p>
                     </div>
-                    <div className="rounded-lg bg-blue-50 px-1 py-1.5">
-                      <p className="text-sm font-bold text-blue-600">{food.protein_g}</p>
-                      <p className="text-[9px] text-slate-500">Prot</p>
+                    <div className="rounded-lg bg-primary-50 px-1 py-1.5">
+                      <p className="text-sm font-bold text-primary-600">{food.protein_g}</p>
+                      <p className="text-[9px] text-content-muted">Prot</p>
                     </div>
                     <div className="rounded-lg bg-orange-50 px-1 py-1.5">
                       <p className="text-sm font-bold text-orange-600">{food.carbs_g}</p>
-                      <p className="text-[9px] text-slate-500">Carb</p>
+                      <p className="text-[9px] text-content-muted">Carb</p>
                     </div>
                     <div className="rounded-lg bg-amber-50 px-1 py-1.5">
                       <p className="text-sm font-bold text-amber-600">{food.fat_g}</p>
-                      <p className="text-[9px] text-slate-500">Gord</p>
+                      <p className="text-[9px] text-content-muted">Gord</p>
                     </div>
                   </div>
                 </CardContent>
@@ -250,67 +250,67 @@ export function Recipes() {
       {/* Food detail drawer */}
       {selectedFood && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
+          <div className="w-full max-w-lg rounded-2xl bg-surface-card p-6 shadow-xl">
             <div className="mb-4 flex items-start justify-between">
               <div>
-                <h2 className="text-lg font-bold text-slate-900">{selectedFood.name}</h2>
-                <p className="text-sm text-slate-500">
+                <h2 className="text-lg font-bold text-content-strong">{selectedFood.name}</h2>
+                <p className="text-sm text-content-muted">
                   {selectedFood.category} · Porção: {selectedFood.serving_size}
                 </p>
               </div>
-              <button onClick={() => setSelectedFood(null)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => setSelectedFood(null)} className="text-content-muted hover:text-content-body">
                 <X className="h-5 w-5" />
               </button>
             </div>
 
             {/* Nutrition per serving */}
             <div className="mb-4 grid grid-cols-5 gap-2 text-center">
-              <div className="rounded-xl bg-slate-50 p-2">
-                <p className="text-lg font-bold text-slate-900">{selectedFood.calories}</p>
-                <p className="text-[10px] text-slate-500">kcal</p>
+              <div className="rounded-xl bg-surface-base p-2">
+                <p className="text-lg font-bold text-content-strong">{selectedFood.calories}</p>
+                <p className="text-[10px] text-content-muted">kcal</p>
               </div>
-              <div className="rounded-xl bg-blue-50 p-2">
-                <p className="text-lg font-bold text-blue-600">{selectedFood.protein_g}</p>
-                <p className="text-[10px] text-slate-500">Prot (g)</p>
+              <div className="rounded-xl bg-primary-50 p-2">
+                <p className="text-lg font-bold text-primary-600">{selectedFood.protein_g}</p>
+                <p className="text-[10px] text-content-muted">Prot (g)</p>
               </div>
               <div className="rounded-xl bg-orange-50 p-2">
                 <p className="text-lg font-bold text-orange-600">{selectedFood.carbs_g}</p>
-                <p className="text-[10px] text-slate-500">Carb (g)</p>
+                <p className="text-[10px] text-content-muted">Carb (g)</p>
               </div>
               <div className="rounded-xl bg-amber-50 p-2">
                 <p className="text-lg font-bold text-amber-600">{selectedFood.fat_g}</p>
-                <p className="text-[10px] text-slate-500">Gord (g)</p>
+                <p className="text-[10px] text-content-muted">Gord (g)</p>
               </div>
               <div className="rounded-xl bg-green-50 p-2">
                 <p className="text-lg font-bold text-green-600">{selectedFood.fiber_g}</p>
-                <p className="text-[10px] text-slate-500">Fibra (g)</p>
+                <p className="text-[10px] text-content-muted">Fibra (g)</p>
               </div>
             </div>
 
             {/* Add to diary section */}
-            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
-              <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900">
+            <div className="rounded-xl border border-primary-200 bg-primary-50 p-4">
+              <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-content-strong">
                 <Plus className="h-4 w-4" />
                 Adicionar ao diário de hoje
               </h3>
               <div className="flex flex-wrap items-end gap-3">
                 <div>
-                  <label className="text-xs font-medium text-slate-600">Porções</label>
+                  <label className="text-xs font-medium text-content-body">Porções</label>
                   <input
                     type="number"
                     step="0.5"
                     min="0.25"
                     value={servings}
                     onChange={(e) => setServings(e.target.value)}
-                    className="mt-1 block w-20 rounded-lg border border-blue-300 bg-white px-2 py-1.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-200"
+                    className="mt-1 block w-20 rounded-lg border border-primary-300 bg-surface-card px-2 py-1.5 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-200"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-slate-600">Refeição</label>
+                  <label className="text-xs font-medium text-content-body">Refeição</label>
                   <select
                     value={mealType}
                     onChange={(e) => setMealType(e.target.value)}
-                    className="mt-1 block rounded-lg border border-blue-300 bg-white px-2 py-1.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-200"
+                    className="mt-1 block rounded-lg border border-primary-300 bg-surface-card px-2 py-1.5 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-200"
                   >
                     {mealTypeOptions.map((o) => (
                       <option key={o.value} value={o.value}>{o.label}</option>
@@ -344,25 +344,25 @@ export function Recipes() {
                   const v = computedValues();
                   return (
                     <>
-                      <div className="rounded-lg bg-white px-1 py-1">
-                        <p className="text-sm font-bold text-slate-900">{v.cal}</p>
-                        <p className="text-[9px] text-slate-500">kcal</p>
+                      <div className="rounded-lg bg-surface-card px-1 py-1">
+                        <p className="text-sm font-bold text-content-strong">{v.cal}</p>
+                        <p className="text-[9px] text-content-muted">kcal</p>
                       </div>
-                      <div className="rounded-lg bg-white px-1 py-1">
-                        <p className="text-sm font-bold text-blue-600">{v.prot}</p>
-                        <p className="text-[9px] text-slate-500">Prot</p>
+                      <div className="rounded-lg bg-surface-card px-1 py-1">
+                        <p className="text-sm font-bold text-primary-600">{v.prot}</p>
+                        <p className="text-[9px] text-content-muted">Prot</p>
                       </div>
-                      <div className="rounded-lg bg-white px-1 py-1">
+                      <div className="rounded-lg bg-surface-card px-1 py-1">
                         <p className="text-sm font-bold text-orange-600">{v.carb}</p>
-                        <p className="text-[9px] text-slate-500">Carb</p>
+                        <p className="text-[9px] text-content-muted">Carb</p>
                       </div>
-                      <div className="rounded-lg bg-white px-1 py-1">
+                      <div className="rounded-lg bg-surface-card px-1 py-1">
                         <p className="text-sm font-bold text-amber-600">{v.fat}</p>
-                        <p className="text-[9px] text-slate-500">Gord</p>
+                        <p className="text-[9px] text-content-muted">Gord</p>
                       </div>
-                      <div className="rounded-lg bg-white px-1 py-1">
+                      <div className="rounded-lg bg-surface-card px-1 py-1">
                         <p className="text-sm font-bold text-green-600">{v.fiber}</p>
-                        <p className="text-[9px] text-slate-500">Fibra</p>
+                        <p className="text-[9px] text-content-muted">Fibra</p>
                       </div>
                     </>
                   );

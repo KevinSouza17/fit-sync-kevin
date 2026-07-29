@@ -7,7 +7,7 @@ export function DashboardLayout() {
   const themeClass = profile?.is_professional ? "theme-pro" : "";
 
   return (
-    <div className={`flex h-screen overflow-hidden bg-slate-50 ${themeClass}`}>
+    <div className={`flex h-screen overflow-hidden bg-surface-base ${themeClass}`}>
       <Sidebar />
       <main className="flex-1 overflow-y-auto">
         <Outlet />

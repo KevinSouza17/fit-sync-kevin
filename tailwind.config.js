@@ -1,5 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+  darkMode: 'class',
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
@@ -14,6 +15,19 @@ export default {
           600: 'rgb(var(--primary-600) / <alpha-value>)',
           700: 'rgb(var(--primary-700) / <alpha-value>)',
           800: 'rgb(var(--primary-800) / <alpha-value>)',
+        },
+        surface: {
+          base:   'rgb(var(--bg-base) / <alpha-value>)',
+          card:   'rgb(var(--bg-card) / <alpha-value>)',
+          subtle: 'rgb(var(--bg-subtle) / <alpha-value>)',
+        },
+        content: {
+          strong: 'rgb(var(--text-strong) / <alpha-value>)',
+          body:   'rgb(var(--text-body) / <alpha-value>)',
+          muted:  'rgb(var(--text-muted) / <alpha-value>)',
+        },
+        edge: {
+          base: 'rgb(var(--border-base) / <alpha-value>)',
         },
       },
     },

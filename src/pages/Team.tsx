@@ -22,7 +22,7 @@ interface Professional {
 
 const roleColors: Record<string, { bg: string; text: string }> = {
   "Nutricionista": { bg: "bg-rose-50", text: "text-rose-700" },
-  "Personal Trainer": { bg: "bg-blue-50", text: "text-blue-700" },
+  "Personal Trainer": { bg: "bg-primary-50", text: "text-primary-700" },
   "Médico do Esporte": { bg: "bg-green-50", text: "text-green-700" },
   "Fisioterapeuta": { bg: "bg-teal-50", text: "text-teal-700" },
   "Psicóloga(o)": { bg: "bg-violet-50", text: "text-violet-700" },

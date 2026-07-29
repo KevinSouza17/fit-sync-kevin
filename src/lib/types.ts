@@ -22,6 +22,7 @@ export interface Database {
           available_for_booking: boolean;
           rating_avg: number;
           rating_count: number;
+          avatar_url: string | null;
           created_at: string;
           updated_at: string;
         };
