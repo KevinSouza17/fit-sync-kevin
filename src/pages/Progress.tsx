@@ -56,7 +56,7 @@ export function Progress() {
 
       {loading ? (
         <div className="flex h-64 items-center justify-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-600 border-t-transparent" />
         </div>
       ) : (
         <>
@@ -92,7 +92,7 @@ export function Progress() {
                   <p className="text-xs text-slate-500">{s.label}</p>
                   <p className="mt-1 text-2xl font-bold text-slate-900">{s.value}</p>
                   {s.diff && (
-                    <div className={`mt-1 flex items-center gap-1 text-xs font-medium ${s.up ? "text-green-600" : "text-blue-600"}`}>
+                    <div className={`mt-1 flex items-center gap-1 text-xs font-medium ${s.up ? "text-green-600" : "text-primary-600"}`}>
                       {typeof s.up === "boolean" && s.diff.startsWith("+") && <ArrowUp className="h-3 w-3" />}
                       {typeof s.up === "boolean" && s.diff.startsWith("-") && <ArrowDown className="h-3 w-3" />}
                       {s.diff}
@@ -116,16 +116,18 @@ export function Progress() {
                   </div>
                 ) : (
                   <div className="relative">
-                    <div className="flex items-end gap-1 h-40">
+                    <div className="flex items-end gap-1.5" style={{ height: "160px" }}>
                       {weightLogs.slice(-14).map((log, i) => {
-                        const h = Math.max(8, ((Number(log.weight_kg) - minWeight) / range) * 100 + 10);
+                        const chartH = 130;
+                        const h = Math.max(8, ((Number(log.weight_kg) - minWeight) / range) * chartH + 16);
+                        const isLast = i === weightLogs.slice(-14).length - 1;
                         return (
-                          <div key={log.id} className="group relative flex flex-1 flex-col items-center gap-1">
+                          <div key={log.id} className="group relative flex flex-1 flex-col items-center justify-end">
                             <div
-                              className={`w-full rounded-t-md transition-all ${i === weightLogs.slice(-14).length - 1 ? "bg-blue-600" : "bg-blue-200"}`}
-                              style={{ height: `${h}%` }}
+                              className={`w-full rounded-t-md transition-all ${isLast ? "bg-primary-600" : "bg-primary-200"}`}
+                              style={{ height: `${h}px` }}
                             />
-                            <span className="text-[10px] text-slate-400 rotate-45 origin-left truncate">
+                            <span className="mt-1 text-[10px] text-slate-400 truncate" style={{ writingMode: "vertical-rl" }}>
                               {new Date(log.logged_date).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
                             </span>
                             <div className="absolute bottom-full mb-1 hidden rounded bg-slate-900 px-2 py-1 text-xs text-white group-hover:block whitespace-nowrap">
@@ -182,10 +184,10 @@ export function Progress() {
                 {milestones.map((m) => (
                   <div
                     key={m.text}
-                    className={`flex items-center gap-3 rounded-xl p-3 ${m.done ? "bg-blue-50" : "bg-slate-50"}`}
+                    className={`flex items-center gap-3 rounded-xl p-3 ${m.done ? "bg-primary-50" : "bg-slate-50"}`}
                   >
                     <div
-                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${m.done ? "bg-blue-600" : "bg-slate-200"}`}
+                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${m.done ? "bg-primary-600" : "bg-slate-200"}`}
                     >
                       <TrendingUp className={`h-3.5 w-3.5 ${m.done ? "text-white" : "text-slate-400"}`} />
                     </div>
