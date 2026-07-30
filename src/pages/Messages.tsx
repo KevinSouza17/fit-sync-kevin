@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { Send, Search, ArrowLeft, MessageCircle, UserCircle, UserPlus } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
+import { useNotifications } from "../context/NotificationsContext";
 import { Avatar, AvatarFallback } from "../components/ui/avatar";
 import { InviteModal } from "../components/InviteModal";
 
@@ -40,6 +41,7 @@ function formatTime(iso: string) {
 
 export function Messages() {
   const { user } = useAuth();
+  const { notifications, markRead } = useNotifications();
   const [searchParams, setSearchParams] = useSearchParams();
   const [conversations, setConversations] = useState<ConversationRow[]>([]);
   const [messages, setMessages] = useState<{ id: string; sender_id: string; content: string; created_at: string }[]>([]);
@@ -220,6 +222,10 @@ export function Messages() {
     setActiveId(c.id);
     setActiveName(c.otherName);
     setSearchParams({ c: c.id });
+    // Mark any message notifications tied to this conversation as read.
+    notifications
+      .filter((n) => n.type === "message" && n.conversation_id === c.id && !n.read)
+      .forEach((n) => markRead(n.id));
   }
 
   const filtered = conversations.filter((c) =>

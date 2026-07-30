@@ -169,6 +169,28 @@ export interface Database {
         };
         Update: Partial<Database["public"]["Tables"]["messages"]["Row"]>;
       };
+      notifications: {
+        Row: {
+          id: string;
+          user_id: string;
+          type: string;
+          title: string;
+          body: string | null;
+          code: string | null;
+          invite_email: string | null;
+          inviter_id: string | null;
+          inviter_name: string | null;
+          conversation_id: string | null;
+          read: boolean;
+          created_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["notifications"]["Row"], "id" | "user_id" | "created_at"> & {
+          id?: string;
+          user_id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["notifications"]["Row"]>;
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
@@ -185,3 +207,4 @@ export type WeightLog = Database["public"]["Tables"]["weight_logs"]["Row"];
 export type Goal = Database["public"]["Tables"]["goals"]["Row"];
 export type Conversation = Database["public"]["Tables"]["conversations"]["Row"];
 export type Message = Database["public"]["Tables"]["messages"]["Row"];
+export type Notification = Database["public"]["Tables"]["notifications"]["Row"];

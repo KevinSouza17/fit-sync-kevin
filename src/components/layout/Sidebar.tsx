@@ -12,10 +12,12 @@ import {
   Briefcase,
   UserCircle,
   MessageCircle,
+  Bell,
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { Avatar, AvatarImage, AvatarFallback } from "../ui/avatar";
 import { useAuth } from "../../context/AuthContext";
+import { useNotifications } from "../../context/NotificationsContext";
 
 const navItems = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -24,6 +26,7 @@ const navItems = [
   { to: "/team", label: "Equipe", icon: Users },
   { to: "/professional-profile", label: "Perfil Profissional", icon: UserCircle },
   { to: "/messages", label: "Mensagens", icon: MessageCircle },
+  { to: "/notifications", label: "Notificações", icon: Bell },
   { to: "/progress", label: "Progresso", icon: TrendingUp },
   { to: "/recipes", label: "Alimentos", icon: UtensilsCrossed },
   { to: "/settings", label: "Configurações", icon: Settings },
@@ -40,6 +43,7 @@ function initials(name: string) {
 export function Sidebar() {
   const { profile, user, signOut } = useAuth();
   const navigate = useNavigate();
+  const { unreadCount } = useNotifications();
 
   const displayName = profile?.full_name || user?.email?.split("@")[0] || "Usuário";
   const plan = profile?.plan === "pro" ? "Plano Pro" : "Plano Free";
@@ -64,23 +68,31 @@ export function Sidebar() {
       </header>
 
       <nav className="flex flex-1 flex-col gap-1">
-        {visibleNavItems.map(({ to, label, icon: Icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            className={({ isActive }) =>
-              cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                isActive
-                  ? "bg-primary-50 text-primary-600"
-                  : "text-content-body hover:bg-surface-subtle hover:text-content-strong"
-              )
-            }
-          >
-            <Icon className="h-5 w-5 shrink-0" />
-            {label}
-          </NavLink>
-        ))}
+        {visibleNavItems.map(({ to, label, icon: Icon }) => {
+          const showBadge = to === "/notifications" && unreadCount > 0;
+          return (
+            <NavLink
+              key={to}
+              to={to}
+              className={({ isActive }) =>
+                cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                  isActive
+                    ? "bg-primary-50 text-primary-600"
+                    : "text-content-body hover:bg-surface-subtle hover:text-content-strong"
+                )
+              }
+            >
+              <Icon className="h-5 w-5 shrink-0" />
+              {label}
+              {showBadge && (
+                <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-primary-600 px-1.5 text-[10px] font-bold text-white">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
+            </NavLink>
+          );
+        })}
       </nav>
 
       <footer className="border-t border-edge-base pt-4">
