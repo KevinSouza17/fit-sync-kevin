@@ -215,7 +215,21 @@ export function Messages() {
     if (data) {
       setMessages((prev) => [...prev, data]);
       loadConversations();
+      // Best-effort email notification to the recipient.
+      fireMessageEmail(activeId, text).catch(() => {});
     }
+  }
+
+  async function fireMessageEmail(convId: string, content: string) {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (!token) return;
+    const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/notify-message`;
+    await fetch(apiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ conversationId: convId, content }),
+    });
   }
 
   function openConversation(c: ConversationRow) {
