@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { UserPlus, MessageCircle, Calendar, Star, MapPin, Search, Award } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Avatar, AvatarFallback } from "../components/ui/avatar";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
+import { InviteModal } from "../components/InviteModal";
 
 interface Professional {
   id: string;
@@ -36,7 +36,6 @@ function initials(name: string) {
 
 export function Team() {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -58,32 +57,10 @@ export function Team() {
     setLoading(false);
   }
 
-  async function startConversation(pro: Professional) {
-    if (!user) return;
-    const me = user.id;
-    const them = pro.id;
-    const userA = me < them ? me : them;
-    const userB = me < them ? them : me;
+  const [inviteTarget, setInviteTarget] = useState<{ id: string; name: string } | null>(null);
 
-    const { data: existing } = await supabase
-      .from("conversations")
-      .select("id")
-      .eq("user_a_id", userA)
-      .eq("user_b_id", userB)
-      .maybeSingle();
-
-    let convId = existing?.id;
-    if (!convId) {
-      const { data: created } = await supabase
-        .from("conversations")
-        .insert({ user_a_id: userA, user_b_id: userB })
-        .select("id")
-        .single();
-      convId = created?.id;
-    }
-    if (convId) {
-      navigate(`/messages?c=${convId}`);
-    }
+  function startConversation(pro: Professional) {
+    setInviteTarget({ id: pro.id, name: pro.full_name });
   }
 
   const filtered = professionals.filter((p) => {
@@ -225,6 +202,14 @@ export function Team() {
           })}
         </div>
       )}
+
+      {/* Invite (email verification) modal triggered from the professional card */}
+      <InviteModal
+        open={!!inviteTarget}
+        onClose={() => setInviteTarget(null)}
+        hintName={inviteTarget?.name}
+        expectedUserId={inviteTarget?.id}
+      />
 
       {/* Professional detail modal */}
       {selectedPro && (
