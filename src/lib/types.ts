@@ -23,6 +23,9 @@ export interface Database {
           rating_avg: number;
           rating_count: number;
           avatar_url: string | null;
+          registration_type: string;
+          document_number: string | null;
+          verified: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -308,3 +311,4 @@ export type WorkoutExercise = Database["public"]["Tables"]["workout_exercises"][
 export type WorkoutLog = Database["public"]["Tables"]["workout_logs"]["Row"];
 export type CustomFood = Database["public"]["Tables"]["custom_foods"]["Row"];
 export type Appointment = Database["public"]["Tables"]["appointments"]["Row"];
+export type ClientPlan = Database["public"]["Tables"]["client_plans"]["Row"];

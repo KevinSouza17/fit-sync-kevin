@@ -25,14 +25,22 @@ import { useAuth } from "../../context/AuthContext";
 import { useNotifications } from "../../context/NotificationsContext";
 import { useI18n } from "../../context/I18nContext";
 
-const navKeys = [
+interface NavItem {
+  to: string;
+  key: string;
+  icon: typeof LayoutDashboard;
+  proOnly?: boolean;
+}
+
+const navKeys: NavItem[] = [
   { to: "/dashboard", key: "nav.dashboard", icon: LayoutDashboard },
   { to: "/diary", key: "nav.diary", icon: BookOpen },
   { to: "/goals", key: "nav.goals", icon: Target },
   { to: "/team", key: "nav.team", icon: Users },
-  { to: "/professional-profile", key: "nav.professionalProfile", icon: UserCircle },
+  { to: "/professional-profile", key: "nav.professionalProfile", icon: UserCircle, proOnly: true },
   { to: "/workout", key: "nav.workout", icon: Dumbbell },
   { to: "/appointments", key: "nav.appointments", icon: CalendarCheck },
+  { to: "/my-clients", key: "nav.myClients", icon: Users, proOnly: true },
   { to: "/messages", key: "nav.messages", icon: MessageCircle },
   { to: "/notifications", key: "nav.notifications", icon: Bell },
   { to: "/progress", key: "nav.progress", icon: TrendingUp },
@@ -55,7 +63,7 @@ export function Sidebar() {
   const plan = profile?.plan === "pro" ? t("nav.planPro") : t("nav.planFree");
   const isPro = profile?.is_professional;
 
-  const visibleNavItems = navKeys.filter((item) => item.to !== "/professional-profile" || isPro);
+  const visibleNavItems = navKeys.filter((item) => !item.proOnly || isPro);
 
   async function handleSignOut() {
     await signOut();

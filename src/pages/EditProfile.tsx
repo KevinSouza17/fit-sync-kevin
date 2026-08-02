@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Camera, Save, Check, Briefcase, GraduationCap, Award, MapPin, Loader2 } from "lucide-react";
+import { Camera, Save, Check, Briefcase, GraduationCap, Award, MapPin, Loader2, Building2, ShieldCheck, ShieldAlert, User } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -41,6 +41,8 @@ interface FormState {
   credentials: string;
   location_city: string;
   available_for_booking: boolean;
+  registration_type: "autonomo" | "empresa";
+  document_number: string;
 }
 
 const professionalRoles = [
@@ -89,6 +91,8 @@ export function EditProfile() {
     credentials: "",
     location_city: "",
     available_for_booking: false,
+    registration_type: "autonomo",
+    document_number: "",
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -115,6 +119,8 @@ export function EditProfile() {
         credentials: profile.credentials ?? "",
         location_city: profile.location_city ?? "",
         available_for_booking: profile.available_for_booking ?? false,
+        registration_type: (profile.registration_type as "autonomo" | "empresa") ?? "autonomo",
+        document_number: profile.document_number ?? "",
       });
       setAvatarUrl(profile.avatar_url ?? null);
     }
@@ -181,6 +187,8 @@ export function EditProfile() {
       credentials: form.is_professional ? form.credentials : null,
       location_city: form.is_professional ? form.location_city : null,
       available_for_booking: form.is_professional ? form.available_for_booking : false,
+      registration_type: form.is_professional ? form.registration_type : "autonomo",
+      document_number: form.is_professional ? form.document_number : null,
       updated_at: new Date().toISOString(),
     };
     const { error: err } = await supabase
@@ -247,10 +255,23 @@ export function EditProfile() {
               <h3 className="mt-4 text-lg font-bold text-content-strong">{displayName}</h3>
               <p className="text-sm text-content-muted">{user?.email}</p>
               {form.is_professional && (
-                <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                  <Briefcase className="h-3 w-3" />
-                  {form.professional_role || "Profissional"}
-                </span>
+                <div className="mt-2 flex flex-col items-center gap-2">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                    <Briefcase className="h-3 w-3" />
+                    {form.professional_role || "Profissional"}
+                  </span>
+                  {profile?.verified ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+                      <ShieldCheck className="h-3 w-3" />
+                      {t("proreg.verifiedBadge")}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+                      <ShieldAlert className="h-3 w-3" />
+                      {t("proreg.pendingBadge")}
+                    </span>
+                  )}
+                </div>
               )}
             </CardContent>
           </Card>
@@ -446,6 +467,63 @@ export function EditProfile() {
                       />
                     </div>
                   </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium text-content-body">Tipo de Registro</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setField("registration_type", "autonomo")}
+                        className={`flex items-center gap-2 rounded-lg border-2 px-3 py-2.5 text-sm font-medium transition-all ${
+                          form.registration_type === "autonomo"
+                            ? "border-primary-600 bg-primary-50 text-primary-700"
+                            : "border-edge-base bg-surface-card text-content-body hover:border-slate-300"
+                        }`}
+                      >
+                        <User className="h-4 w-4" />
+                        {t("proreg.autonomo")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setField("registration_type", "empresa")}
+                        className={`flex items-center gap-2 rounded-lg border-2 px-3 py-2.5 text-sm font-medium transition-all ${
+                          form.registration_type === "empresa"
+                            ? "border-primary-600 bg-primary-50 text-primary-700"
+                            : "border-edge-base bg-surface-card text-content-body hover:border-slate-300"
+                        }`}
+                      >
+                        <Building2 className="h-4 w-4" />
+                        {t("proreg.empresa")}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium text-content-body">
+                      {form.registration_type === "empresa" ? "CNPJ" : "Documento (CRN, CREF, CRM...)"}
+                    </label>
+                    <div className="relative">
+                      <Award className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <Input
+                        placeholder={form.registration_type === "empresa" ? "Ex: 12.345.678/0001-90" : "Ex: CRN-3 12345"}
+                        value={form.document_number}
+                        onChange={(e) => setField("document_number", e.target.value)}
+                        className="pl-9"
+                      />
+                    </div>
+                    {profile?.verified ? (
+                      <p className="flex items-center gap-1 text-xs text-blue-600">
+                        <ShieldCheck className="h-3 w-3" />
+                        {t("proreg.verified")}
+                      </p>
+                    ) : (
+                      <p className="flex items-center gap-1 text-xs text-amber-600">
+                        <ShieldAlert className="h-3 w-3" />
+                        {t("proreg.notVerified")}
+                      </p>
+                    )}
+                  </div>
+
                   <div className="space-y-1.5">
                     <label className="text-sm font-medium text-content-body">Cidade</label>
                     <div className="relative">

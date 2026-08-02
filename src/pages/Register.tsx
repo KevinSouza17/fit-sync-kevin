@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Activity, Mail, Lock, Eye, EyeOff, User, Briefcase, GraduationCap, Award, MapPin, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import { Activity, Mail, Lock, Eye, EyeOff, User, Briefcase, GraduationCap, Award, MapPin, Loader2, CheckCircle2, AlertCircle, Building2 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { useAuth } from "../context/AuthContext";
@@ -45,6 +45,9 @@ export function Register() {
   const [proSpecialty, setProSpecialty] = useState("");
   const [proCredentials, setProCredentials] = useState("");
   const [proCity, setProCity] = useState("");
+  const [regType, setRegType] = useState<"autonomo" | "empresa">("autonomo");
+  const [docNumber, setDocNumber] = useState("");
+  const [docError, setDocError] = useState("");
 
   const { signUp } = useAuth();
   const navigate = useNavigate();
@@ -81,6 +84,17 @@ export function Register() {
       setError(t("register.fillFields"));
       return;
     }
+    if (accountType === "professional" && !docNumber.trim()) {
+      setError(t("proreg.documentRequired"));
+      return;
+    }
+    if (accountType === "professional" && regType === "empresa") {
+      const digits = docNumber.replace(/\D/g, "");
+      if (digits.length !== 14) {
+        setError(t("proreg.invalidCnpj"));
+        return;
+      }
+    }
     if (!emailChecked) {
       await checkEmail(email);
     }
@@ -90,7 +104,7 @@ export function Register() {
     }
     setLoading(true);
     const proData = accountType === "professional"
-      ? { role: proRole, specialty: proSpecialty, credentials: proCredentials }
+      ? { role: proRole, specialty: proSpecialty, credentials: proCredentials, registrationType: regType, documentNumber: docNumber.trim() }
       : undefined;
     const { error } = await signUp(email, password, fullName, proData);
     if (error) {
@@ -313,17 +327,61 @@ export function Register() {
                   </div>
                 </div>
 
+                {/* Registration type toggle */}
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-content-body">Registro Profissional (CRN, CREF, CRM...)</label>
+                  <label className="text-sm font-medium text-content-body">Tipo de Registro *</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => { setRegType("autonomo"); setDocNumber(""); setDocError(""); }}
+                      className={`flex items-center gap-2 rounded-lg border-2 px-3 py-2.5 text-sm font-medium transition-all ${
+                        regType === "autonomo"
+                          ? "border-emerald-600 bg-emerald-50 text-emerald-700"
+                          : "border-edge-base bg-surface-card text-content-body hover:border-slate-300"
+                      }`}
+                    >
+                      <User className="h-4 w-4" />
+                      Autônomo
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setRegType("empresa"); setDocNumber(""); setDocError(""); }}
+                      className={`flex items-center gap-2 rounded-lg border-2 px-3 py-2.5 text-sm font-medium transition-all ${
+                        regType === "empresa"
+                          ? "border-emerald-600 bg-emerald-50 text-emerald-700"
+                          : "border-edge-base bg-surface-card text-content-body hover:border-slate-300"
+                      }`}
+                    >
+                      <Building2 className="h-4 w-4" />
+                      Empresa
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-content-body">
+                    {regType === "empresa" ? "CNPJ *" : "Registro Profissional (CRN, CREF, CRM...) *"}
+                  </label>
                   <div className="relative">
                     <Award className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-content-muted" />
                     <Input
-                      placeholder="Ex: CRN-3 12345"
-                      value={proCredentials}
-                      onChange={(e) => setProCredentials(e.target.value)}
+                      placeholder={regType === "empresa" ? "Ex: 12.345.678/0001-90" : "Ex: CRN-3 12345"}
+                      value={docNumber}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setDocNumber(v);
+                        if (regType === "empresa") {
+                          const digits = v.replace(/\D/g, "");
+                          setDocError(digits.length === 14 || digits.length === 0 ? "" : t("proreg.invalidCnpj"));
+                        } else {
+                          setDocError(v.trim().length < 3 ? t("proreg.invalidDoc") : "");
+                        }
+                      }}
                       className="pl-9"
+                      required
                     />
                   </div>
+                  {docError && <p className="text-xs text-red-500">{docError}</p>}
                 </div>
 
                 <div className="space-y-1.5">
