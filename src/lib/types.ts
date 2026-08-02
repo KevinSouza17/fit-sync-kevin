@@ -307,3 +307,4 @@ export type WorkoutDay = Database["public"]["Tables"]["workout_days"]["Row"];
 export type WorkoutExercise = Database["public"]["Tables"]["workout_exercises"]["Row"];
 export type WorkoutLog = Database["public"]["Tables"]["workout_logs"]["Row"];
 export type CustomFood = Database["public"]["Tables"]["custom_foods"]["Row"];
+export type Appointment = Database["public"]["Tables"]["appointments"]["Row"];

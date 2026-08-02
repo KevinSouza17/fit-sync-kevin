@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Activity, Mail, Lock, Eye, EyeOff, User, Briefcase, GraduationCap, Award, MapPin } from "lucide-react";
+import { Activity, Mail, Lock, Eye, EyeOff, User, Briefcase, GraduationCap, Award, MapPin, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { useAuth } from "../context/AuthContext";
+import { supabase } from "../lib/supabase";
+import { useI18n } from "../context/I18nContext";
 
 const professionalRoles = [
   "Nutricionista",
@@ -46,20 +48,44 @@ export function Register() {
 
   const { signUp } = useAuth();
   const navigate = useNavigate();
+  const { t } = useI18n();
+  const [emailChecking, setEmailChecking] = useState(false);
+  const [emailExists, setEmailExists] = useState(false);
+  const [emailChecked, setEmailChecked] = useState(false);
+
+  async function checkEmail(value: string) {
+    if (!value.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+      setEmailChecked(false);
+      setEmailExists(false);
+      return;
+    }
+    setEmailChecking(true);
+    const { data } = await supabase.rpc("email_exists", { check_email: value.trim() });
+    setEmailChecking(false);
+    setEmailChecked(true);
+    setEmailExists(!!data);
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     if (password !== confirm) {
-      setError("As senhas não coincidem.");
+      setError(t("register.passwordMismatch"));
       return;
     }
     if (password.length < 6) {
-      setError("A senha deve ter pelo menos 6 caracteres.");
+      setError(t("register.passwordShort"));
       return;
     }
     if (accountType === "professional" && (!proRole || !proSpecialty)) {
-      setError("Preencha sua função e especialidade.");
+      setError(t("register.fillFields"));
+      return;
+    }
+    if (!emailChecked) {
+      await checkEmail(email);
+    }
+    if (emailExists) {
+      setError(t("register.emailExists"));
       return;
     }
     setLoading(true);
@@ -69,9 +95,9 @@ export function Register() {
     const { error } = await signUp(email, password, fullName, proData);
     if (error) {
       if (error.includes("already registered")) {
-        setError("Este e-mail já está cadastrado.");
+        setError(t("register.emailExists"));
       } else {
-        setError("Erro ao criar conta. Tente novamente.");
+        setError(error);
       }
     } else {
       navigate("/dashboard");
@@ -168,18 +194,35 @@ export function Register() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-content-body">E-mail</label>
+              <label className="text-sm font-medium text-content-body">{t("register.email")}</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-content-muted" />
                 <Input
                   type="email"
                   placeholder="seu@email.com"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="pl-9"
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    setEmailChecked(false);
+                    setEmailExists(false);
+                  }}
+                  onBlur={(e) => checkEmail(e.target.value)}
+                  className="pl-9 pr-10"
                   required
                 />
+                {emailChecking && (
+                  <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-content-muted" />
+                )}
+                {emailChecked && !emailChecking && !emailExists && (
+                  <CheckCircle2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-green-500" />
+                )}
+                {emailChecked && !emailChecking && emailExists && (
+                  <AlertCircle className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-red-500" />
+                )}
               </div>
+              {emailChecked && emailExists && (
+                <p className="text-xs text-red-500">{t("register.emailExists")}</p>
+              )}
             </div>
 
             <div className="space-y-1.5">

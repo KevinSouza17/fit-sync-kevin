@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { UserPlus, MessageCircle, Calendar, Star, MapPin, Search, Award } from "lucide-react";
+import { UserPlus, MessageCircle, Calendar, Star, MapPin, Search, Award, X, CheckCircle2 } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
-import { Avatar, AvatarFallback } from "../components/ui/avatar";
+import { Avatar, AvatarImage, AvatarFallback } from "../components/ui/avatar";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
+import { useNotifications } from "../context/NotificationsContext";
 import { InviteModal } from "../components/InviteModal";
 import { useI18n } from "../context/I18nContext";
 
@@ -19,6 +20,7 @@ interface Professional {
   available_for_booking: boolean;
   rating_avg: number;
   rating_count: number;
+  avatar_url: string | null;
 }
 
 const roleColors: Record<string, { bg: string; text: string }> = {
@@ -52,7 +54,7 @@ export function Team() {
     setLoading(true);
     const { data } = await supabase
       .from("profiles")
-      .select("id, full_name, professional_role, specialty, credentials, location_city, bio, available_for_booking, rating_avg, rating_count")
+      .select("id, full_name, professional_role, specialty, credentials, location_city, bio, available_for_booking, rating_avg, rating_count, avatar_url")
       .eq("is_professional", true)
       .order("rating_avg", { ascending: false });
     if (data) setProfessionals(data as Professional[]);
@@ -60,9 +62,40 @@ export function Team() {
   }
 
   const [inviteTarget, setInviteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [bookingTarget, setBookingTarget] = useState<Professional | null>(null);
+  const [bookingForm, setBookingForm] = useState({ date: "", time: "09:00", duration: "60", notes: "" });
+  const [bookingSaving, setBookingSaving] = useState(false);
+  const [bookingSuccess, setBookingSuccess] = useState(false);
 
   function startConversation(pro: Professional) {
     setInviteTarget({ id: pro.id, name: pro.full_name });
+  }
+
+  function openBooking(pro: Professional) {
+    setBookingTarget(pro);
+    setBookingForm({ date: "", time: "09:00", duration: "60", notes: "" });
+    setBookingSuccess(false);
+  }
+
+  async function submitBooking() {
+    if (!bookingTarget || !bookingForm.date) return;
+    setBookingSaving(true);
+    const { data } = await supabase
+      .from("appointments")
+      .insert({
+        professional_id: bookingTarget.id,
+        appointment_date: bookingForm.date,
+        appointment_time: bookingForm.time,
+        duration_minutes: parseInt(bookingForm.duration) || 60,
+        notes: bookingForm.notes || null,
+      })
+      .select()
+      .single();
+    setBookingSaving(false);
+    if (data) {
+      setBookingSuccess(true);
+      setTimeout(() => { setBookingTarget(null); setBookingSuccess(false); }, 2000);
+    }
   }
 
   const filtered = professionals.filter((p) => {
@@ -148,9 +181,13 @@ export function Team() {
                 <CardContent className="p-5">
                   <div className="mb-3 flex items-start gap-3">
                     <Avatar className="h-12 w-12">
-                      <AvatarFallback className={`text-sm font-bold ${color.bg} ${color.text}`}>
-                        {initials(pro.full_name)}
-                      </AvatarFallback>
+                      {pro.avatar_url ? (
+                        <AvatarImage src={pro.avatar_url} alt={pro.full_name} />
+                      ) : (
+                        <AvatarFallback className={`text-sm font-bold ${color.bg} ${color.text}`}>
+                          {initials(pro.full_name)}
+                        </AvatarFallback>
+                      )}
                     </Avatar>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
@@ -193,7 +230,7 @@ export function Team() {
                         <span className="text-xs text-slate-400">({pro.rating_count})</span>
                       )}
                     </div>
-                    <Button size="sm" className="h-7 gap-1.5 px-3 text-xs">
+                    <Button size="sm" className="h-7 gap-1.5 px-3 text-xs" onClick={() => openBooking(pro)}>
                       <Calendar className="h-3 w-3" />
                       {t("team.book")}
                     </Button>
@@ -213,6 +250,59 @@ export function Team() {
         expectedUserId={inviteTarget?.id}
       />
 
+      {/* Booking modal */}
+      {bookingTarget && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onClick={() => setBookingTarget(null)}>
+          <div className="w-full max-w-md rounded-t-2xl bg-surface-card p-6 shadow-xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-4 flex items-start justify-between">
+              <div>
+                <h2 className="text-lg font-bold text-content-strong">{t("appointments.bookWith")} {bookingTarget.full_name}</h2>
+                <p className="text-sm text-content-muted">{bookingTarget.professional_role}</p>
+              </div>
+              <button onClick={() => setBookingTarget(null)} className="text-content-muted hover:text-content-body">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            {bookingSuccess ? (
+              <div className="flex flex-col items-center py-8 text-center">
+                <CheckCircle2 className="mb-3 h-12 w-12 text-green-500" />
+                <p className="text-base font-semibold text-content-strong">{t("appointments.bookSuccess")}</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-sm font-medium text-content-body">{t("appointments.date")}</label>
+                    <input type="date" min={new Date().toISOString().slice(0, 10)} value={bookingForm.date} onChange={(e) => setBookingForm({ ...bookingForm, date: e.target.value })} className="mt-1 flex h-10 w-full rounded-lg border border-edge-base bg-surface-card px-3 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-content-body">{t("appointments.time")}</label>
+                    <input type="time" value={bookingForm.time} onChange={(e) => setBookingForm({ ...bookingForm, time: e.target.value })} className="mt-1 flex h-10 w-full rounded-lg border border-edge-base bg-surface-card px-3 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100" />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-content-body">{t("appointments.duration")}</label>
+                  <select value={bookingForm.duration} onChange={(e) => setBookingForm({ ...bookingForm, duration: e.target.value })} className="mt-1 flex h-10 w-full rounded-lg border border-edge-base bg-surface-card px-3 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100">
+                    <option value="30">30</option>
+                    <option value="60">60</option>
+                    <option value="90">90</option>
+                    <option value="120">120</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-content-body">{t("appointments.notes")}</label>
+                  <textarea rows={3} placeholder={t("appointments.notesPlaceholder")} value={bookingForm.notes} onChange={(e) => setBookingForm({ ...bookingForm, notes: e.target.value })} className="mt-1 flex w-full rounded-lg border border-edge-base bg-surface-card px-3 py-2 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100" />
+                </div>
+                <div className="flex gap-3">
+                  <Button variant="outline" className="flex-1" onClick={() => setBookingTarget(null)}>{t("cancel")}</Button>
+                  <Button className="flex-1" onClick={submitBooking} disabled={bookingSaving || !bookingForm.date}>{bookingSaving ? t("loading") : t("add")}</Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Professional detail modal */}
       {selectedPro && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -220,9 +310,13 @@ export function Team() {
             <div className="mb-4 flex items-start justify-between">
               <div className="flex items-start gap-3">
                 <Avatar className="h-14 w-14">
-                  <AvatarFallback className={`text-base font-bold ${roleColors[selectedPro.professional_role ?? ""]?.bg ?? "bg-slate-50"} ${roleColors[selectedPro.professional_role ?? ""]?.text ?? "text-slate-700"}`}>
-                    {initials(selectedPro.full_name)}
-                  </AvatarFallback>
+                  {selectedPro.avatar_url ? (
+                    <AvatarImage src={selectedPro.avatar_url} alt={selectedPro.full_name} />
+                  ) : (
+                    <AvatarFallback className={`text-base font-bold ${roleColors[selectedPro.professional_role ?? ""]?.bg ?? "bg-slate-50"} ${roleColors[selectedPro.professional_role ?? ""]?.text ?? "text-slate-700"}`}>
+                      {initials(selectedPro.full_name)}
+                    </AvatarFallback>
+                  )}
                 </Avatar>
                 <div>
                   <h2 className="text-lg font-bold text-slate-900">{selectedPro.full_name}</h2>
@@ -284,7 +378,7 @@ export function Team() {
                 <MessageCircle className="h-4 w-4" />
                 {t("team.message")}
               </Button>
-              <Button className="flex-1 gap-2" disabled={!selectedPro.available_for_booking}>
+              <Button className="flex-1 gap-2" disabled={!selectedPro.available_for_booking} onClick={() => openBooking(selectedPro)}>
                 <Calendar className="h-4 w-4" />
                 {t("team.book")}
               </Button>

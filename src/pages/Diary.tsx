@@ -3,7 +3,7 @@ import { Plus, Check, ChevronRight, Dumbbell, Apple, Droplets, Moon, X, Trash2 }
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
-import { Avatar, AvatarFallback } from "../components/ui/avatar";
+import { Avatar, AvatarImage, AvatarFallback } from "../components/ui/avatar";
 import { Progress } from "../components/ui/progress";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
@@ -281,9 +281,13 @@ export function Diary() {
             <Card>
               <CardContent className="flex flex-col items-center p-6 text-center">
                 <Avatar className="h-20 w-20">
-                  <AvatarFallback className="bg-primary-50 text-2xl font-bold text-primary-700">
-                    {initials(displayName)}
-                  </AvatarFallback>
+                  {profile?.avatar_url ? (
+                    <AvatarImage src={profile.avatar_url} alt={displayName} />
+                  ) : (
+                    <AvatarFallback className="bg-primary-50 text-2xl font-bold text-primary-700">
+                      {initials(displayName)}
+                    </AvatarFallback>
+                  )}
                 </Avatar>
                 <h3 className="mt-3 text-lg font-bold text-content-strong">{displayName}</h3>
                 <p className="text-sm text-content-muted">{profile?.plan === "pro" ? t("nav.planPro") : t("nav.planFree")}</p>

@@ -4,7 +4,7 @@ import { Send, Search, ArrowLeft, MessageCircle, UserCircle, UserPlus } from "lu
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
 import { useNotifications } from "../context/NotificationsContext";
-import { Avatar, AvatarFallback } from "../components/ui/avatar";
+import { Avatar, AvatarImage, AvatarFallback } from "../components/ui/avatar";
 import { InviteModal } from "../components/InviteModal";
 import { useI18n } from "../context/I18nContext";
 
@@ -16,6 +16,7 @@ interface ConversationRow {
   otherName: string;
   otherRole: string;
   otherId: string;
+  otherAvatar: string | null;
   lastContent: string;
   unread: number;
 }
@@ -76,7 +77,7 @@ export function Messages() {
         const otherId = c.user_a_id === user.id ? c.user_b_id : c.user_a_id;
         const { data: other } = await supabase
           .from("profiles")
-          .select("full_name, professional_role, is_professional")
+          .select("full_name, professional_role, is_professional, avatar_url")
           .eq("id", otherId)
           .maybeSingle();
 
@@ -103,6 +104,7 @@ export function Messages() {
           otherId,
           otherName: other?.full_name || "Usuário",
           otherRole: other?.is_professional ? other.professional_role ?? t("messages.professional") : t("messages.patient"),
+          otherAvatar: other?.avatar_url ?? null,
           lastContent: lastMsg?.content ?? "",
           unread: count ?? 0,
         };
@@ -307,9 +309,13 @@ export function Messages() {
                 }`}
               >
                 <Avatar className="h-11 w-11 shrink-0">
-                  <AvatarFallback className="bg-primary-100 text-sm font-bold text-primary-700">
-                    {initials(c.otherName)}
-                  </AvatarFallback>
+                  {c.otherAvatar ? (
+                    <AvatarImage src={c.otherAvatar} alt={c.otherName} />
+                  ) : (
+                    <AvatarFallback className="bg-primary-100 text-sm font-bold text-primary-700">
+                      {initials(c.otherName)}
+                    </AvatarFallback>
+                  )}
                 </Avatar>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">

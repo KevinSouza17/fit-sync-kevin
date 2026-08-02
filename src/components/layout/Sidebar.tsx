@@ -17,6 +17,7 @@ import {
   Dumbbell,
   Menu,
   X,
+  CalendarCheck,
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { Avatar, AvatarImage, AvatarFallback } from "../ui/avatar";
@@ -31,6 +32,7 @@ const navKeys = [
   { to: "/team", key: "nav.team", icon: Users },
   { to: "/professional-profile", key: "nav.professionalProfile", icon: UserCircle },
   { to: "/workout", key: "nav.workout", icon: Dumbbell },
+  { to: "/appointments", key: "nav.appointments", icon: CalendarCheck },
   { to: "/messages", key: "nav.messages", icon: MessageCircle },
   { to: "/notifications", key: "nav.notifications", icon: Bell },
   { to: "/progress", key: "nav.progress", icon: TrendingUp },
