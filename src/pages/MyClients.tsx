@@ -34,6 +34,7 @@ export function MyClients() {
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const [planType, setPlanType] = useState<"diet" | "workout">("diet");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -83,7 +84,7 @@ export function MyClients() {
     setPlanType("diet"); setTitle(""); setDescription("");
     setCalories(""); setProtein(""); setCarbs(""); setFat("");
     setMeals([{ name: "", items: "" }]); setDays([{ name: "", exercises: "" }]);
-    setSuccess(false);
+    setSuccess(false); setSaveError("");
   }
   function openNewPlan() {
     if (!selectedClient) return;
@@ -97,7 +98,7 @@ export function MyClients() {
 
   async function savePlan() {
     if (!user || !selectedClient || !title.trim()) return;
-    setSaving(true);
+    setSaving(true); setSaveError("");
     const content = planType === "diet"
       ? { meals: meals.filter((m) => m.name.trim()) }
       : { days: days.filter((d) => d.name.trim()) };
@@ -110,7 +111,9 @@ export function MyClients() {
       target_fat_g: planType === "diet" ? Number(fat) || null : null,
       content, active: true,
     }).select().single();
-    if (!error && data) {
+    if (error) {
+      setSaveError(error.message);
+    } else if (data) {
       setAllPlans((prev) => [data as ClientPlan, ...prev]);
       setSuccess(true);
       setTimeout(() => { setSuccess(false); setModalOpen(false); resetForm(); }, 1400);
@@ -318,6 +321,9 @@ export function MyClients() {
                 </div>
               ) : (
                 <div className="flex flex-col gap-4">
+                  {saveError && (
+                    <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{saveError}</div>
+                  )}
                   <div className="grid grid-cols-2 gap-2">
                     {(["diet", "workout"] as const).map((pt) => (
                       <button key={pt} onClick={() => setPlanType(pt)}

@@ -56,17 +56,24 @@ export function Register() {
   const [emailExists, setEmailExists] = useState(false);
   const [emailChecked, setEmailChecked] = useState(false);
 
-  async function checkEmail(value: string) {
+  async function checkEmail(value: string): Promise<boolean> {
     if (!value.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
       setEmailChecked(false);
       setEmailExists(false);
-      return;
+      return false;
     }
     setEmailChecking(true);
-    const { data } = await supabase.rpc("email_exists", { check_email: value.trim() });
+    const { data, error } = await supabase.rpc("email_exists", { check_email: value.trim() });
     setEmailChecking(false);
+    if (error) {
+      setEmailChecked(false);
+      setEmailExists(false);
+      return false;
+    }
+    const exists = !!data;
     setEmailChecked(true);
-    setEmailExists(!!data);
+    setEmailExists(exists);
+    return exists;
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -95,10 +102,8 @@ export function Register() {
         return;
       }
     }
-    if (!emailChecked) {
-      await checkEmail(email);
-    }
-    if (emailExists) {
+    const exists = emailChecked ? emailExists : await checkEmail(email);
+    if (exists) {
       setError(t("register.emailExists"));
       return;
     }
