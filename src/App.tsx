@@ -13,6 +13,8 @@ import { EditProfile } from "./pages/EditProfile";
 import { ProfessionalProfile } from "./pages/ProfessionalProfile";
 import { Messages } from "./pages/Messages";
 import { Notifications } from "./pages/Notifications";
+import { Workout } from "./pages/Workout";
+import { WorkoutProgression } from "./pages/WorkoutProgression";
 import { DashboardLayout } from "./components/layout/DashboardLayout";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -77,6 +79,8 @@ export default function App() {
           <Route path="/professional-profile" element={<ProfessionalRoute><ProfessionalProfile /></ProfessionalRoute>} />
           <Route path="/messages" element={<Messages />} />
           <Route path="/notifications" element={<Notifications />} />
+          <Route path="/workout" element={<Workout />} />
+          <Route path="/workout/progression" element={<WorkoutProgression />} />
         </Route>
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>

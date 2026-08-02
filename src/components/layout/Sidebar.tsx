@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -13,78 +14,81 @@ import {
   UserCircle,
   MessageCircle,
   Bell,
+  Dumbbell,
+  Menu,
+  X,
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { Avatar, AvatarImage, AvatarFallback } from "../ui/avatar";
 import { useAuth } from "../../context/AuthContext";
 import { useNotifications } from "../../context/NotificationsContext";
+import { useI18n } from "../../context/I18nContext";
 
-const navItems = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/diary", label: "Diário", icon: BookOpen },
-  { to: "/goals", label: "Metas", icon: Target },
-  { to: "/team", label: "Equipe", icon: Users },
-  { to: "/professional-profile", label: "Perfil Profissional", icon: UserCircle },
-  { to: "/messages", label: "Mensagens", icon: MessageCircle },
-  { to: "/notifications", label: "Notificações", icon: Bell },
-  { to: "/progress", label: "Progresso", icon: TrendingUp },
-  { to: "/recipes", label: "Alimentos", icon: UtensilsCrossed },
-  { to: "/settings", label: "Configurações", icon: Settings },
+const navKeys = [
+  { to: "/dashboard", key: "nav.dashboard", icon: LayoutDashboard },
+  { to: "/diary", key: "nav.diary", icon: BookOpen },
+  { to: "/goals", key: "nav.goals", icon: Target },
+  { to: "/team", key: "nav.team", icon: Users },
+  { to: "/professional-profile", key: "nav.professionalProfile", icon: UserCircle },
+  { to: "/workout", key: "nav.workout", icon: Dumbbell },
+  { to: "/messages", key: "nav.messages", icon: MessageCircle },
+  { to: "/notifications", key: "nav.notifications", icon: Bell },
+  { to: "/progress", key: "nav.progress", icon: TrendingUp },
+  { to: "/recipes", key: "nav.recipes", icon: UtensilsCrossed },
+  { to: "/settings", key: "nav.settings", icon: Settings },
 ];
 
 function initials(name: string) {
-  return name
-    .split(" ")
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? "")
-    .join("");
+  return name.split(" ").slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("");
 }
 
 export function Sidebar() {
   const { profile, user, signOut } = useAuth();
   const navigate = useNavigate();
   const { unreadCount } = useNotifications();
+  const { t } = useI18n();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
-  const displayName = profile?.full_name || user?.email?.split("@")[0] || "Usuário";
-  const plan = profile?.plan === "pro" ? "Plano Pro" : "Plano Free";
+  const displayName = profile?.full_name || user?.email?.split("@")[0] || "FitSync";
+  const plan = profile?.plan === "pro" ? t("nav.planPro") : t("nav.planFree");
   const isPro = profile?.is_professional;
 
-  const visibleNavItems = navItems.filter(
-    (item) => item.to !== "/professional-profile" || isPro
-  );
+  const visibleNavItems = navKeys.filter((item) => item.to !== "/professional-profile" || isPro);
 
   async function handleSignOut() {
     await signOut();
     navigate("/login");
   }
 
-  return (
-    <aside className="flex h-screen w-64 shrink-0 flex-col border-r border-edge-base bg-surface-card px-4 py-4">
+  const sidebarContent = (
+    <aside className="flex h-full w-64 shrink-0 flex-col border-r border-edge-base bg-surface-card px-4 py-4">
       <header className="flex items-center gap-2.5 px-2 pb-6 pt-1">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-600">
           <Activity className="h-5 w-5 text-white" />
         </div>
         <span className="text-xl font-bold text-content-strong">FitSync</span>
+        <button onClick={() => setMobileOpen(false)} className="ml-auto rounded-lg p-1.5 text-content-muted hover:bg-surface-subtle lg:hidden">
+          <X className="h-5 w-5" />
+        </button>
       </header>
 
-      <nav className="flex flex-1 flex-col gap-1">
-        {visibleNavItems.map(({ to, label, icon: Icon }) => {
+      <nav className="flex flex-1 flex-col gap-1 overflow-y-auto">
+        {visibleNavItems.map(({ to, key, icon: Icon }) => {
           const showBadge = to === "/notifications" && unreadCount > 0;
           return (
             <NavLink
               key={to}
               to={to}
+              onClick={() => setMobileOpen(false)}
               className={({ isActive }) =>
                 cn(
                   "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                  isActive
-                    ? "bg-primary-50 text-primary-600"
-                    : "text-content-body hover:bg-surface-subtle hover:text-content-strong"
+                  isActive ? "bg-primary-50 text-primary-600" : "text-content-body hover:bg-surface-subtle hover:text-content-strong"
                 )
               }
             >
               <Icon className="h-5 w-5 shrink-0" />
-              {label}
+              {t(key)}
               {showBadge && (
                 <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-primary-600 px-1.5 text-[10px] font-bold text-white">
                   {unreadCount > 9 ? "9+" : unreadCount}
@@ -98,15 +102,12 @@ export function Sidebar() {
       <footer className="border-t border-edge-base pt-4">
         <NavLink
           to="/profile"
+          onClick={() => setMobileOpen(false)}
           className="flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-surface-subtle"
         >
           <Avatar className="h-9 w-9">
-            {profile?.avatar_url ? (
-              <AvatarImage src={profile.avatar_url} alt={displayName} />
-            ) : (
-              <AvatarFallback className="bg-primary-50 text-xs font-bold text-primary-700">
-                {initials(displayName)}
-              </AvatarFallback>
+            {profile?.avatar_url ? <AvatarImage src={profile.avatar_url} alt={displayName} /> : (
+              <AvatarFallback className="bg-primary-50 text-xs font-bold text-primary-700">{initials(displayName)}</AvatarFallback>
             )}
           </Avatar>
           <div className="flex min-w-0 flex-1 flex-col">
@@ -127,9 +128,37 @@ export function Sidebar() {
           className="mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-content-muted transition-colors hover:bg-red-50 hover:text-red-600"
         >
           <LogOut className="h-4 w-4" />
-          Sair
+          {t("nav.logout")}
         </button>
       </footer>
     </aside>
+  );
+
+  return (
+    <>
+      {/* Mobile top bar */}
+      <div className="flex items-center justify-between border-b border-edge-base bg-surface-card px-4 py-3 lg:hidden">
+        <div className="flex items-center gap-2">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary-600">
+            <Activity className="h-4 w-4 text-white" />
+          </div>
+          <span className="text-lg font-bold text-content-strong">FitSync</span>
+        </div>
+        <button onClick={() => setMobileOpen(true)} className="rounded-lg p-2 text-content-body hover:bg-surface-subtle">
+          <Menu className="h-5 w-5" />
+        </button>
+      </div>
+
+      {/* Desktop sidebar */}
+      <div className="hidden lg:block">{sidebarContent}</div>
+
+      {/* Mobile sidebar overlay */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setMobileOpen(false)} />
+          <div className="sidebar-mobile-enter absolute left-0 top-0 h-full">{sidebarContent}</div>
+        </div>
+      )}
+    </>
   );
 }

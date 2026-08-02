@@ -6,6 +6,7 @@ import { Input } from "../components/ui/input";
 import { Avatar, AvatarImage, AvatarFallback } from "../components/ui/avatar";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
+import { useI18n } from "../context/I18nContext";
 
 const healthGoals = [
   "Perda de Peso",
@@ -71,6 +72,7 @@ function initials(name: string) {
 
 export function EditProfile() {
   const { profile, user, refreshProfile } = useAuth();
+  const { t } = useI18n();
   const [form, setForm] = useState<FormState>({
     full_name: "",
     height_cm: "",
@@ -197,17 +199,17 @@ export function EditProfile() {
   const displayName = form.full_name || user?.email?.split("@")[0] || "Usuário";
 
   return (
-    <div className="flex flex-col gap-6 p-8">
+    <div className="flex flex-col gap-6 p-4 sm:p-6 lg:p-8">
       <header className="flex items-end justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-content-strong">Editar Perfil</h1>
+          <h1 className="text-2xl font-bold text-content-strong">{t("profile.title")}</h1>
           <p className="mt-0.5 text-sm text-content-muted">Atualize suas informações pessoais e de saúde</p>
         </div>
         <div className="flex items-center gap-3">
           {error && <p className="text-sm text-red-500">{error}</p>}
           <Button onClick={handleSave} disabled={saving} className="gap-2">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : saved ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4" />}
-            {saving ? "Salvando..." : saved ? "Salvo!" : "Salvar Alterações"}
+            {saving ? t("saving") : saved ? "Salvo!" : t("profile.save")}
           </Button>
         </div>
       </header>
@@ -301,7 +303,7 @@ export function EditProfile() {
               <h2 className="mb-4 text-base font-semibold text-content-strong">Informações Pessoais</h2>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-sm font-medium text-content-body">Nome completo</label>
+                  <label className="text-sm font-medium text-content-body">{t("profile.fullName")}</label>
                   <Input
                     type="text"
                     value={form.full_name}
@@ -317,7 +319,7 @@ export function EditProfile() {
                   <label className="text-sm font-medium text-content-body">Conta criada em</label>
                   <Input
                     type="text"
-                    value={user?.created_at ? new Date(user.created_at).toLocaleDateString("pt-BR") : ""}
+                    value={user?.created_at ? new Date(user.created_at).toLocaleDateString(undefined) : ""}
                     disabled
                     className="bg-surface-subtle text-content-muted"
                   />
@@ -331,11 +333,11 @@ export function EditProfile() {
               <h2 className="mb-4 text-base font-semibold text-content-strong">Medidas e Saúde</h2>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-content-body">Altura (cm)</label>
+                  <label className="text-sm font-medium text-content-body">{t("profile.height")}</label>
                   <Input type="number" step="0.1" placeholder="178" value={form.height_cm} onChange={(e) => setField("height_cm", e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-content-body">Peso atual (kg)</label>
+                  <label className="text-sm font-medium text-content-body">{t("profile.weight")}</label>
                   <Input type="number" step="0.1" placeholder="75.0" value={form.weight_kg} onChange={(e) => setField("weight_kg", e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
@@ -348,7 +350,7 @@ export function EditProfile() {
 
           <Card>
             <CardContent className="p-5">
-              <h2 className="mb-4 text-base font-semibold text-content-strong">Objetivo de Saúde</h2>
+              <h2 className="mb-4 text-base font-semibold text-content-strong">{t("profile.healthGoal")}</h2>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {healthGoals.map((goal) => (
                   <button

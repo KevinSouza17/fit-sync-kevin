@@ -6,6 +6,7 @@ import { Input } from "../components/ui/input";
 import { Progress } from "../components/ui/progress";
 import { supabase } from "../lib/supabase";
 import type { Goal } from "../lib/types";
+import { useI18n } from "../context/I18nContext";
 
 const categories = ["Força", "Cardio", "Peso", "Nutrição", "Composição", "Saúde", "Geral"];
 const colorOptions = [
@@ -47,6 +48,7 @@ const emptyForm: GoalForm = {
 };
 
 export function Goals() {
+  const { t } = useI18n();
   const [goals, setGoals] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -127,7 +129,7 @@ export function Goals() {
   }
 
   return (
-    <div className="flex flex-col gap-6 p-8">
+    <div className="flex flex-col gap-6 p-4 sm:p-6 lg:p-8">
       <header className="flex items-end justify-between">
         <div>
           <h1 className="text-2xl font-bold text-content-strong">Minhas Metas</h1>
@@ -329,7 +331,7 @@ export function Goals() {
             <div className="mt-5 flex gap-3">
               <Button variant="outline" className="flex-1" onClick={() => setShowModal(false)}>Cancelar</Button>
               <Button className="flex-1" onClick={saveGoal} disabled={saving || !form.title || !form.target_value}>
-                {saving ? "Salvando..." : editingGoal ? "Atualizar" : "Criar Meta"}
+                {saving ? t("saving") : editingGoal ? "Atualizar" : "Criar Meta"}
               </Button>
             </div>
           </div>

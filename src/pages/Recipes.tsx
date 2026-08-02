@@ -1,8 +1,10 @@
-import { useEffect, useState, useRef } from "react";
-import { Search, UtensilsCrossed, Plus, X, Flame } from "lucide-react";
+import { useEffect, useState, useRef, useCallback } from "react";
+import { Search, UtensilsCrossed, Plus, X, Flame, Barcode, History, BookUser, Clock, Trash2, Check } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { supabase } from "../lib/supabase";
+import { useAuth } from "../context/AuthContext";
+import { useI18n } from "../context/I18nContext";
 
 interface Food {
   id: string;
@@ -14,6 +16,33 @@ interface Food {
   carbs_g: number;
   fat_g: number;
   fiber_g: number;
+}
+
+interface CustomFood {
+  id: string;
+  name: string;
+  category: string;
+  serving_size: string;
+  calories: number;
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
+  fiber_g: number;
+  barcode: string | null;
+  is_recipe: boolean;
+  ingredients: string | null;
+}
+
+interface MealLog {
+  id: string;
+  name: string;
+  meal_type: string;
+  calories: number;
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
+  logged_date: string;
+  created_at: string;
 }
 
 const categoryColors: Record<string, { bg: string; text: string }> = {
@@ -29,34 +58,58 @@ const categoryColors: Record<string, { bg: string; text: string }> = {
   "Preparações": { bg: "bg-violet-50", text: "text-violet-600" },
   "Condimentos": { bg: "bg-surface-base", text: "text-content-body" },
   "Suplementos": { bg: "bg-teal-50", text: "text-teal-600" },
+  "Personalizado": { bg: "bg-slate-100", text: "text-slate-600" },
 };
 
-const mealTypeOptions = [
-  { value: "breakfast", label: "Café da Manhã" },
-  { value: "lunch", label: "Almoço" },
-  { value: "dinner", label: "Jantar" },
-  { value: "snack", label: "Lanche" },
-];
+function getMealLabel(mealType: string, t: (k: string) => string) {
+  const map: Record<string, string> = {
+    breakfast: t("meal.breakfast"),
+    lunch: t("meal.lunch"),
+    dinner: t("meal.dinner"),
+    snack: t("meal.snack"),
+    pre_workout: t("meal.preWorkout"),
+    post_workout: t("meal.postWorkout"),
+  };
+  return map[mealType] || mealType;
+}
+
+const mealOrder = ["breakfast", "pre_workout", "lunch", "snack", "post_workout", "dinner"];
+
+type Tab = "catalog" | "mine" | "history";
 
 export function Recipes() {
+  const { user } = useAuth();
+  const { t } = useI18n();
+  const [tab, setTab] = useState<Tab>("catalog");
   const [foods, setFoods] = useState<Food[]>([]);
   const [filtered, setFiltered] = useState<Food[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [categories, setCategories] = useState<string[]>([]);
-  const [selectedFood, setSelectedFood] = useState<Food | null>(null);
+  const [selectedFood, setSelectedFood] = useState<Food | CustomFood | null>(null);
+  const [isCustom, setIsCustom] = useState(false);
   const [servings, setServings] = useState("1");
   const [mealType, setMealType] = useState("snack");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
-  useEffect(() => {
-    loadFoods();
-  }, []);
+  const [customFoods, setCustomFoods] = useState<CustomFood[]>([]);
+  const [customFiltered, setCustomFiltered] = useState<CustomFood[]>([]);
+  const [showCustomModal, setShowCustomModal] = useState(false);
+  const [customForm, setCustomForm] = useState({
+    name: "", category: "Personalizado", serving_size: "100g",
+    calories: "", protein_g: "", carbs_g: "", fat_g: "", fiber_g: "",
+    barcode: "", is_recipe: false, ingredients: "",
+  });
 
-  async function loadFoods() {
+  const [meals, setMeals] = useState<MealLog[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  const loadFoods = useCallback(async () => {
     setLoading(true);
     const { data } = await supabase.from("foods").select("*").order("category").order("name");
     if (data) {
@@ -66,7 +119,34 @@ export function Recipes() {
       setCategories(cats);
     }
     setLoading(false);
-  }
+  }, []);
+
+  const loadCustomFoods = useCallback(async () => {
+    if (!user) return;
+    const { data } = await supabase.from("custom_foods").select("*").order("created_at", { ascending: false });
+    if (data) {
+      setCustomFoods(data);
+      setCustomFiltered(data);
+    }
+  }, [user]);
+
+  const loadHistory = useCallback(async () => {
+    setHistoryLoading(true);
+    const { data } = await supabase
+      .from("meals")
+      .select("*")
+      .order("logged_date", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(100);
+    if (data) setMeals(data);
+    setHistoryLoading(false);
+  }, []);
+
+  useEffect(() => {
+    loadFoods();
+    loadCustomFoods();
+    loadHistory();
+  }, [loadFoods, loadCustomFoods, loadHistory]);
 
   function handleSearch(value: string) {
     setSearch(value);
@@ -84,18 +164,15 @@ export function Recipes() {
     let result = foods;
     if (query.trim()) {
       const q = query.toLowerCase();
-      result = result.filter(
-        (f) => f.name.toLowerCase().includes(q) || f.category.toLowerCase().includes(q)
-      );
+      result = result.filter((f) => f.name.toLowerCase().includes(q) || f.category.toLowerCase().includes(q));
     }
-    if (cat) {
-      result = result.filter((f) => f.category === cat);
-    }
+    if (cat) result = result.filter((f) => f.category === cat);
     setFiltered(result);
   }
 
-  function openFoodDetail(food: Food) {
+  function openFoodDetail(food: Food | CustomFood, custom: boolean) {
     setSelectedFood(food);
+    setIsCustom(custom);
     setServings("1");
     setMealType("snack");
     setSaved(false);
@@ -113,11 +190,10 @@ export function Recipes() {
     };
   }
 
-  async function addFromCatalog() {
+  async function addToDiary() {
     if (!selectedFood) return;
     setSaving(true);
     const n = parseFloat(servings) || 1;
-    const today = new Date().toISOString().slice(0, 10);
     const { data } = await supabase
       .from("meals")
       .insert({
@@ -134,244 +210,461 @@ export function Recipes() {
     setSaving(false);
     if (data) {
       setSaved(true);
-      setTimeout(() => {
-        setSelectedFood(null);
-        setSaved(false);
-      }, 1500);
+      setMeals((prev) => [data, ...prev]);
+      setTimeout(() => { setSelectedFood(null); setSaved(false); }, 1500);
     }
   }
 
-  const totalFoods = foods.length;
+  async function saveCustomFood() {
+    if (!customForm.name.trim() || !customForm.calories) return;
+    setSaving(true);
+    const { data } = await supabase
+      .from("custom_foods")
+      .insert({
+        name: customForm.name,
+        category: customForm.category,
+        serving_size: customForm.serving_size,
+        calories: parseInt(customForm.calories) || 0,
+        protein_g: parseFloat(customForm.protein_g) || 0,
+        carbs_g: parseFloat(customForm.carbs_g) || 0,
+        fat_g: parseFloat(customForm.fat_g) || 0,
+        fiber_g: parseFloat(customForm.fiber_g) || 0,
+        barcode: customForm.barcode || null,
+        is_recipe: customForm.is_recipe,
+        ingredients: customForm.is_recipe ? customForm.ingredients : null,
+      })
+      .select()
+      .single();
+    setSaving(false);
+    if (data) {
+      setCustomFoods((prev) => [data, ...prev]);
+      setCustomFiltered((prev) => [data, ...prev]);
+      setShowCustomModal(false);
+      setCustomForm({ name: "", category: "Personalizado", serving_size: "100g", calories: "", protein_g: "", carbs_g: "", fat_g: "", fiber_g: "", barcode: "", is_recipe: false, ingredients: "" });
+    }
+  }
+
+  async function deleteCustomFood(id: string) {
+    await supabase.from("custom_foods").delete().eq("id", id);
+    setCustomFoods((prev) => prev.filter((f) => f.id !== id));
+    setCustomFiltered((prev) => prev.filter((f) => f.id !== id));
+  }
+
+  async function searchByBarcode() {
+    if (!customForm.barcode.trim()) return;
+    const { data } = await supabase.from("foods").select("*").eq("barcode", customForm.barcode.trim()).maybeSingle();
+    if (data) {
+      setCustomForm((prev) => ({
+        ...prev, name: data.name, category: data.category, serving_size: data.serving_size,
+        calories: String(data.calories), protein_g: String(data.protein_g), carbs_g: String(data.carbs_g), fat_g: String(data.fat_g), fiber_g: String(data.fiber_g),
+      }));
+    }
+  }
+
+  // Group meals by type for history view
+  const mealsByType: Record<string, MealLog[]> = {};
+  meals.forEach((m) => {
+    if (!mealsByType[m.meal_type]) mealsByType[m.meal_type] = [];
+    mealsByType[m.meal_type].push(m);
+  });
+
+  const sortedMealTypes = Object.keys(mealsByType).sort((a, b) => {
+    const ia = mealOrder.indexOf(a); const ib = mealOrder.indexOf(b);
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+  });
+
+  const tabConfig: { key: Tab; label: string; icon: typeof UtensilsCrossed }[] = [
+    { key: "catalog", label: t("foods.tabCatalog"), icon: UtensilsCrossed },
+    { key: "mine", label: t("foods.tabMine"), icon: BookUser },
+    { key: "history", label: t("foods.tabHistory"), icon: History },
+  ];
 
   return (
-    <div className="flex flex-col gap-6 p-8">
-      <header>
-        <h1 className="text-2xl font-bold text-content-strong">Catálogo de Alimentos</h1>
-        <p className="mt-0.5 text-sm text-content-muted">
-          Pesquise e selecione alimentos para registrar automaticamente calorias e nutrientes
-        </p>
+    <div className="flex flex-col gap-6 p-4 sm:p-6 lg:p-8">
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-content-strong">{t("foods.title")}</h1>
+          <p className="mt-0.5 text-sm text-content-muted">{t("foods.subtitle")}</p>
+        </div>
+        <Button className="gap-2" onClick={() => setShowCustomModal(true)}>
+          <Plus className="h-4 w-4" />
+          {t("foods.addCustom")}
+        </Button>
       </header>
 
-      {/* Search bar */}
-      <div className="relative">
-        <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-content-muted" />
-        <input
-          className="flex h-12 w-full rounded-xl border border-edge-base bg-surface-card pl-12 pr-4 text-base text-content-strong placeholder:text-content-muted focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
-          placeholder="Buscar alimento por nome ou categoria..."
-          value={search}
-          onChange={(e) => handleSearch(e.target.value)}
-        />
+      {/* Tabs */}
+      <div className="flex gap-2 border-b border-edge-base pb-px">
+        {tabConfig.map((tabItem) => (
+          <button
+            key={tabItem.key}
+            onClick={() => setTab(tabItem.key)}
+            className={`flex items-center gap-2 rounded-t-lg px-3 sm:px-4 py-2.5 text-sm font-medium transition-colors ${
+              tab === tabItem.key ? "border-b-2 border-primary-600 text-primary-600" : "text-content-muted hover:text-content-body"
+            }`}
+          >
+            <tabItem.icon className="h-4 w-4" />
+            {tabItem.label}
+          </button>
+        ))}
       </div>
 
-      {/* Category filter chips */}
-      <div className="flex flex-wrap gap-2">
-        <button
-          onClick={() => handleCategoryFilter(null)}
-          className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-            !activeCategory ? "bg-primary-600 text-white" : "bg-surface-subtle text-content-body hover:bg-slate-200"
-          }`}
-        >
-          Todos ({totalFoods})
-        </button>
-        {categories.map((cat) => {
-          const count = foods.filter((f) => f.category === cat).length;
-          const color = categoryColors[cat] ?? { bg: "bg-surface-subtle", text: "text-content-body" };
-          return (
+      {/* ── Catalog tab ── */}
+      {tab === "catalog" && (
+        <>
+          <div className="relative">
+            <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-content-muted" />
+            <input
+              className="flex h-12 w-full rounded-xl border border-edge-base bg-surface-card pl-12 pr-4 text-base text-content-strong placeholder:text-content-muted focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
+              placeholder={t("foods.searchPlaceholder")}
+              value={search}
+              onChange={(e) => handleSearch(e.target.value)}
+            />
+          </div>
+
+          <div className="flex flex-wrap gap-2">
             <button
-              key={cat}
-              onClick={() => handleCategoryFilter(cat)}
-              className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-                activeCategory === cat
-                  ? `${color.bg} ${color.text} ring-2 ring-offset-1 ring-current`
-                  : "bg-surface-subtle text-content-body hover:bg-slate-200"
-              }`}
+              onClick={() => handleCategoryFilter(null)}
+              className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${!activeCategory ? "bg-primary-600 text-white" : "bg-surface-subtle text-content-body hover:bg-slate-200"}`}
             >
-              {cat} ({count})
+              {t("all")} ({foods.length})
             </button>
-          );
-        })}
-      </div>
+            {categories.map((cat) => {
+              const count = foods.filter((f) => f.category === cat).length;
+              const color = categoryColors[cat] ?? { bg: "bg-surface-subtle", text: "text-content-body" };
+              return (
+                <button
+                  key={cat}
+                  onClick={() => handleCategoryFilter(cat)}
+                  className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${activeCategory === cat ? `${color.bg} ${color.text} ring-2 ring-offset-1 ring-current` : "bg-surface-subtle text-content-body hover:bg-slate-200"}`}
+                >
+                  {t(`cat.${cat}`)} ({count})
+                </button>
+              );
+            })}
+          </div>
 
-      {loading ? (
-        <div className="flex h-64 items-center justify-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-600 border-t-transparent" />
-        </div>
-      ) : filtered.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center py-16 text-center">
-            <UtensilsCrossed className="mb-3 h-12 w-12 text-slate-200" />
-            <h3 className="text-base font-semibold text-content-body">Nenhum alimento encontrado</h3>
-            <p className="mt-1 text-sm text-content-muted">Tente outro termo de busca ou selecione outra categoria</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {filtered.map((food) => {
-            const color = categoryColors[food.category] ?? { bg: "bg-surface-base", text: "text-content-body" };
-            return (
-              <Card
-                key={food.id}
-                className="cursor-pointer transition-all hover:shadow-md hover:-translate-y-0.5"
-                onClick={() => openFoodDetail(food)}
-              >
-                <CardContent className="p-4">
-                  <div className="mb-2 flex items-start justify-between gap-2">
-                    <h3 className="text-sm font-semibold text-content-strong leading-tight">{food.name}</h3>
-                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${color.bg} ${color.text}`}>
-                      {food.category}
-                    </span>
-                  </div>
-                  <p className="mb-3 text-xs text-content-muted">Porção: {food.serving_size}</p>
-                  <div className="grid grid-cols-4 gap-1 text-center">
-                    <div className="rounded-lg bg-surface-base px-1 py-1.5">
-                      <p className="text-sm font-bold text-content-strong">{food.calories}</p>
-                      <p className="text-[9px] text-content-muted">kcal</p>
-                    </div>
-                    <div className="rounded-lg bg-primary-50 px-1 py-1.5">
-                      <p className="text-sm font-bold text-primary-600">{food.protein_g}</p>
-                      <p className="text-[9px] text-content-muted">Prot</p>
-                    </div>
-                    <div className="rounded-lg bg-orange-50 px-1 py-1.5">
-                      <p className="text-sm font-bold text-orange-600">{food.carbs_g}</p>
-                      <p className="text-[9px] text-content-muted">Carb</p>
-                    </div>
-                    <div className="rounded-lg bg-amber-50 px-1 py-1.5">
-                      <p className="text-sm font-bold text-amber-600">{food.fat_g}</p>
-                      <p className="text-[9px] text-content-muted">Gord</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
+          {loading ? (
+            <div className="flex h-64 items-center justify-center">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-600 border-t-transparent" />
+            </div>
+          ) : filtered.length === 0 ? (
+            <Card><CardContent className="flex flex-col items-center py-16 text-center">
+              <UtensilsCrossed className="mb-3 h-12 w-12 text-slate-200" />
+              <h3 className="text-base font-semibold text-content-body">{t("foods.noResults")}</h3>
+              <p className="mt-1 text-sm text-content-muted">{t("foods.tryAnother")}</p>
+            </CardContent></Card>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {filtered.map((food) => {
+                const color = categoryColors[food.category] ?? { bg: "bg-surface-base", text: "text-content-body" };
+                return (
+                  <Card key={food.id} className="cursor-pointer transition-all hover:shadow-md hover:-translate-y-0.5" onClick={() => openFoodDetail(food, false)}>
+                    <CardContent className="p-4">
+                      <div className="mb-2 flex items-start justify-between gap-2">
+                        <h3 className="text-sm font-semibold text-content-strong leading-tight">{food.name}</h3>
+                        <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${color.bg} ${color.text}`}>{t(`cat.${food.category}`)}</span>
+                      </div>
+                      <p className="mb-3 text-xs text-content-muted">{t("foods.serving")}: {food.serving_size}</p>
+                      <div className="grid grid-cols-4 gap-1 text-center">
+                        <div className="rounded-lg bg-surface-base px-1 py-1.5"><p className="text-sm font-bold text-content-strong">{food.calories}</p><p className="text-[9px] text-content-muted">kcal</p></div>
+                        <div className="rounded-lg bg-primary-50 px-1 py-1.5"><p className="text-sm font-bold text-primary-600">{food.protein_g}</p><p className="text-[9px] text-content-muted">Prot</p></div>
+                        <div className="rounded-lg bg-orange-50 px-1 py-1.5"><p className="text-sm font-bold text-orange-600">{food.carbs_g}</p><p className="text-[9px] text-content-muted">Carb</p></div>
+                        <div className="rounded-lg bg-amber-50 px-1 py-1.5"><p className="text-sm font-bold text-amber-600">{food.fat_g}</p><p className="text-[9px] text-content-muted">Gord</p></div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ── My Foods tab ── */}
+      {tab === "mine" && (
+        <div className="flex flex-col gap-4">
+          {customFoods.length === 0 ? (
+            <Card><CardContent className="flex flex-col items-center py-16 text-center">
+              <BookUser className="mb-3 h-12 w-12 text-slate-200" />
+              <h3 className="text-base font-semibold text-content-body">{t("foods.myFoods")}</h3>
+              <p className="mt-1 text-sm text-content-muted">{t("foods.noHistory")}</p>
+              <Button className="mt-4 gap-2" onClick={() => setShowCustomModal(true)}>
+                <Plus className="h-4 w-4" />
+                {t("foods.addCustom")}
+              </Button>
+            </CardContent></Card>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {customFiltered.map((food) => {
+                const color = categoryColors[food.category] ?? { bg: "bg-slate-100", text: "text-slate-600" };
+                return (
+                  <Card key={food.id} className="group cursor-pointer transition-all hover:shadow-md hover:-translate-y-0.5" onClick={() => openFoodDetail(food, true)}>
+                    <CardContent className="p-4">
+                      <div className="mb-2 flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <h3 className="text-sm font-semibold text-content-strong leading-tight">{food.name}</h3>
+                          {food.is_recipe && <span className="text-[10px] font-medium text-primary-600">Receita</span>}
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          {food.barcode && <Barcode className="h-3.5 w-3.5 text-content-muted" />}
+                          <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${color.bg} ${color.text}`}>{t(`cat.${food.category}`)}</span>
+                        </div>
+                      </div>
+                      <p className="mb-3 text-xs text-content-muted">{t("foods.serving")}: {food.serving_size}</p>
+                      <div className="grid grid-cols-4 gap-1 text-center">
+                        <div className="rounded-lg bg-surface-base px-1 py-1.5"><p className="text-sm font-bold text-content-strong">{food.calories}</p><p className="text-[9px] text-content-muted">kcal</p></div>
+                        <div className="rounded-lg bg-primary-50 px-1 py-1.5"><p className="text-sm font-bold text-primary-600">{food.protein_g}</p><p className="text-[9px] text-content-muted">Prot</p></div>
+                        <div className="rounded-lg bg-orange-50 px-1 py-1.5"><p className="text-sm font-bold text-orange-600">{food.carbs_g}</p><p className="text-[9px] text-content-muted">Carb</p></div>
+                        <div className="rounded-lg bg-amber-50 px-1 py-1.5"><p className="text-sm font-bold text-amber-600">{food.fat_g}</p><p className="text-[9px] text-content-muted">Gord</p></div>
+                      </div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); deleteCustomFood(food.id); }}
+                        className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg bg-surface-subtle py-1.5 text-xs font-medium text-content-muted opacity-0 transition-opacity hover:text-red-600 group-hover:opacity-100"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                        {t("delete")}
+                      </button>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
-      {/* Food detail drawer */}
+      {/* ── History tab ── */}
+      {tab === "history" && (
+        <div className="flex flex-col gap-4">
+          {historyLoading ? (
+            <div className="flex h-40 items-center justify-center">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-600 border-t-transparent" />
+            </div>
+          ) : meals.length === 0 ? (
+            <Card><CardContent className="flex flex-col items-center py-16 text-center">
+              <Clock className="mb-3 h-12 w-12 text-slate-200" />
+              <h3 className="text-base font-semibold text-content-body">{t("foods.foodHistory")}</h3>
+              <p className="mt-1 text-sm text-content-muted">{t("foods.noHistory")}</p>
+            </CardContent></Card>
+          ) : (
+            <div className="flex flex-col gap-6">
+              {sortedMealTypes.map((mType) => {
+                const typeMeals = mealsByType[mType];
+                const totalCal = typeMeals.reduce((s, m) => s + m.calories, 0);
+                return (
+                  <div key={mType}>
+                    <div className="mb-3 flex items-center justify-between">
+                      <h3 className="flex items-center gap-2 text-base font-semibold text-content-strong">
+                        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary-50 text-primary-600">
+                          <UtensilsCrossed className="h-3.5 w-3.5" />
+                        </span>
+                        {getMealLabel(mType, t)}
+                      </h3>
+                      <span className="text-sm font-medium text-content-muted">{totalCal} kcal</span>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      {typeMeals.map((meal) => (
+                        <Card key={meal.id}>
+                          <CardContent className="flex items-center justify-between p-3.5">
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-content-strong">{meal.name}</p>
+                              <p className="text-xs text-content-muted">
+                                {new Date(meal.logged_date).toLocaleDateString(undefined, { day: "2-digit", month: "short" })}
+                                <span className="ml-2">P:{Math.round(Number(meal.protein_g))}g C:{Math.round(Number(meal.carbs_g))}g G:{Math.round(Number(meal.fat_g))}g</span>
+                              </p>
+                            </div>
+                            <span className="shrink-0 text-sm font-semibold text-content-body">{meal.calories} kcal</span>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Food detail modal ── */}
       {selectedFood && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-surface-card p-6 shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onClick={() => setSelectedFood(null)}>
+          <div className="w-full max-w-lg rounded-t-2xl bg-surface-card p-6 shadow-xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="mb-4 flex items-start justify-between">
               <div>
                 <h2 className="text-lg font-bold text-content-strong">{selectedFood.name}</h2>
-                <p className="text-sm text-content-muted">
-                  {selectedFood.category} · Porção: {selectedFood.serving_size}
-                </p>
+                <p className="text-sm text-content-muted">{t(`cat.${selectedFood.category}`)} · {t("foods.serving")}: {selectedFood.serving_size}</p>
+                {isCustom && (selectedFood as CustomFood).barcode && <p className="mt-1 flex items-center gap-1 text-xs text-content-muted"><Barcode className="h-3 w-3" />{(selectedFood as CustomFood).barcode}</p>}
               </div>
-              <button onClick={() => setSelectedFood(null)} className="text-content-muted hover:text-content-body">
-                <X className="h-5 w-5" />
-              </button>
+              <button onClick={() => setSelectedFood(null)} className="text-content-muted hover:text-content-body"><X className="h-5 w-5" /></button>
             </div>
 
-            {/* Nutrition per serving */}
+            {isCustom && (selectedFood as CustomFood).is_recipe && (selectedFood as CustomFood).ingredients && (
+              <div className="mb-4 rounded-xl bg-surface-subtle p-3">
+                <p className="text-xs font-medium text-content-muted">{t("foods.ingredients")}</p>
+                <p className="mt-1 text-sm text-content-body">{(selectedFood as CustomFood).ingredients}</p>
+              </div>
+            )}
+
             <div className="mb-4 grid grid-cols-5 gap-2 text-center">
-              <div className="rounded-xl bg-surface-base p-2">
-                <p className="text-lg font-bold text-content-strong">{selectedFood.calories}</p>
-                <p className="text-[10px] text-content-muted">kcal</p>
-              </div>
-              <div className="rounded-xl bg-primary-50 p-2">
-                <p className="text-lg font-bold text-primary-600">{selectedFood.protein_g}</p>
-                <p className="text-[10px] text-content-muted">Prot (g)</p>
-              </div>
-              <div className="rounded-xl bg-orange-50 p-2">
-                <p className="text-lg font-bold text-orange-600">{selectedFood.carbs_g}</p>
-                <p className="text-[10px] text-content-muted">Carb (g)</p>
-              </div>
-              <div className="rounded-xl bg-amber-50 p-2">
-                <p className="text-lg font-bold text-amber-600">{selectedFood.fat_g}</p>
-                <p className="text-[10px] text-content-muted">Gord (g)</p>
-              </div>
-              <div className="rounded-xl bg-green-50 p-2">
-                <p className="text-lg font-bold text-green-600">{selectedFood.fiber_g}</p>
-                <p className="text-[10px] text-content-muted">Fibra (g)</p>
-              </div>
+              <div className="rounded-xl bg-surface-base p-2"><p className="text-lg font-bold text-content-strong">{selectedFood.calories}</p><p className="text-[10px] text-content-muted">kcal</p></div>
+              <div className="rounded-xl bg-primary-50 p-2"><p className="text-lg font-bold text-primary-600">{selectedFood.protein_g}</p><p className="text-[10px] text-content-muted">Prot (g)</p></div>
+              <div className="rounded-xl bg-orange-50 p-2"><p className="text-lg font-bold text-orange-600">{selectedFood.carbs_g}</p><p className="text-[10px] text-content-muted">Carb (g)</p></div>
+              <div className="rounded-xl bg-amber-50 p-2"><p className="text-lg font-bold text-amber-600">{selectedFood.fat_g}</p><p className="text-[10px] text-content-muted">Gord (g)</p></div>
+              <div className="rounded-xl bg-green-50 p-2"><p className="text-lg font-bold text-green-600">{selectedFood.fiber_g}</p><p className="text-[10px] text-content-muted">Fibra (g)</p></div>
             </div>
 
-            {/* Add to diary section */}
             <div className="rounded-xl border border-primary-200 bg-primary-50 p-4">
-              <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-content-strong">
-                <Plus className="h-4 w-4" />
-                Adicionar ao diário de hoje
-              </h3>
+              <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-content-strong"><Plus className="h-4 w-4" />{t("foods.addToDiary")}</h3>
               <div className="flex flex-wrap items-end gap-3">
                 <div>
-                  <label className="text-xs font-medium text-content-body">Porções</label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    min="0.25"
-                    value={servings}
-                    onChange={(e) => setServings(e.target.value)}
-                    className="mt-1 block w-20 rounded-lg border border-primary-300 bg-surface-card px-2 py-1.5 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-200"
-                  />
+                  <label className="text-xs font-medium text-content-body">{t("dashboard.portions")}</label>
+                  <input type="number" step="0.5" min="0.25" value={servings} onChange={(e) => setServings(e.target.value)} className="mt-1 block w-20 rounded-lg border border-primary-300 bg-surface-card px-2 py-1.5 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-200" />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-content-body">Refeição</label>
-                  <select
-                    value={mealType}
-                    onChange={(e) => setMealType(e.target.value)}
-                    className="mt-1 block rounded-lg border border-primary-300 bg-surface-card px-2 py-1.5 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-200"
-                  >
-                    {mealTypeOptions.map((o) => (
-                      <option key={o.value} value={o.value}>{o.label}</option>
-                    ))}
+                  <label className="text-xs font-medium text-content-body">{t("dashboard.mealType")}</label>
+                  <select value={mealType} onChange={(e) => setMealType(e.target.value)} className="mt-1 block rounded-lg border border-primary-300 bg-surface-card px-2 py-1.5 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-200">
+                    <option value="breakfast">{t("meal.breakfast")}</option>
+                    <option value="lunch">{t("meal.lunch")}</option>
+                    <option value="dinner">{t("meal.dinner")}</option>
+                    <option value="snack">{t("meal.snack")}</option>
+                    <option value="pre_workout">{t("meal.preWorkout")}</option>
+                    <option value="post_workout">{t("meal.postWorkout")}</option>
                   </select>
                 </div>
-                <Button
-                  onClick={addFromCatalog}
-                  disabled={saving || saved}
-                  className="gap-2"
-                >
-                  {saved ? (
-                    <>
-                      <Flame className="h-4 w-4" />
-                      Adicionado!
-                    </>
-                  ) : saving ? (
-                    "Salvando..."
-                  ) : (
-                    <>
-                      <Plus className="h-4 w-4" />
-                      Adicionar
-                    </>
-                  )}
+                <Button onClick={addToDiary} disabled={saving || saved} className="gap-2">
+                  {saved ? <><Check className="h-4 w-4" />{t("foods.added")}</> : saving ? t("saving") : <><Plus className="h-4 w-4" />{t("add")}</>}
                 </Button>
               </div>
-
-              {/* Computed values */}
               <div className="mt-3 grid grid-cols-5 gap-1.5 text-center">
-                {(() => {
-                  const v = computedValues();
-                  return (
-                    <>
-                      <div className="rounded-lg bg-surface-card px-1 py-1">
-                        <p className="text-sm font-bold text-content-strong">{v.cal}</p>
-                        <p className="text-[9px] text-content-muted">kcal</p>
-                      </div>
-                      <div className="rounded-lg bg-surface-card px-1 py-1">
-                        <p className="text-sm font-bold text-primary-600">{v.prot}</p>
-                        <p className="text-[9px] text-content-muted">Prot</p>
-                      </div>
-                      <div className="rounded-lg bg-surface-card px-1 py-1">
-                        <p className="text-sm font-bold text-orange-600">{v.carb}</p>
-                        <p className="text-[9px] text-content-muted">Carb</p>
-                      </div>
-                      <div className="rounded-lg bg-surface-card px-1 py-1">
-                        <p className="text-sm font-bold text-amber-600">{v.fat}</p>
-                        <p className="text-[9px] text-content-muted">Gord</p>
-                      </div>
-                      <div className="rounded-lg bg-surface-card px-1 py-1">
-                        <p className="text-sm font-bold text-green-600">{v.fiber}</p>
-                        <p className="text-[9px] text-content-muted">Fibra</p>
-                      </div>
-                    </>
-                  );
-                })()}
+                {(() => { const v = computedValues(); return (<>
+                  <div className="rounded-lg bg-surface-card px-1 py-1"><p className="text-sm font-bold text-content-strong">{v.cal}</p><p className="text-[9px] text-content-muted">kcal</p></div>
+                  <div className="rounded-lg bg-surface-card px-1 py-1"><p className="text-sm font-bold text-primary-600">{v.prot}</p><p className="text-[9px] text-content-muted">Prot</p></div>
+                  <div className="rounded-lg bg-surface-card px-1 py-1"><p className="text-sm font-bold text-orange-600">{v.carb}</p><p className="text-[9px] text-content-muted">Carb</p></div>
+                  <div className="rounded-lg bg-surface-card px-1 py-1"><p className="text-sm font-bold text-amber-600">{v.fat}</p><p className="text-[9px] text-content-muted">Gord</p></div>
+                  <div className="rounded-lg bg-surface-card px-1 py-1"><p className="text-sm font-bold text-green-600">{v.fiber}</p><p className="text-[9px] text-content-muted">Fibra</p></div>
+                </>); })()}
               </div>
             </div>
+            <div className="mt-4 flex justify-end"><Button variant="outline" onClick={() => setSelectedFood(null)}>{t("close")}</Button></div>
+          </div>
+        </div>
+      )}
 
-            <div className="mt-4 flex justify-end">
-              <Button variant="outline" onClick={() => setSelectedFood(null)}>Fechar</Button>
+      {/* ── Custom food modal ── */}
+      {showCustomModal && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onClick={() => setShowCustomModal(false)}>
+          <div className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-y-auto rounded-t-2xl bg-surface-card p-6 shadow-xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-5 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-content-strong">{t("foods.addCustom")}</h2>
+              <button onClick={() => setShowCustomModal(false)} className="text-content-muted hover:text-content-body"><X className="h-5 w-5" /></button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Barcode */}
+              <div>
+                <label className="text-sm font-medium text-content-body">{t("foods.barcode")}</label>
+                <div className="mt-1 flex gap-2">
+                  <div className="relative flex-1">
+                    <Barcode className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-content-muted" />
+                    <input
+                      type="text"
+                      placeholder={t("foods.barcodePlaceholder")}
+                      value={customForm.barcode}
+                      onChange={(e) => setCustomForm({ ...customForm, barcode: e.target.value })}
+                      className="flex h-10 w-full rounded-lg border border-edge-base bg-surface-card pl-9 pr-3 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
+                    />
+                  </div>
+                  <Button variant="outline" size="sm" onClick={searchByBarcode}>{t("foods.scanBarcode")}</Button>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-content-body">{t("foods.customFoodName")} *</label>
+                <input
+                  type="text"
+                  placeholder={t("foods.customFoodName")}
+                  value={customForm.name}
+                  onChange={(e) => setCustomForm({ ...customForm, name: e.target.value })}
+                  className="mt-1 flex h-10 w-full rounded-lg border border-edge-base bg-surface-card px-3 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm font-medium text-content-body">{t("foods.category")}</label>
+                  <select
+                    value={customForm.category}
+                    onChange={(e) => setCustomForm({ ...customForm, category: e.target.value })}
+                    className="mt-1 flex h-10 w-full rounded-lg border border-edge-base bg-surface-card px-3 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
+                  >
+                    {categories.map((c) => <option key={c} value={c}>{t(`cat.${c}`)}</option>)}
+                    <option value="Personalizado">{t("cat.Personalizado")}</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-content-body">{t("foods.servingSize")}</label>
+                  <input
+                    type="text"
+                    value={customForm.serving_size}
+                    onChange={(e) => setCustomForm({ ...customForm, serving_size: e.target.value })}
+                    className="mt-1 flex h-10 w-full rounded-lg border border-edge-base bg-surface-card px-3 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                <div>
+                  <label className="text-sm font-medium text-content-body">{t("dashboard.calories")} *</label>
+                  <input type="number" placeholder="0" value={customForm.calories} onChange={(e) => setCustomForm({ ...customForm, calories: e.target.value })} className="mt-1 flex h-10 w-full rounded-lg border border-edge-base bg-surface-card px-3 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100" />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-content-body">{t("dashboard.protein")}</label>
+                  <input type="number" placeholder="0" value={customForm.protein_g} onChange={(e) => setCustomForm({ ...customForm, protein_g: e.target.value })} className="mt-1 flex h-10 w-full rounded-lg border border-edge-base bg-surface-card px-3 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100" />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-content-body">{t("dashboard.carbs")}</label>
+                  <input type="number" placeholder="0" value={customForm.carbs_g} onChange={(e) => setCustomForm({ ...customForm, carbs_g: e.target.value })} className="mt-1 flex h-10 w-full rounded-lg border border-edge-base bg-surface-card px-3 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100" />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-content-body">{t("dashboard.fat")}</label>
+                  <input type="number" placeholder="0" value={customForm.fat_g} onChange={(e) => setCustomForm({ ...customForm, fat_g: e.target.value })} className="mt-1 flex h-10 w-full rounded-lg border border-edge-base bg-surface-card px-3 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100" />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-content-body">{t("foods.fiber")}</label>
+                  <input type="number" placeholder="0" value={customForm.fiber_g} onChange={(e) => setCustomForm({ ...customForm, fiber_g: e.target.value })} className="mt-1 flex h-10 w-full rounded-lg border border-edge-base bg-surface-card px-3 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100" />
+                </div>
+              </div>
+
+              <label className="flex items-center gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={customForm.is_recipe}
+                  onChange={(e) => setCustomForm({ ...customForm, is_recipe: e.target.checked })}
+                  className="h-4 w-4 rounded border-edge-base text-primary-600 focus:ring-primary-500"
+                />
+                <span className="text-sm text-content-body">{t("foods.isRecipe")}</span>
+              </label>
+
+              {customForm.is_recipe && (
+                <div>
+                  <label className="text-sm font-medium text-content-body">{t("foods.ingredients")}</label>
+                  <textarea
+                    rows={3}
+                    placeholder={t("foods.ingredientsPlaceholder")}
+                    value={customForm.ingredients}
+                    onChange={(e) => setCustomForm({ ...customForm, ingredients: e.target.value })}
+                    className="mt-1 flex w-full rounded-lg border border-edge-base bg-surface-card px-3 py-2 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="mt-5 flex gap-3">
+              <Button variant="outline" className="flex-1" onClick={() => setShowCustomModal(false)}>{t("cancel")}</Button>
+              <Button className="flex-1" onClick={saveCustomFood} disabled={saving || !customForm.name.trim() || !customForm.calories}>
+                {saving ? t("saving") : t("save")}
+              </Button>
             </div>
           </div>
         </div>

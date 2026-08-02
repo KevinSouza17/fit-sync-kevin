@@ -9,7 +9,7 @@ export function DashboardLayout() {
 
   return (
     <NotificationsProvider>
-      <div className={`flex h-screen overflow-hidden bg-surface-base ${themeClass}`}>
+      <div className={`flex h-screen flex-col overflow-hidden bg-surface-base lg:flex-row ${themeClass}`}>
         <Sidebar />
         <main className="flex-1 overflow-y-auto">
           <Outlet />

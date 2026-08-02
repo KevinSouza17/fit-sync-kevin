@@ -6,6 +6,7 @@ import { Avatar, AvatarFallback } from "../components/ui/avatar";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
 import { InviteModal } from "../components/InviteModal";
+import { useI18n } from "../context/I18nContext";
 
 interface Professional {
   id: string;
@@ -36,6 +37,7 @@ function initials(name: string) {
 
 export function Team() {
   const { user } = useAuth();
+  const { t } = useI18n();
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -75,11 +77,11 @@ export function Team() {
   const uniqueRoles = [...new Set(professionals.map((p) => p.professional_role).filter(Boolean))];
 
   return (
-    <div className="flex flex-col gap-6 p-8">
+    <div className="flex flex-col gap-6 p-4 sm:p-6 lg:p-8">
       <header className="flex items-end justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Minha Equipe</h1>
-          <p className="mt-0.5 text-sm text-slate-500">Encontre profissionais de saúde e fitness</p>
+          <h1 className="text-2xl font-bold text-slate-900">{t("team.title")}</h1>
+          <p className="mt-0.5 text-sm text-slate-500">{t("team.subtitle")}</p>
         </div>
       </header>
 
@@ -89,7 +91,7 @@ export function Team() {
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
             className="flex h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
-            placeholder="Buscar por nome, função ou especialidade..."
+            placeholder={t("team.search")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -101,7 +103,7 @@ export function Team() {
               !roleFilter ? "bg-primary-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
             }`}
           >
-            Todos
+            {t("all")}
           </button>
           {uniqueRoles.map((role) => (
             <button
@@ -126,7 +128,7 @@ export function Team() {
           <CardContent className="flex flex-col items-center py-16 text-center">
             <UserPlus className="mb-3 h-12 w-12 text-slate-200" />
             <h3 className="text-base font-semibold text-slate-700">
-              {professionals.length === 0 ? "Nenhum profissional cadastrado ainda" : "Nenhum profissional encontrado"}
+              {professionals.length === 0 ? "Nenhum profissional cadastrado ainda" : t("team.noResults")}
             </h3>
             <p className="mt-1 text-sm text-slate-400">
               {professionals.length === 0 ? "Profissionais aparecerão aqui quando se cadastrarem" : "Tente outro termo de busca"}
@@ -193,7 +195,7 @@ export function Team() {
                     </div>
                     <Button size="sm" className="h-7 gap-1.5 px-3 text-xs">
                       <Calendar className="h-3 w-3" />
-                      Agendar
+                      {t("team.book")}
                     </Button>
                   </div>
                 </CardContent>
@@ -280,11 +282,11 @@ export function Team() {
             <div className="mt-5 flex gap-3">
               <Button variant="outline" className="flex-1 gap-2" onClick={() => startConversation(selectedPro)}>
                 <MessageCircle className="h-4 w-4" />
-                Mensagem
+                {t("team.message")}
               </Button>
               <Button className="flex-1 gap-2" disabled={!selectedPro.available_for_booking}>
                 <Calendar className="h-4 w-4" />
-                Agendar
+                {t("team.book")}
               </Button>
             </div>
           </div>

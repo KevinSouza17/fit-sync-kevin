@@ -4,6 +4,7 @@ import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { useTheme } from "../context/ThemeContext";
+import { useI18n, type Lang } from "../context/I18nContext";
 import { supabase } from "../lib/supabase";
 
 interface ToggleProps {
@@ -45,6 +46,7 @@ const deviceItems = [
 
 export function Settings() {
   const { darkMode, reducedMotion, toggleDarkMode, toggleReducedMotion } = useTheme();
+  const { t, lang, setLang } = useI18n();
   const [notifToggles, setNotifToggles] = useState<Record<string, boolean>>({
     mealReminders: true,
     waterAlerts: true,
@@ -58,6 +60,12 @@ export function Settings() {
   });
   const [showPasswordModal, setShowPasswordModal] = useState(false);
 
+  const langOptions: { value: Lang; label: string }[] = [
+    { value: "pt", label: "Português (Brasil)" },
+    { value: "en", label: "English" },
+    { value: "es", label: "Español" },
+  ];
+
   function toggleNotif(key: string) {
     setNotifToggles((prev) => ({ ...prev, [key]: !prev[key] }));
   }
@@ -68,8 +76,8 @@ export function Settings() {
   return (
     <div className="flex flex-col gap-6 p-8">
       <header>
-        <h1 className="text-2xl font-bold text-content-strong">Configurações</h1>
-        <p className="mt-0.5 text-sm text-content-muted">Personalize sua experiência no FitSync</p>
+        <h1 className="text-2xl font-bold text-content-strong">{t("settings.title")}</h1>
+        <p className="mt-0.5 text-sm text-content-muted">{t("settings.subtitle")}</p>
       </header>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -81,8 +89,8 @@ export function Settings() {
                 <Bell className="h-5 w-5 text-primary-600" />
               </div>
               <div>
-                <h2 className="text-base font-semibold text-content-strong">Notificações</h2>
-                <p className="text-xs text-content-muted">Gerencie suas preferências de notificação</p>
+                <h2 className="text-base font-semibold text-content-strong">{t("settings.notifications")}</h2>
+                <p className="text-xs text-content-muted">{t("settings.notificationsSub")}</p>
               </div>
             </div>
             <div className="flex flex-col gap-3">
@@ -104,22 +112,22 @@ export function Settings() {
                 <Moon className="h-5 w-5 text-primary-600" />
               </div>
               <div>
-                <h2 className="text-base font-semibold text-content-strong">Aparência</h2>
-                <p className="text-xs text-content-muted">Personalize a interface</p>
+                <h2 className="text-base font-semibold text-content-strong">{t("settings.appearance")}</h2>
+                <p className="text-xs text-content-muted">{t("settings.appearanceSub")}</p>
               </div>
             </div>
             <div className="flex flex-col gap-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <span className="text-sm text-content-body">Modo escuro</span>
-                  <p className="text-xs text-content-muted">Reduz o brilho da tela em ambientes escuros</p>
+                  <span className="text-sm text-content-body">{t("settings.darkMode")}</span>
+                  <p className="text-xs text-content-muted">{t("settings.darkModeSub")}</p>
                 </div>
                 <Toggle enabled={darkMode} onChange={toggleDarkMode} />
               </div>
               <div className="flex items-center justify-between">
                 <div>
-                  <span className="text-sm text-content-body">Animações reduzidas</span>
-                  <p className="text-xs text-content-muted">Diminui movimentos e transições</p>
+                  <span className="text-sm text-content-body">{t("settings.reducedMotion")}</span>
+                  <p className="text-xs text-content-muted">{t("settings.reducedMotionSub")}</p>
                 </div>
                 <Toggle enabled={reducedMotion} onChange={toggleReducedMotion} />
               </div>
@@ -135,8 +143,8 @@ export function Settings() {
                 <Smartphone className="h-5 w-5 text-primary-600" />
               </div>
               <div>
-                <h2 className="text-base font-semibold text-content-strong">Dispositivos</h2>
-                <p className="text-xs text-content-muted">Sincronização com wearables e apps</p>
+                <h2 className="text-base font-semibold text-content-strong">{t("settings.devices")}</h2>
+                <p className="text-xs text-content-muted">{t("settings.devicesSub")}</p>
               </div>
             </div>
             <div className="flex flex-col gap-3">
@@ -158,20 +166,20 @@ export function Settings() {
                 <Shield className="h-5 w-5 text-primary-600" />
               </div>
               <div>
-                <h2 className="text-base font-semibold text-content-strong">Segurança</h2>
-                <p className="text-xs text-content-muted">Proteja sua conta</p>
+                <h2 className="text-base font-semibold text-content-strong">{t("settings.security")}</h2>
+                <p className="text-xs text-content-muted">{t("settings.securitySub")}</p>
               </div>
             </div>
             <div className="flex flex-col gap-3">
               <Button variant="outline" className="justify-start gap-2" onClick={() => setShowPasswordModal(true)}>
                 <Key className="h-4 w-4" />
-                Alterar senha
+                {t("settings.changePassword")}
               </Button>
               <Button variant="outline" className="justify-start">
-                Autenticação de dois fatores
+                {t("settings.twoFactor")}
               </Button>
               <Button variant="outline" className="justify-start">
-                Dispositivos conectados
+                {t("settings.connectedDevices")}
               </Button>
             </div>
           </CardContent>
@@ -185,21 +193,25 @@ export function Settings() {
                 <Globe className="h-5 w-5 text-primary-600" />
               </div>
               <div>
-                <h2 className="text-base font-semibold text-content-strong">Idioma e Região</h2>
-                <p className="text-xs text-content-muted">Preferências regionais</p>
+                <h2 className="text-base font-semibold text-content-strong">{t("settings.language")}</h2>
+                <p className="text-xs text-content-muted">{t("settings.languageSub")}</p>
               </div>
             </div>
             <div className="flex flex-col gap-3">
               <div>
-                <label className="text-sm font-medium text-content-body">Idioma</label>
-                <select className="mt-1 w-full rounded-lg border border-edge-base bg-surface-card px-3 py-2 text-sm text-content-body focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100">
-                  <option>Português (Brasil)</option>
-                  <option>English</option>
-                  <option>Español</option>
+                <label className="text-sm font-medium text-content-body">{t("settings.languageLabel")}</label>
+                <select
+                  value={lang}
+                  onChange={(e) => setLang(e.target.value as Lang)}
+                  className="mt-1 w-full rounded-lg border border-edge-base bg-surface-card px-3 py-2 text-sm text-content-body focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
+                >
+                  {langOptions.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
                 </select>
               </div>
               <div>
-                <label className="text-sm font-medium text-content-body">Unidade de peso</label>
+                <label className="text-sm font-medium text-content-body">{t("settings.weightUnit")}</label>
                 <select className="mt-1 w-full rounded-lg border border-edge-base bg-surface-card px-3 py-2 text-sm text-content-body focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100">
                   <option>Quilogramas (kg)</option>
                   <option>Libras (lb)</option>

@@ -6,6 +6,7 @@ import { useAuth } from "../context/AuthContext";
 import { useNotifications } from "../context/NotificationsContext";
 import { Avatar, AvatarFallback } from "../components/ui/avatar";
 import { InviteModal } from "../components/InviteModal";
+import { useI18n } from "../context/I18nContext";
 
 interface ConversationRow {
   id: string;
@@ -32,16 +33,17 @@ function formatTime(iso: string) {
   const now = new Date();
   const sameDay = d.toDateString() === now.toDateString();
   if (sameDay) {
-    return d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+    return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
   }
   const diffDays = Math.floor((now.getTime() - d.getTime()) / 86400000);
-  if (diffDays < 7) return d.toLocaleDateString("pt-BR", { weekday: "short" });
-  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+  if (diffDays < 7) return d.toLocaleDateString(undefined, { weekday: "short" });
+  return d.toLocaleDateString(undefined, { day: "2-digit", month: "2-digit" });
 }
 
 export function Messages() {
   const { user } = useAuth();
   const { notifications, markRead } = useNotifications();
+  const { t } = useI18n();
   const [searchParams, setSearchParams] = useSearchParams();
   const [conversations, setConversations] = useState<ConversationRow[]>([]);
   const [messages, setMessages] = useState<{ id: string; sender_id: string; content: string; created_at: string }[]>([]);
@@ -100,7 +102,7 @@ export function Messages() {
           last_message_at: c.last_message_at,
           otherId,
           otherName: other?.full_name || "Usuário",
-          otherRole: other?.is_professional ? other.professional_role ?? "Profissional" : "Paciente",
+          otherRole: other?.is_professional ? other.professional_role ?? t("messages.professional") : t("messages.patient"),
           lastContent: lastMsg?.content ?? "",
           unread: count ?? 0,
         };
@@ -257,13 +259,13 @@ export function Messages() {
         <div className="border-b border-slate-100 px-5 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-lg font-bold text-slate-900">Mensagens</h1>
-              <p className="mt-0.5 text-xs text-slate-500">Converse com seus contatos</p>
+              <h1 className="text-lg font-bold text-slate-900">{t("messages.title")}</h1>
+              <p className="mt-0.5 text-xs text-slate-500">{t("messages.subtitle")}</p>
             </div>
             <button
               onClick={() => setInviteOpen(true)}
               className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary-600 text-white transition-colors hover:bg-primary-700"
-              title="Convidar pessoa por e-mail"
+              title={t("messages.invitePerson")}
             >
               <UserPlus className="h-4 w-4" />
             </button>
@@ -275,7 +277,7 @@ export function Messages() {
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               className="flex h-10 w-full rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-primary-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-100"
-              placeholder="Buscar conversas..."
+              placeholder={t("messages.search")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -290,9 +292,9 @@ export function Messages() {
           ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <MessageCircle className="mb-2 h-10 w-10 text-slate-200" />
-              <p className="text-sm font-medium text-slate-600">Nenhuma conversa ainda</p>
+              <p className="text-sm font-medium text-slate-600">{t("messages.noConversations")}</p>
               <p className="mt-0.5 text-xs text-slate-400">
-                Convide alguém pelo botão acima
+                {t("messages.inviteSomeone")}
               </p>
             </div>
           ) : (
@@ -362,7 +364,7 @@ export function Messages() {
               {messages.length === 0 ? (
                 <div className="flex flex-1 flex-col items-center justify-center py-20 text-center">
                   <MessageCircle className="mb-2 h-10 w-10 text-slate-200" />
-                  <p className="text-sm text-slate-400">Nenhuma mensagem ainda. Diga olá!</p>
+                  <p className="text-sm text-slate-400">{t("messages.noMessagesYet")}</p>
                 </div>
               ) : (
                 messages.map((m) => {
@@ -396,7 +398,7 @@ export function Messages() {
             <div className="mx-auto flex max-w-2xl items-center gap-2">
               <input
                 className="flex-1 rounded-full border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-primary-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-100"
-                placeholder="Digite uma mensagem..."
+                placeholder={t("messages.typeMessage")}
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
                 onKeyDown={(e) => {
@@ -422,16 +424,16 @@ export function Messages() {
             <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary-50">
               <MessageCircle className="h-8 w-8 text-primary-600" />
             </div>
-            <h2 className="text-lg font-semibold text-slate-700">Suas mensagens</h2>
+            <h2 className="text-lg font-semibold text-slate-700">{t("messages.yourMessages")}</h2>
             <p className="mt-1 max-w-xs text-sm text-slate-400">
-              Selecione uma conversa à esquerda ou convide alguém pelo botão de adicionar
+              {t("messages.selectConversation")}
             </p>
             <button
               onClick={() => setInviteOpen(true)}
               className="mt-5 flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
             >
               <UserPlus className="h-4 w-4" />
-              Convidar pessoa
+              {t("messages.invitePerson")}
             </button>
           </div>
         </section>
