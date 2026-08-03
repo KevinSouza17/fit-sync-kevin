@@ -77,10 +77,13 @@ export function Team() {
     setBookingSuccess(false);
   }
 
+  const [bookingError, setBookingError] = useState("");
+
   async function submitBooking() {
-    if (!bookingTarget || !bookingForm.date) return;
+    if (!bookingTarget || !bookingForm.date || !user) return;
     setBookingSaving(true);
-    const { data } = await supabase
+    setBookingError("");
+    const { data, error } = await supabase
       .from("appointments")
       .insert({
         professional_id: bookingTarget.id,
@@ -92,7 +95,24 @@ export function Team() {
       .select()
       .single();
     setBookingSaving(false);
+    if (error) {
+      setBookingError(error.message);
+      return;
+    }
     if (data) {
+      const { data: meProfile } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", user.id)
+        .maybeSingle();
+      const myName = meProfile?.full_name || "Um cliente";
+      await supabase.from("notifications").insert({
+        user_id: bookingTarget.id,
+        type: "appointment",
+        title: t("appointments.notifTitle"),
+        body: t("appointments.notifBody", { name: myName, date: bookingForm.date, time: bookingForm.time }),
+        read: false,
+      });
       setBookingSuccess(true);
       setTimeout(() => { setBookingTarget(null); setBookingSuccess(false); }, 2000);
     }
@@ -270,6 +290,9 @@ export function Team() {
               </div>
             ) : (
               <div className="space-y-4">
+                {bookingError && (
+                  <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{bookingError}</div>
+                )}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-sm font-medium text-content-body">{t("appointments.date")}</label>

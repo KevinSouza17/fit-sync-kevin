@@ -39,9 +39,24 @@ export function MyClients() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [calories, setCalories] = useState("");
-  const [protein, setProtein] = useState("");
-  const [carbs, setCarbs] = useState("");
-  const [fat, setFat] = useState("");
+  const [proteinPct, setProteinPct] = useState("");
+  const [carbsPct, setCarbsPct] = useState("");
+  const [fatPct, setFatPct] = useState("");
+
+  // Convert macro percentages into grams based on the calorie target.
+  // Protein and carbs = 4 kcal/g; fat = 9 kcal/g.
+  const macroGrams = (() => {
+    const kcal = Number(calories) || 0;
+    const pPct = Number(proteinPct) || 0;
+    const cPct = Number(carbsPct) || 0;
+    const fPct = Number(fatPct) || 0;
+    return {
+      protein: kcal && pPct ? Math.round((kcal * pPct) / 100 / 4) : null,
+      carbs: kcal && cPct ? Math.round((kcal * cPct) / 100 / 4) : null,
+      fat: kcal && fPct ? Math.round((kcal * fPct) / 100 / 9) : null,
+    };
+  })();
+  const macroPctSum = (Number(proteinPct) || 0) + (Number(carbsPct) || 0) + (Number(fatPct) || 0);
   const [meals, setMeals] = useState<MealEntry[]>([{ name: "", items: "" }]);
   const [days, setDays] = useState<DayEntry[]>([{ name: "", exercises: "" }]);
 
@@ -49,14 +64,18 @@ export function MyClients() {
     if (!user) return;
     (async () => {
       setLoading(true);
-      const [{ data: aptData }, { data: planData }] = await Promise.all([
+      const [{ data: aptData }, { data: planData }, { data: convData }] = await Promise.all([
         supabase.from("appointments").select("user_id").eq("professional_id", user.id),
         supabase.from("client_plans").select("client_id").eq("professional_id", user.id),
+        supabase.from("conversations").select("user_a_id, user_b_id").or(`user_a_id.eq.${user.id},user_b_id.eq.${user.id}`),
       ]);
       const ids = [...new Set([
         ...(aptData || []).map((a) => a.user_id),
         ...(planData || []).map((p) => p.client_id),
-      ])];
+        ...(convData || []).flatMap((c) =>
+          c.user_a_id === user.id ? [c.user_b_id] : [c.user_a_id]
+        ),
+      ])].filter((id) => id !== user.id);
       if (ids.length) {
         const { data: profiles } = await supabase
           .from("profiles")
@@ -64,6 +83,9 @@ export function MyClients() {
           .in("id", ids);
         setClients((profiles as ClientProfile[]) || []);
         setSelectedId(ids[0]);
+      } else {
+        setClients([]);
+        setSelectedId(null);
       }
       const { data: plans } = await supabase
         .from("client_plans").select("*").eq("professional_id", user.id)
@@ -82,7 +104,7 @@ export function MyClients() {
 
   function resetForm() {
     setPlanType("diet"); setTitle(""); setDescription("");
-    setCalories(""); setProtein(""); setCarbs(""); setFat("");
+    setCalories(""); setProteinPct(""); setCarbsPct(""); setFatPct("");
     setMeals([{ name: "", items: "" }]); setDays([{ name: "", exercises: "" }]);
     setSuccess(false); setSaveError("");
   }
@@ -106,9 +128,9 @@ export function MyClients() {
       professional_id: user.id, client_id: selectedClient.id,
       plan_type: planType, title: title.trim(), description: description.trim(),
       target_calories: planType === "diet" ? Number(calories) || null : null,
-      target_protein_g: planType === "diet" ? Number(protein) || null : null,
-      target_carbs_g: planType === "diet" ? Number(carbs) || null : null,
-      target_fat_g: planType === "diet" ? Number(fat) || null : null,
+      target_protein_g: planType === "diet" ? macroGrams.protein : null,
+      target_carbs_g: planType === "diet" ? macroGrams.carbs : null,
+      target_fat_g: planType === "diet" ? macroGrams.fat : null,
       content, active: true,
     }).select().single();
     if (error) {
@@ -353,14 +375,20 @@ export function MyClients() {
                         <label className="text-xs font-medium text-content-muted">{t("plans.targetCalories")}</label>
                         <Input type="number" value={calories} onChange={(e) => setCalories(e.target.value)} placeholder="2000" />
                       </div>
-                      <p className="text-xs font-semibold uppercase tracking-wide text-content-muted">{t("plans.macros")}</p>
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-content-muted">{t("plans.macros")}</p>
+                        <span className={`text-xs font-medium ${macroPctSum === 100 ? "text-green-600" : macroPctSum > 0 ? "text-amber-600" : "text-content-muted"}`}>
+                          {macroPctSum}%{macroPctSum === 100 ? " ✓" : "/100%"}
+                        </span>
+                      </div>
                       <div className="grid grid-cols-3 gap-3">
-                        {[{ v: protein, set: setProtein, k: "plans.protein" },
-                          { v: carbs, set: setCarbs, k: "plans.carbs" },
-                          { v: fat, set: setFat, k: "plans.fat" }].map((m) => (
+                        {[{ v: proteinPct, set: setProteinPct, k: "plans.protein", g: macroGrams.protein },
+                          { v: carbsPct, set: setCarbsPct, k: "plans.carbs", g: macroGrams.carbs },
+                          { v: fatPct, set: setFatPct, k: "plans.fat", g: macroGrams.fat }].map((m) => (
                           <div key={m.k} className="flex flex-col gap-1.5">
-                            <label className="text-xs font-medium text-content-muted">{t(m.k)} (g)</label>
-                            <Input type="number" value={m.v} onChange={(e) => m.set(e.target.value)} placeholder="0" />
+                            <label className="text-xs font-medium text-content-muted">{t(m.k)} (%)</label>
+                            <Input type="number" min="0" max="100" value={m.v} onChange={(e) => m.set(e.target.value)} placeholder="0" />
+                            <span className="text-[11px] text-content-muted">≈ {m.g ?? 0}g</span>
                           </div>
                         ))}
                       </div>

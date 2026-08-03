@@ -6,10 +6,12 @@ import {
   X,
   CalendarCheck,
   CalendarX,
-  User,
+  Plus,
+  Loader2,
 } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
 import { Avatar, AvatarImage, AvatarFallback } from "../components/ui/avatar";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
@@ -34,6 +36,14 @@ interface EnrichedAppointment extends Appointment {
   otherAvatar: string | null;
   otherRole: string | null;
   otherIsPro: boolean;
+}
+
+interface Contact {
+  id: string;
+  full_name: string;
+  avatar_url: string | null;
+  is_professional: boolean;
+  professional_role: string | null;
 }
 
 const statusConfig: Record<
@@ -97,6 +107,20 @@ export function Appointments() {
   const [roleView, setRoleView] = useState<"pro" | "client">("pro");
   const [busyId, setBusyId] = useState<string | null>(null);
 
+  const [showBookModal, setShowBookModal] = useState(false);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [contactsLoading, setContactsLoading] = useState(false);
+  const [bookForm, setBookForm] = useState({
+    otherId: "",
+    date: "",
+    time: "09:00",
+    duration: "60",
+    notes: "",
+  });
+  const [bookingSaving, setBookingSaving] = useState(false);
+  const [bookingError, setBookingError] = useState("");
+  const [bookingSuccess, setBookingSuccess] = useState(false);
+
   const isProfessional = !!profile?.is_professional;
 
   const loadAppointments = useCallback(async () => {
@@ -142,10 +166,98 @@ export function Appointments() {
     loadAppointments();
   }, [loadAppointments]);
 
+  async function loadContacts() {
+    if (!user) return;
+    setContactsLoading(true);
+    const { data: convs } = await supabase
+      .from("conversations")
+      .select("user_a_id, user_b_id")
+      .or(`user_a_id.eq.${user.id},user_b_id.eq.${user.id}`);
+
+    const otherIds = [
+      ...new Set(
+        (convs || []).flatMap((c: { user_a_id: string; user_b_id: string }) =>
+          c.user_a_id === user.id ? [c.user_b_id] : [c.user_a_id]
+        )
+      ),
+    ];
+
+    if (otherIds.length) {
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, full_name, avatar_url, is_professional, professional_role")
+        .in("id", otherIds);
+      setContacts((profiles as Contact[]) || []);
+    } else {
+      setContacts([]);
+    }
+    setContactsLoading(false);
+  }
+
   async function updateStatus(id: string, status: AppointmentStatus) {
     setBusyId(id);
     await supabase.from("appointments").update({ status }).eq("id", id);
     setBusyId(null);
+    await loadAppointments();
+  }
+
+  function openBookModal() {
+    setBookForm({ otherId: "", date: "", time: "09:00", duration: "60", notes: "" });
+    setBookingError("");
+    setBookingSuccess(false);
+    loadContacts();
+    setShowBookModal(true);
+  }
+
+  async function submitBooking() {
+    if (!user || !bookForm.otherId || !bookForm.date) return;
+    setBookingSaving(true);
+    setBookingError("");
+
+    const other = contacts.find((c) => c.id === bookForm.otherId);
+    if (!other) {
+      setBookingError(t("appointments.selectContact"));
+      setBookingSaving(false);
+      return;
+    }
+
+    const professionalId = isProfessional ? user.id : other.id;
+    const clientId = isProfessional ? other.id : user.id;
+
+    const { error } = await supabase.from("appointments").insert({
+      user_id: clientId,
+      professional_id: professionalId,
+      appointment_date: bookForm.date,
+      appointment_time: bookForm.time,
+      duration_minutes: parseInt(bookForm.duration) || 60,
+      notes: bookForm.notes || null,
+    });
+
+    setBookingSaving(false);
+    if (error) {
+      setBookingError(error.message);
+      return;
+    }
+
+    const { data: meProfile } = await supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", user.id)
+      .maybeSingle();
+    const myName = meProfile?.full_name || "—";
+    await supabase.from("notifications").insert({
+      user_id: other.id,
+      type: "appointment",
+      title: t("appointments.notifTitle"),
+      body: t("appointments.notifBody", { name: myName, date: bookForm.date, time: bookForm.time }),
+      read: false,
+    });
+
+    setBookingSuccess(true);
+    setTimeout(() => {
+      setShowBookModal(false);
+      setBookingSuccess(false);
+    }, 1600);
     await loadAppointments();
   }
 
@@ -176,15 +288,28 @@ export function Appointments() {
       (!isProfessional || isInRole(a))
   ).length;
 
+  const taCls =
+    "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-content-strong placeholder:text-slate-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100";
+  const inputCls =
+    "flex h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-content-strong placeholder:text-slate-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100";
+  const selectCls =
+    "flex h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100";
+
   return (
     <div className="flex flex-col gap-6 p-4 sm:p-6 lg:p-8">
-      <header>
-        <h1 className="text-2xl font-bold text-content-strong">
-          {t("appointments.title")}
-        </h1>
-        <p className="mt-0.5 text-sm text-content-muted">
-          {t("appointments.subtitle")}
-        </p>
+      <header className="flex items-end justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-content-strong">
+            {t("appointments.title")}
+          </h1>
+          <p className="mt-0.5 text-sm text-content-muted">
+            {t("appointments.subtitle")}
+          </p>
+        </div>
+        <Button className="gap-2" onClick={openBookModal}>
+          <Plus className="h-4 w-4" />
+          {t("appointments.new")}
+        </Button>
       </header>
 
       {/* Role segment for professionals */}
@@ -259,6 +384,10 @@ export function Appointments() {
             <p className="mt-1 max-w-xs text-sm text-content-muted">
               {t("appointments.noAppointmentsSub")}
             </p>
+            <Button className="mt-4 gap-2" onClick={openBookModal}>
+              <Plus className="h-4 w-4" />
+              {t("appointments.new")}
+            </Button>
           </CardContent>
         </Card>
       ) : (
@@ -278,14 +407,10 @@ export function Appointments() {
                 className="border-edge-base bg-surface-card transition-all hover:shadow-md"
               >
                 <CardContent className="p-5">
-                  {/* Header: other party */}
                   <div className="mb-4 flex items-start gap-3">
                     <Avatar className="h-12 w-12">
                       {apt.otherAvatar ? (
-                        <AvatarImage
-                          src={apt.otherAvatar}
-                          alt={apt.otherName}
-                        />
+                        <AvatarImage src={apt.otherAvatar} alt={apt.otherName} />
                       ) : (
                         <AvatarFallback className="bg-primary-50 text-sm font-bold text-primary-700">
                           {initials(apt.otherName)}
@@ -313,7 +438,6 @@ export function Appointments() {
                     </span>
                   </div>
 
-                  {/* Date / time / duration */}
                   <div className="mb-4 flex flex-wrap gap-x-5 gap-y-2">
                     <div className="flex items-center gap-1.5 text-sm text-content-body">
                       <Calendar className="h-4 w-4 text-content-muted" />
@@ -329,14 +453,12 @@ export function Appointments() {
                     </div>
                   </div>
 
-                  {/* Notes */}
                   {apt.notes && (
                     <div className="mb-4 rounded-xl bg-surface-subtle p-3 text-sm leading-relaxed text-content-body">
                       {apt.notes}
                     </div>
                   )}
 
-                  {/* Actions */}
                   {(canConfirm || canComplete || canCancel) && (
                     <div className="flex flex-wrap gap-2 border-t border-edge-base pt-4">
                       {canConfirm && (
@@ -380,6 +502,140 @@ export function Appointments() {
               </Card>
             );
           })}
+        </div>
+      )}
+
+      {/* Booking Modal */}
+      {showBookModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center sm:p-4"
+          onClick={() => setShowBookModal(false)}
+        >
+          <Card
+            className="w-full max-w-lg overflow-hidden rounded-b-none border-edge-base bg-surface-card shadow-2xl sm:rounded-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-edge-base p-4">
+              <h3 className="text-base font-bold text-content-strong">{t("appointments.new")}</h3>
+              <button
+                onClick={() => setShowBookModal(false)}
+                className="text-content-muted transition-colors hover:text-content-strong"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="max-h-[70vh] overflow-y-auto p-4">
+              {bookingSuccess ? (
+                <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-green-50">
+                    <Check className="h-7 w-7 text-green-500" />
+                  </div>
+                  <p className="text-sm font-semibold text-content-strong">{t("appointments.bookSuccess")}</p>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-4">
+                  {bookingError && (
+                    <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{bookingError}</div>
+                  )}
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-medium text-content-muted">
+                      {isProfessional ? t("appointments.selectClient") : t("appointments.selectProfessional")}
+                    </label>
+                    {contactsLoading ? (
+                      <div className="flex items-center gap-2 text-sm text-content-muted">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        {t("loading")}
+                      </div>
+                    ) : contacts.length === 0 ? (
+                      <p className="rounded-lg bg-surface-subtle px-3 py-3 text-sm text-content-muted">
+                        {t("appointments.noContacts")}
+                      </p>
+                    ) : (
+                      <select
+                        className={selectCls}
+                        value={bookForm.otherId}
+                        onChange={(e) => setBookForm((f) => ({ ...f, otherId: e.target.value }))}
+                      >
+                        <option value="">{t("appointments.selectContact")}</option>
+                        {contacts.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.full_name}
+                            {c.is_professional ? ` · ${c.professional_role ?? t("appointments.professional")}` : ""}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-medium text-content-muted">{t("appointments.date")}</label>
+                      <Input
+                        type="date"
+                        value={bookForm.date}
+                        onChange={(e) => setBookForm((f) => ({ ...f, date: e.target.value }))}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-medium text-content-muted">{t("appointments.time")}</label>
+                      <Input
+                        type="time"
+                        value={bookForm.time}
+                        onChange={(e) => setBookForm((f) => ({ ...f, time: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-medium text-content-muted">{t("appointments.duration")}</label>
+                    <select
+                      className={selectCls}
+                      value={bookForm.duration}
+                      onChange={(e) => setBookForm((f) => ({ ...f, duration: e.target.value }))}
+                    >
+                      <option value="30">30 min</option>
+                      <option value="60">60 min</option>
+                      <option value="90">90 min</option>
+                      <option value="120">120 min</option>
+                    </select>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-medium text-content-muted">{t("appointments.notes")}</label>
+                    <textarea
+                      className={taCls}
+                      rows={3}
+                      placeholder={t("appointments.notesPlaceholder")}
+                      value={bookForm.notes}
+                      onChange={(e) => setBookForm((f) => ({ ...f, notes: e.target.value }))}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {!bookingSuccess && (
+              <div className="flex items-center justify-end gap-2 border-t border-edge-base p-4">
+                <Button variant="outline" onClick={() => setShowBookModal(false)}>
+                  {t("cancel")}
+                </Button>
+                <Button
+                  onClick={submitBooking}
+                  disabled={bookingSaving || !bookForm.otherId || !bookForm.date}
+                  className="gap-2"
+                >
+                  {bookingSaving ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <CalendarCheck className="h-4 w-4" />
+                  )}
+                  {t("appointments.confirm")}
+                </Button>
+              </div>
+            )}
+          </Card>
         </div>
       )}
     </div>
