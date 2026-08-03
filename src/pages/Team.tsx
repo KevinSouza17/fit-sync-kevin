@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { UserPlus, MessageCircle, Calendar, Star, MapPin, Search, Award } from "lucide-react";
+import { UserPlus, MessageCircle, Calendar, Star, MapPin, Search, Award, X, CheckCircle2 } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "../components/ui/avatar";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
+import { useNotifications } from "../context/NotificationsContext";
+import { InviteModal } from "../components/InviteModal";
+import { useI18n } from "../context/I18nContext";
 
 interface Professional {
   id: string;
@@ -37,7 +39,7 @@ function initials(name: string) {
 
 export function Team() {
   const { user } = useAuth();
-  const navigate = useNavigate();
+  const { t } = useI18n();
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -59,31 +61,40 @@ export function Team() {
     setLoading(false);
   }
 
-  async function startConversation(pro: Professional) {
-    if (!user) return;
-    const me = user.id;
-    const them = pro.id;
-    const userA = me < them ? me : them;
-    const userB = me < them ? them : me;
+  const [inviteTarget, setInviteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [bookingTarget, setBookingTarget] = useState<Professional | null>(null);
+  const [bookingForm, setBookingForm] = useState({ date: "", time: "09:00", duration: "60", notes: "" });
+  const [bookingSaving, setBookingSaving] = useState(false);
+  const [bookingSuccess, setBookingSuccess] = useState(false);
 
-    const { data: existing } = await supabase
-      .from("conversations")
-      .select("id")
-      .eq("user_a_id", userA)
-      .eq("user_b_id", userB)
-      .maybeSingle();
+  function startConversation(pro: Professional) {
+    setInviteTarget({ id: pro.id, name: pro.full_name });
+  }
 
-    let convId = existing?.id;
-    if (!convId) {
-      const { data: created } = await supabase
-        .from("conversations")
-        .insert({ user_a_id: userA, user_b_id: userB })
-        .select("id")
-        .single();
-      convId = created?.id;
-    }
-    if (convId) {
-      navigate(`/messages?c=${convId}`);
+  function openBooking(pro: Professional) {
+    setBookingTarget(pro);
+    setBookingForm({ date: "", time: "09:00", duration: "60", notes: "" });
+    setBookingSuccess(false);
+  }
+
+  async function submitBooking() {
+    if (!bookingTarget || !bookingForm.date) return;
+    setBookingSaving(true);
+    const { data } = await supabase
+      .from("appointments")
+      .insert({
+        professional_id: bookingTarget.id,
+        appointment_date: bookingForm.date,
+        appointment_time: bookingForm.time,
+        duration_minutes: parseInt(bookingForm.duration) || 60,
+        notes: bookingForm.notes || null,
+      })
+      .select()
+      .single();
+    setBookingSaving(false);
+    if (data) {
+      setBookingSuccess(true);
+      setTimeout(() => { setBookingTarget(null); setBookingSuccess(false); }, 2000);
     }
   }
 
@@ -99,11 +110,11 @@ export function Team() {
   const uniqueRoles = [...new Set(professionals.map((p) => p.professional_role).filter(Boolean))];
 
   return (
-    <div className="flex flex-col gap-6 p-8">
+    <div className="flex flex-col gap-6 p-4 sm:p-6 lg:p-8">
       <header className="flex items-end justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Minha Equipe</h1>
-          <p className="mt-0.5 text-sm text-slate-500">Encontre profissionais de saúde e fitness</p>
+          <h1 className="text-2xl font-bold text-slate-900">{t("team.title")}</h1>
+          <p className="mt-0.5 text-sm text-slate-500">{t("team.subtitle")}</p>
         </div>
       </header>
 
@@ -113,7 +124,7 @@ export function Team() {
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
             className="flex h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
-            placeholder="Buscar por nome, função ou especialidade..."
+            placeholder={t("team.search")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -125,7 +136,7 @@ export function Team() {
               !roleFilter ? "bg-primary-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
             }`}
           >
-            Todos
+            {t("all")}
           </button>
           {uniqueRoles.map((role) => (
             <button
@@ -150,7 +161,7 @@ export function Team() {
           <CardContent className="flex flex-col items-center py-16 text-center">
             <UserPlus className="mb-3 h-12 w-12 text-slate-200" />
             <h3 className="text-base font-semibold text-slate-700">
-              {professionals.length === 0 ? "Nenhum profissional cadastrado ainda" : "Nenhum profissional encontrado"}
+              {professionals.length === 0 ? "Nenhum profissional cadastrado ainda" : t("team.noResults")}
             </h3>
             <p className="mt-1 text-sm text-slate-400">
               {professionals.length === 0 ? "Profissionais aparecerão aqui quando se cadastrarem" : "Tente outro termo de busca"}
@@ -219,15 +230,76 @@ export function Team() {
                         <span className="text-xs text-slate-400">({pro.rating_count})</span>
                       )}
                     </div>
-                    <Button size="sm" className="h-7 gap-1.5 px-3 text-xs">
+                    <Button size="sm" className="h-7 gap-1.5 px-3 text-xs" onClick={() => openBooking(pro)}>
                       <Calendar className="h-3 w-3" />
-                      Agendar
+                      {t("team.book")}
                     </Button>
                   </div>
                 </CardContent>
               </Card>
             );
           })}
+        </div>
+      )}
+
+      {/* Invite (email verification) modal triggered from the professional card */}
+      <InviteModal
+        open={!!inviteTarget}
+        onClose={() => setInviteTarget(null)}
+        hintName={inviteTarget?.name}
+        expectedUserId={inviteTarget?.id}
+      />
+
+      {/* Booking modal */}
+      {bookingTarget && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onClick={() => setBookingTarget(null)}>
+          <div className="w-full max-w-md rounded-t-2xl bg-surface-card p-6 shadow-xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-4 flex items-start justify-between">
+              <div>
+                <h2 className="text-lg font-bold text-content-strong">{t("appointments.bookWith")} {bookingTarget.full_name}</h2>
+                <p className="text-sm text-content-muted">{bookingTarget.professional_role}</p>
+              </div>
+              <button onClick={() => setBookingTarget(null)} className="text-content-muted hover:text-content-body">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            {bookingSuccess ? (
+              <div className="flex flex-col items-center py-8 text-center">
+                <CheckCircle2 className="mb-3 h-12 w-12 text-green-500" />
+                <p className="text-base font-semibold text-content-strong">{t("appointments.bookSuccess")}</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-sm font-medium text-content-body">{t("appointments.date")}</label>
+                    <input type="date" min={new Date().toISOString().slice(0, 10)} value={bookingForm.date} onChange={(e) => setBookingForm({ ...bookingForm, date: e.target.value })} className="mt-1 flex h-10 w-full rounded-lg border border-edge-base bg-surface-card px-3 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-content-body">{t("appointments.time")}</label>
+                    <input type="time" value={bookingForm.time} onChange={(e) => setBookingForm({ ...bookingForm, time: e.target.value })} className="mt-1 flex h-10 w-full rounded-lg border border-edge-base bg-surface-card px-3 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100" />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-content-body">{t("appointments.duration")}</label>
+                  <select value={bookingForm.duration} onChange={(e) => setBookingForm({ ...bookingForm, duration: e.target.value })} className="mt-1 flex h-10 w-full rounded-lg border border-edge-base bg-surface-card px-3 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100">
+                    <option value="30">30</option>
+                    <option value="60">60</option>
+                    <option value="90">90</option>
+                    <option value="120">120</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-content-body">{t("appointments.notes")}</label>
+                  <textarea rows={3} placeholder={t("appointments.notesPlaceholder")} value={bookingForm.notes} onChange={(e) => setBookingForm({ ...bookingForm, notes: e.target.value })} className="mt-1 flex w-full rounded-lg border border-edge-base bg-surface-card px-3 py-2 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100" />
+                </div>
+                <div className="flex gap-3">
+                  <Button variant="outline" className="flex-1" onClick={() => setBookingTarget(null)}>{t("cancel")}</Button>
+                  <Button className="flex-1" onClick={submitBooking} disabled={bookingSaving || !bookingForm.date}>{bookingSaving ? t("loading") : t("add")}</Button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -304,11 +376,11 @@ export function Team() {
             <div className="mt-5 flex gap-3">
               <Button variant="outline" className="flex-1 gap-2" onClick={() => startConversation(selectedPro)}>
                 <MessageCircle className="h-4 w-4" />
-                Mensagem
+                {t("team.message")}
               </Button>
-              <Button className="flex-1 gap-2" disabled={!selectedPro.available_for_booking}>
+              <Button className="flex-1 gap-2" disabled={!selectedPro.available_for_booking} onClick={() => openBooking(selectedPro)}>
                 <Calendar className="h-4 w-4" />
-                Agendar
+                {t("team.book")}
               </Button>
             </div>
           </div>

@@ -4,6 +4,7 @@ import { Activity, Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { useAuth } from "../context/AuthContext";
+import { useI18n } from "../context/I18nContext";
 
 export function Login() {
   const [showPassword, setShowPassword] = useState(false);
@@ -12,6 +13,7 @@ export function Login() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const { signIn } = useAuth();
+  const { t } = useI18n();
   const navigate = useNavigate();
 
   async function handleSubmit(e: React.FormEvent) {
@@ -20,7 +22,7 @@ export function Login() {
     setLoading(true);
     const { error } = await signIn(email, password);
     if (error) {
-      setError("E-mail ou senha inválidos. Tente novamente.");
+      setError(t("login.invalidCredentials"));
     } else {
       navigate("/dashboard");
     }
@@ -60,8 +62,8 @@ export function Login() {
           </div>
 
           <div className="mb-8">
-            <h1 className="text-2xl font-bold text-content-strong">Bem-vindo de volta</h1>
-            <p className="mt-1.5 text-sm text-content-muted">Insira suas credenciais para acessar sua conta</p>
+            <h1 className="text-2xl font-bold text-content-strong">{t("login.title")}</h1>
+            <p className="mt-1.5 text-sm text-content-muted">{t("login.subtitle")}</p>
           </div>
 
           {error && (
@@ -72,7 +74,7 @@ export function Login() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-content-body">E-mail</label>
+              <label className="text-sm font-medium text-content-body">{t("login.email")}</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-content-muted" />
                 <Input
@@ -88,7 +90,7 @@ export function Login() {
 
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <label className="text-sm font-medium text-content-body">Senha</label>
+                <label className="text-sm font-medium text-content-body">{t("login.password")}</label>
               </div>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-content-muted" />
@@ -111,7 +113,7 @@ export function Login() {
             </div>
 
             <Button type="submit" className="w-full" size="lg" disabled={loading}>
-              {loading ? "Entrando..." : "Entrar"}
+              {loading ? "Entrando..." : t("login.signIn")}
             </Button>
           </form>
 
@@ -122,9 +124,9 @@ export function Login() {
           </div>
 
           <p className="text-center text-sm text-content-muted">
-            Não tem uma conta?{" "}
+            {t("login.noAccount")}{" "}
             <Link to="/register" className="font-medium text-primary-600 hover:text-primary-700">
-              Criar conta
+              {t("login.signUp")}
             </Link>
           </p>
         </div>

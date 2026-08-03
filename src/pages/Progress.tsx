@@ -4,9 +4,11 @@ import { Card, CardContent } from "../components/ui/card";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
 import type { WeightLog } from "../lib/types";
+import { useI18n } from "../context/I18nContext";
 
 export function Progress() {
   const { profile } = useAuth();
+  const { t } = useI18n();
   const [weightLogs, setWeightLogs] = useState<WeightLog[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -48,10 +50,10 @@ export function Progress() {
   ];
 
   return (
-    <div className="flex flex-col gap-6 p-8">
+    <div className="flex flex-col gap-6 p-4 sm:p-6 lg:p-8">
       <header>
-        <h1 className="text-2xl font-bold text-content-strong">Progresso</h1>
-        <p className="mt-0.5 text-sm text-content-muted">Acompanhe sua evolução ao longo do tempo</p>
+        <h1 className="text-2xl font-bold text-content-strong">{t("progress.title")}</h1>
+        <p className="mt-0.5 text-sm text-content-muted">{t("progress.subtitle")}</p>
       </header>
 
       {loading ? (
@@ -128,7 +130,7 @@ export function Progress() {
                               style={{ height: `${h}px` }}
                             />
                             <span className="mt-1 text-[10px] text-content-muted truncate" style={{ writingMode: "vertical-rl" }}>
-                              {new Date(log.logged_date).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
+                              {new Date(log.logged_date).toLocaleDateString(undefined, { day: "2-digit", month: "2-digit" })}
                             </span>
                             <div className="absolute bottom-full mb-1 hidden rounded bg-slate-900 px-2 py-1 text-xs text-white group-hover:block whitespace-nowrap">
                               {log.weight_kg} kg
@@ -158,7 +160,7 @@ export function Progress() {
                           <div>
                             <p className="text-sm font-medium text-content-strong">{log.weight_kg} kg</p>
                             <p className="text-xs text-content-muted">
-                              {new Date(log.logged_date).toLocaleDateString("pt-BR", { weekday: "short", day: "numeric", month: "short" })}
+                              {new Date(log.logged_date).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })}
                             </p>
                           </div>
                           {diff !== null && (

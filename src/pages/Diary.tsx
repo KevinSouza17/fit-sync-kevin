@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, Check, ChevronRight, Dumbbell, Apple, Droplets, Moon, X, Trash2, Pencil } from "lucide-react";
+import { Plus, Check, ChevronRight, Dumbbell, Apple, Droplets, Moon, X, Trash2 } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -8,10 +8,10 @@ import { Progress } from "../components/ui/progress";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
 import type { DiaryTask, Exercise } from "../lib/types";
+import { useI18n } from "../context/I18nContext";
 
 const today = new Date().toISOString().slice(0, 10);
 
-const categoryOptions = ["Hidratação", "Treino", "Nutrição", "Descanso", "Geral"];
 const workoutTypes = ["Superior A", "Superior B", "Inferior A", "Inferior B", "Full Body", "Cardio"];
 
 function initials(name: string) {
@@ -20,6 +20,15 @@ function initials(name: string) {
 
 export function Diary() {
   const { profile, user } = useAuth();
+  const { t } = useI18n();
+
+  const categoryOptions = [
+    { value: "Hidratação", label: t("diary.hydration") },
+    { value: "Treino", label: t("diary.workout") },
+    { value: "Nutrição", label: t("diary.nutrition") },
+    { value: "Descanso", label: t("diary.rest") },
+    { value: "Geral", label: t("diary.general") },
+  ];
   const [tasks, setTasks] = useState<DiaryTask[]>([]);
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,7 +38,6 @@ export function Diary() {
   const [taskCategory, setTaskCategory] = useState("Geral");
 
   const [showExModal, setShowExModal] = useState(false);
-  const [editingEx, setEditingEx] = useState<Exercise | null>(null);
   const [exForm, setExForm] = useState({ name: "", sets: "3x12", weight_kg: "", workout_type: "Superior A" });
   const [saving, setSaving] = useState(false);
 
@@ -93,80 +101,47 @@ export function Diary() {
     if (data) setExercises((prev) => prev.map((e) => (e.id === ex.id ? data : e)));
   }
 
-  async function saveExercise() {
+  async function addExercise() {
     if (!exForm.name.trim()) return;
     setSaving(true);
-    if (editingEx) {
-      const { data } = await supabase
-        .from("exercises")
-        .update({
-          name: exForm.name,
-          sets: exForm.sets,
-          weight_kg: exForm.weight_kg ? parseFloat(exForm.weight_kg) : null,
-          workout_type: exForm.workout_type,
-        })
-        .eq("id", editingEx.id)
-        .select()
-        .single();
-      if (data) setExercises((prev) => prev.map((e) => (e.id === data.id ? data : e)));
-    } else {
-      const { data } = await supabase
-        .from("exercises")
-        .insert({
-          name: exForm.name,
-          sets: exForm.sets,
-          weight_kg: exForm.weight_kg ? parseFloat(exForm.weight_kg) : null,
-          workout_type: exForm.workout_type,
-          exercise_date: today,
-        })
-        .select()
-        .single();
-      if (data) setExercises((prev) => [...prev, data]);
-    }
+    const { data } = await supabase
+      .from("exercises")
+      .insert({
+        name: exForm.name,
+        sets: exForm.sets,
+        weight_kg: exForm.weight_kg ? parseFloat(exForm.weight_kg) : null,
+        workout_type: exForm.workout_type,
+        exercise_date: today,
+      })
+      .select()
+      .single();
+    if (data) setExercises((prev) => [...prev, data]);
     setExForm({ name: "", sets: "3x12", weight_kg: "", workout_type: "Superior A" });
-    setEditingEx(null);
     setShowExModal(false);
     setSaving(false);
-  }
-
-  function openEditExercise(ex: Exercise) {
-    setEditingEx(ex);
-    setExForm({ name: ex.name, sets: ex.sets, weight_kg: ex.weight_kg ? String(ex.weight_kg) : "", workout_type: ex.workout_type });
-    setShowExModal(true);
-  }
-
-  function openAddExercise() {
-    setEditingEx(null);
-    setExForm({ name: "", sets: "3x12", weight_kg: "", workout_type: "Superior A" });
-    setShowExModal(true);
-  }
-
-  async function deleteExercise(id: string) {
-    await supabase.from("exercises").delete().eq("id", id);
-    setExercises((prev) => prev.filter((e) => e.id !== id));
   }
 
   const done = tasks.filter((t) => t.done).length;
 
   const dailyStats = [
-    { icon: Droplets, label: "Água", value: "–", progress: 0, color: "bg-primary-500", iconColor: "text-primary-500", bg: "bg-primary-50" },
+    { icon: Droplets, label: t("diary.water"), value: "–", progress: 0, color: "bg-primary-500", iconColor: "text-primary-500", bg: "bg-primary-50" },
     { icon: Apple, label: "Calorias", value: "–", progress: 0, color: "bg-orange-400", iconColor: "text-orange-500", bg: "bg-orange-50" },
-    { icon: Dumbbell, label: "Treino", value: `${exercises.filter((e) => e.done).length} / ${exercises.length}`, progress: exercises.length > 0 ? (exercises.filter((e) => e.done).length / exercises.length) * 100 : 0, color: "bg-violet-500", iconColor: "text-violet-500", bg: "bg-violet-50" },
-    { icon: Moon, label: "Tarefas", value: `${done} / ${tasks.length}`, progress: tasks.length > 0 ? (done / tasks.length) * 100 : 0, color: "bg-indigo-500", iconColor: "text-indigo-500", bg: "bg-indigo-50" },
+    { icon: Dumbbell, label: t("diary.workout"), value: `${exercises.filter((e) => e.done).length} / ${exercises.length}`, progress: exercises.length > 0 ? (exercises.filter((e) => e.done).length / exercises.length) * 100 : 0, color: "bg-violet-500", iconColor: "text-violet-500", bg: "bg-violet-50" },
+    { icon: Moon, label: t("diary.tasks"), value: `${done} / ${tasks.length}`, progress: tasks.length > 0 ? (done / tasks.length) * 100 : 0, color: "bg-indigo-500", iconColor: "text-indigo-500", bg: "bg-indigo-50" },
   ];
 
   return (
-    <div className="flex flex-col gap-6 p-8">
+    <div className="flex flex-col gap-6 p-4 sm:p-6 lg:p-8">
       <header className="flex items-end justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-content-strong">Diário</h1>
+          <h1 className="text-2xl font-bold text-content-strong">{t("diary.title")}</h1>
           <p className="mt-0.5 text-sm text-content-muted">
-            {new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })}
+            {new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}
           </p>
         </div>
         <Button className="gap-2" onClick={() => setShowTaskModal(true)}>
           <Plus className="h-4 w-4" />
-          Nova Tarefa
+          {t("diary.newTask")}
         </Button>
       </header>
 
@@ -182,14 +157,14 @@ export function Diary() {
               <CardContent className="p-5">
                 <div className="mb-4 flex items-center justify-between">
                   <div>
-                    <h2 className="text-base font-semibold text-content-strong">Tarefas</h2>
-                    <p className="text-xs text-content-muted">{done} de {tasks.length} concluídas</p>
+                    <h2 className="text-base font-semibold text-content-strong">{t("diary.tasks")}</h2>
+                    <p className="text-xs text-content-muted">{t("diary.tasksDone", { done, total: tasks.length })}</p>
                   </div>
                   <button
                     onClick={() => setShowTaskModal(true)}
                     className="text-sm font-medium text-primary-600 hover:text-primary-700"
                   >
-                    + Adicionar
+                    + {t("add")}
                   </button>
                 </div>
                 {tasks.length > 0 && (
@@ -201,12 +176,12 @@ export function Diary() {
                 {tasks.length === 0 ? (
                   <div className="flex flex-col items-center py-8 text-center">
                     <Check className="mb-2 h-8 w-8 text-slate-200" />
-                    <p className="text-sm text-content-muted">Nenhuma tarefa para hoje</p>
+                    <p className="text-sm text-content-muted">{t("diary.noTasks")}</p>
                     <button
                       onClick={() => setShowTaskModal(true)}
                       className="mt-2 text-sm font-medium text-primary-600 hover:text-primary-700"
                     >
-                      Adicionar primeira tarefa
+                      {t("diary.addFirstTask")}
                     </button>
                   </div>
                 ) : (
@@ -247,23 +222,23 @@ export function Diary() {
             <Card>
               <CardContent className="p-5">
                 <div className="mb-4 flex items-center justify-between">
-                  <h2 className="text-base font-semibold text-content-strong">Treino de Hoje</h2>
+                  <h2 className="text-base font-semibold text-content-strong">{t("diary.todayWorkout")}</h2>
                   <button
                     onClick={() => setShowExModal(true)}
                     className="text-sm font-medium text-primary-600 hover:text-primary-700"
                   >
-                    + Adicionar
+                    + {t("add")}
                   </button>
                 </div>
                 {exercises.length === 0 ? (
                   <div className="flex flex-col items-center py-8 text-center">
                     <Dumbbell className="mb-2 h-8 w-8 text-slate-200" />
-                    <p className="text-sm text-content-muted">Nenhum exercício registrado</p>
+                    <p className="text-sm text-content-muted">{t("diary.noExercises")}</p>
                     <button
-                      onClick={openAddExercise}
+                      onClick={() => setShowExModal(true)}
                       className="mt-2 text-sm font-medium text-primary-600 hover:text-primary-700"
                     >
-                      Adicionar exercício
+                      {t("diary.addExercise")}
                     </button>
                   </div>
                 ) : (
@@ -271,7 +246,7 @@ export function Diary() {
                     {exercises.map((ex) => (
                       <div
                         key={ex.id}
-                        className="group flex items-center justify-between rounded-xl border border-edge-base px-4 py-3 transition-colors hover:bg-surface-base"
+                        className="flex items-center justify-between rounded-xl border border-edge-base px-4 py-3 transition-colors hover:bg-surface-base"
                       >
                         <div className="flex items-center gap-3">
                           <button
@@ -282,24 +257,16 @@ export function Diary() {
                           >
                             <Dumbbell className={`h-4 w-4 ${ex.done ? "text-white" : "text-content-muted"}`} />
                           </button>
-                          <div className="cursor-pointer" onClick={() => openEditExercise(ex)}>
+                          <div>
                             <p className="text-sm font-medium text-content-strong">{ex.name}</p>
-                            <p className="text-xs text-content-muted">{ex.sets}{ex.weight_kg ? ` · ${ex.weight_kg} kg` : ""}</p>
+                            <p className="text-xs text-content-muted">{ex.sets}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => openEditExercise(ex)}
-                            className="hidden text-content-muted hover:text-primary-600 group-hover:block"
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            onClick={() => deleteExercise(ex.id)}
-                            className="hidden text-slate-300 hover:text-red-500 group-hover:block"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
+                          {ex.weight_kg && (
+                            <span className="text-sm font-semibold text-content-body">{ex.weight_kg} kg</span>
+                          )}
+                          <ChevronRight className="h-4 w-4 text-slate-300" />
                         </div>
                       </div>
                     ))}
@@ -323,7 +290,7 @@ export function Diary() {
                   )}
                 </Avatar>
                 <h3 className="mt-3 text-lg font-bold text-content-strong">{displayName}</h3>
-                <p className="text-sm text-content-muted">{profile?.plan === "pro" ? "Plano Pro" : "Plano Free"}</p>
+                <p className="text-sm text-content-muted">{profile?.plan === "pro" ? t("nav.planPro") : t("nav.planFree")}</p>
                 <div className="mt-5 grid w-full grid-cols-3 gap-2 border-t border-edge-base pt-4">
                   <div className="flex flex-col items-center">
                     <span className="text-lg font-bold text-content-strong">{weight ?? "–"}</span>
@@ -349,7 +316,7 @@ export function Diary() {
 
             <Card>
               <CardContent className="p-5">
-                <h3 className="mb-4 text-base font-semibold text-content-strong">Progresso do Dia</h3>
+                <h3 className="mb-4 text-base font-semibold text-content-strong">{t("diary.dayProgress")}</h3>
                 <div className="flex flex-col gap-4">
                   {dailyStats.map((stat) => (
                     <div key={stat.label} className="flex flex-col gap-1.5">
@@ -377,14 +344,14 @@ export function Diary() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-sm rounded-2xl bg-surface-card p-6 shadow-xl">
             <div className="mb-5 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-content-strong">Nova Tarefa</h2>
+              <h2 className="text-lg font-bold text-content-strong">{t("diary.newTask")}</h2>
               <button onClick={() => setShowTaskModal(false)} className="text-content-muted hover:text-content-body">
                 <X className="h-5 w-5" />
               </button>
             </div>
             <div className="space-y-3">
               <div>
-                <label className="text-sm font-medium text-content-body">Descrição *</label>
+                <label className="text-sm font-medium text-content-body">{t("diary.taskDescription")} *</label>
                 <Input
                   className="mt-1"
                   placeholder="Ex: Beber 2.5L de água"
@@ -395,20 +362,20 @@ export function Diary() {
                 />
               </div>
               <div>
-                <label className="text-sm font-medium text-content-body">Categoria</label>
+                <label className="text-sm font-medium text-content-body">{t("diary.category")}</label>
                 <select
                   className="mt-1 flex h-10 w-full rounded-lg border border-edge-base bg-surface-card px-3 py-2 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
                   value={taskCategory}
                   onChange={(e) => setTaskCategory(e.target.value)}
                 >
-                  {categoryOptions.map((c) => <option key={c}>{c}</option>)}
+                  {categoryOptions.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
                 </select>
               </div>
             </div>
             <div className="mt-5 flex gap-3">
-              <Button variant="outline" className="flex-1" onClick={() => setShowTaskModal(false)}>Cancelar</Button>
+              <Button variant="outline" className="flex-1" onClick={() => setShowTaskModal(false)}>{t("cancel")}</Button>
               <Button className="flex-1" onClick={addTask} disabled={saving || !taskText.trim()}>
-                {saving ? "Salvando..." : "Adicionar"}
+                {saving ? t("saving") : t("add")}
               </Button>
             </div>
           </div>
@@ -420,14 +387,14 @@ export function Diary() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-sm rounded-2xl bg-surface-card p-6 shadow-xl">
             <div className="mb-5 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-content-strong">{editingEx ? "Editar Exercício" : "Adicionar Exercício"}</h2>
-              <button onClick={() => { setShowExModal(false); setEditingEx(null); }} className="text-content-muted hover:text-content-body">
+              <h2 className="text-lg font-bold text-content-strong">{t("diary.addExercise")}</h2>
+              <button onClick={() => setShowExModal(false)} className="text-content-muted hover:text-content-body">
                 <X className="h-5 w-5" />
               </button>
             </div>
             <div className="space-y-3">
               <div>
-                <label className="text-sm font-medium text-content-body">Exercício *</label>
+                <label className="text-sm font-medium text-content-body">{t("diary.exerciseName")} *</label>
                 <Input
                   className="mt-1"
                   placeholder="Ex: Supino Reto"
@@ -438,16 +405,16 @@ export function Diary() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-sm font-medium text-content-body">Séries x Reps</label>
+                  <label className="text-sm font-medium text-content-body">{t("diary.setsReps")}</label>
                   <Input className="mt-1" placeholder="3x12" value={exForm.sets} onChange={(e) => setExForm({ ...exForm, sets: e.target.value })} />
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-content-body">Carga (kg)</label>
+                  <label className="text-sm font-medium text-content-body">{t("diary.weightKg")}</label>
                   <Input className="mt-1" type="number" placeholder="0" value={exForm.weight_kg} onChange={(e) => setExForm({ ...exForm, weight_kg: e.target.value })} />
                 </div>
               </div>
               <div>
-                <label className="text-sm font-medium text-content-body">Tipo de treino</label>
+                <label className="text-sm font-medium text-content-body">{t("diary.workoutType")}</label>
                 <select
                   className="mt-1 flex h-10 w-full rounded-lg border border-edge-base bg-surface-card px-3 py-2 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
                   value={exForm.workout_type}
@@ -458,9 +425,9 @@ export function Diary() {
               </div>
             </div>
             <div className="mt-5 flex gap-3">
-              <Button variant="outline" className="flex-1" onClick={() => setShowExModal(false)}>Cancelar</Button>
-              <Button className="flex-1" onClick={saveExercise} disabled={saving || !exForm.name.trim()}>
-                {saving ? "Salvando..." : editingEx ? "Salvar" : "Adicionar"}
+              <Button variant="outline" className="flex-1" onClick={() => setShowExModal(false)}>{t("cancel")}</Button>
+              <Button className="flex-1" onClick={addExercise} disabled={saving || !exForm.name.trim()}>
+                {saving ? t("saving") : t("add")}
               </Button>
             </div>
           </div>

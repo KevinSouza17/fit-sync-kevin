@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Activity, Mail, Lock, Eye, EyeOff, User, Briefcase, GraduationCap, Award, MapPin } from "lucide-react";
+import { Activity, Mail, Lock, Eye, EyeOff, User, Briefcase, GraduationCap, Award, MapPin, Loader2, CheckCircle2, AlertCircle, Building2 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { useAuth } from "../context/AuthContext";
+import { supabase } from "../lib/supabase";
+import { useI18n } from "../context/I18nContext";
 
 const professionalRoles = [
   "Nutricionista",
@@ -43,35 +45,78 @@ export function Register() {
   const [proSpecialty, setProSpecialty] = useState("");
   const [proCredentials, setProCredentials] = useState("");
   const [proCity, setProCity] = useState("");
+  const [regType, setRegType] = useState<"autonomo" | "empresa">("autonomo");
+  const [docNumber, setDocNumber] = useState("");
+  const [docError, setDocError] = useState("");
 
   const { signUp } = useAuth();
   const navigate = useNavigate();
+  const { t } = useI18n();
+  const [emailChecking, setEmailChecking] = useState(false);
+  const [emailExists, setEmailExists] = useState(false);
+  const [emailChecked, setEmailChecked] = useState(false);
+
+  async function checkEmail(value: string): Promise<boolean> {
+    if (!value.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+      setEmailChecked(false);
+      setEmailExists(false);
+      return false;
+    }
+    setEmailChecking(true);
+    const { data, error } = await supabase.rpc("email_exists", { check_email: value.trim() });
+    setEmailChecking(false);
+    if (error) {
+      setEmailChecked(false);
+      setEmailExists(false);
+      return false;
+    }
+    const exists = !!data;
+    setEmailChecked(true);
+    setEmailExists(exists);
+    return exists;
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     if (password !== confirm) {
-      setError("As senhas não coincidem.");
+      setError(t("register.passwordMismatch"));
       return;
     }
     if (password.length < 6) {
-      setError("A senha deve ter pelo menos 6 caracteres.");
+      setError(t("register.passwordShort"));
       return;
     }
     if (accountType === "professional" && (!proRole || !proSpecialty)) {
-      setError("Preencha sua função e especialidade.");
+      setError(t("register.fillFields"));
+      return;
+    }
+    if (accountType === "professional" && !docNumber.trim()) {
+      setError(t("proreg.documentRequired"));
+      return;
+    }
+    if (accountType === "professional" && regType === "empresa") {
+      const digits = docNumber.replace(/\D/g, "");
+      if (digits.length !== 14) {
+        setError(t("proreg.invalidCnpj"));
+        return;
+      }
+    }
+    const exists = emailChecked ? emailExists : await checkEmail(email);
+    if (exists) {
+      setError(t("register.emailExists"));
       return;
     }
     setLoading(true);
     const proData = accountType === "professional"
-      ? { role: proRole, specialty: proSpecialty, credentials: proCredentials }
+      ? { role: proRole, specialty: proSpecialty, credentials: proCredentials, registrationType: regType, documentNumber: docNumber.trim() }
       : undefined;
     const { error } = await signUp(email, password, fullName, proData);
     if (error) {
       if (error.includes("already registered")) {
-        setError("Este e-mail já está cadastrado.");
+        setError(t("register.emailExists"));
       } else {
-        setError("Erro ao criar conta. Tente novamente.");
+        setError(error);
       }
     } else {
       navigate("/dashboard");
@@ -168,18 +213,35 @@ export function Register() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-content-body">E-mail</label>
+              <label className="text-sm font-medium text-content-body">{t("register.email")}</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-content-muted" />
                 <Input
                   type="email"
                   placeholder="seu@email.com"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="pl-9"
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    setEmailChecked(false);
+                    setEmailExists(false);
+                  }}
+                  onBlur={(e) => checkEmail(e.target.value)}
+                  className="pl-9 pr-10"
                   required
                 />
+                {emailChecking && (
+                  <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-content-muted" />
+                )}
+                {emailChecked && !emailChecking && !emailExists && (
+                  <CheckCircle2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-green-500" />
+                )}
+                {emailChecked && !emailChecking && emailExists && (
+                  <AlertCircle className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-red-500" />
+                )}
               </div>
+              {emailChecked && emailExists && (
+                <p className="text-xs text-red-500">{t("register.emailExists")}</p>
+              )}
             </div>
 
             <div className="space-y-1.5">
@@ -270,17 +332,61 @@ export function Register() {
                   </div>
                 </div>
 
+                {/* Registration type toggle */}
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-content-body">Registro Profissional (CRN, CREF, CRM...)</label>
+                  <label className="text-sm font-medium text-content-body">Tipo de Registro *</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => { setRegType("autonomo"); setDocNumber(""); setDocError(""); }}
+                      className={`flex items-center gap-2 rounded-lg border-2 px-3 py-2.5 text-sm font-medium transition-all ${
+                        regType === "autonomo"
+                          ? "border-emerald-600 bg-emerald-50 text-emerald-700"
+                          : "border-edge-base bg-surface-card text-content-body hover:border-slate-300"
+                      }`}
+                    >
+                      <User className="h-4 w-4" />
+                      Autônomo
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setRegType("empresa"); setDocNumber(""); setDocError(""); }}
+                      className={`flex items-center gap-2 rounded-lg border-2 px-3 py-2.5 text-sm font-medium transition-all ${
+                        regType === "empresa"
+                          ? "border-emerald-600 bg-emerald-50 text-emerald-700"
+                          : "border-edge-base bg-surface-card text-content-body hover:border-slate-300"
+                      }`}
+                    >
+                      <Building2 className="h-4 w-4" />
+                      Empresa
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-content-body">
+                    {regType === "empresa" ? "CNPJ *" : "Registro Profissional (CRN, CREF, CRM...) *"}
+                  </label>
                   <div className="relative">
                     <Award className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-content-muted" />
                     <Input
-                      placeholder="Ex: CRN-3 12345"
-                      value={proCredentials}
-                      onChange={(e) => setProCredentials(e.target.value)}
+                      placeholder={regType === "empresa" ? "Ex: 12.345.678/0001-90" : "Ex: CRN-3 12345"}
+                      value={docNumber}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setDocNumber(v);
+                        if (regType === "empresa") {
+                          const digits = v.replace(/\D/g, "");
+                          setDocError(digits.length === 14 || digits.length === 0 ? "" : t("proreg.invalidCnpj"));
+                        } else {
+                          setDocError(v.trim().length < 3 ? t("proreg.invalidDoc") : "");
+                        }
+                      }}
                       className="pl-9"
+                      required
                     />
                   </div>
+                  {docError && <p className="text-xs text-red-500">{docError}</p>}
                 </div>
 
                 <div className="space-y-1.5">

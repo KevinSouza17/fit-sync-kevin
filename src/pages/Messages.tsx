@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Send, Search, ArrowLeft, MessageCircle, UserCircle } from "lucide-react";
+import { Send, Search, ArrowLeft, MessageCircle, UserCircle, UserPlus } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
+import { useNotifications } from "../context/NotificationsContext";
 import { Avatar, AvatarImage, AvatarFallback } from "../components/ui/avatar";
+import { InviteModal } from "../components/InviteModal";
+import { useI18n } from "../context/I18nContext";
 
 interface ConversationRow {
   id: string;
@@ -31,15 +34,17 @@ function formatTime(iso: string) {
   const now = new Date();
   const sameDay = d.toDateString() === now.toDateString();
   if (sameDay) {
-    return d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+    return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
   }
   const diffDays = Math.floor((now.getTime() - d.getTime()) / 86400000);
-  if (diffDays < 7) return d.toLocaleDateString("pt-BR", { weekday: "short" });
-  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+  if (diffDays < 7) return d.toLocaleDateString(undefined, { weekday: "short" });
+  return d.toLocaleDateString(undefined, { day: "2-digit", month: "2-digit" });
 }
 
 export function Messages() {
   const { user } = useAuth();
+  const { notifications, markRead } = useNotifications();
+  const { t } = useI18n();
   const [searchParams, setSearchParams] = useSearchParams();
   const [conversations, setConversations] = useState<ConversationRow[]>([]);
   const [messages, setMessages] = useState<{ id: string; sender_id: string; content: string; created_at: string }[]>([]);
@@ -48,6 +53,7 @@ export function Messages() {
   const [loading, setLoading] = useState(true);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeName, setActiveName] = useState("");
+  const [inviteOpen, setInviteOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const activeConv = conversations.find((c) => c.id === activeId);
@@ -96,8 +102,8 @@ export function Messages() {
           user_b_id: c.user_b_id,
           last_message_at: c.last_message_at,
           otherId,
-          otherName: other?.full_name ?? "Usuário",
-          otherRole: other?.is_professional ? other.professional_role ?? "Profissional" : "Paciente",
+          otherName: other?.full_name || "Usuário",
+          otherRole: other?.is_professional ? other.professional_role ?? t("messages.professional") : t("messages.patient"),
           otherAvatar: other?.avatar_url ?? null,
           lastContent: lastMsg?.content ?? "",
           unread: count ?? 0,
@@ -112,6 +118,23 @@ export function Messages() {
   useEffect(() => {
     loadConversations();
   }, [loadConversations]);
+
+  // ── Realtime: refresh conversation list when messages change ─────────────
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel("messages-inbox")
+      .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, () => {
+        loadConversations();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "conversations" }, () => {
+        loadConversations();
+      })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, loadConversations]);
 
   // ── Select conversation from URL param on first load ────────────────────
   useEffect(() => {
@@ -128,6 +151,8 @@ export function Messages() {
   // ── Load messages for active conversation ───────────────────────────────
   useEffect(() => {
     if (!activeId) return;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+
     (async () => {
       const { data } = await supabase
         .from("messages")
@@ -144,9 +169,34 @@ export function Messages() {
           .eq("conversation_id", activeId)
           .neq("sender_id", user.id)
           .eq("read", false);
+        loadConversations();
       }
-      loadConversations();
+
+      // Live new messages in this conversation
+      channel = supabase
+        .channel(`conv-${activeId}`)
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "messages", filter: `conversation_id=eq.${activeId}` },
+          (payload) => {
+            const row = payload.new as { id: string; sender_id: string; content: string; created_at: string };
+            setMessages((prev) => (prev.some((m) => m.id === row.id) ? prev : [...prev, row]));
+            if (user && row.sender_id !== user.id) {
+              supabase
+                .from("messages")
+                .update({ read: true })
+                .eq("id", row.id)
+                .eq("read", false)
+                .then(() => loadConversations());
+            }
+          }
+        )
+        .subscribe();
     })();
+
+    return () => {
+      if (channel) supabase.removeChannel(channel);
+    };
   }, [activeId, user, loadConversations]);
 
   // ── Scroll to bottom on new messages ────────────────────────────────────
@@ -169,13 +219,31 @@ export function Messages() {
     if (data) {
       setMessages((prev) => [...prev, data]);
       loadConversations();
+      // Best-effort email notification to the recipient.
+      fireMessageEmail(activeId, text).catch(() => {});
     }
+  }
+
+  async function fireMessageEmail(convId: string, content: string) {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (!token) return;
+    const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/notify-message`;
+    await fetch(apiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ conversationId: convId, content }),
+    });
   }
 
   function openConversation(c: ConversationRow) {
     setActiveId(c.id);
     setActiveName(c.otherName);
     setSearchParams({ c: c.id });
+    // Mark any message notifications tied to this conversation as read.
+    notifications
+      .filter((n) => n.type === "message" && n.conversation_id === c.id && !n.read)
+      .forEach((n) => markRead(n.id));
   }
 
   const filtered = conversations.filter((c) =>
@@ -191,8 +259,19 @@ export function Messages() {
         }`}
       >
         <div className="border-b border-slate-100 px-5 py-4">
-          <h1 className="text-lg font-bold text-slate-900">Mensagens</h1>
-          <p className="mt-0.5 text-xs text-slate-500">Converse com seus profissionais e pacientes</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-lg font-bold text-slate-900">{t("messages.title")}</h1>
+              <p className="mt-0.5 text-xs text-slate-500">{t("messages.subtitle")}</p>
+            </div>
+            <button
+              onClick={() => setInviteOpen(true)}
+              className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary-600 text-white transition-colors hover:bg-primary-700"
+              title={t("messages.invitePerson")}
+            >
+              <UserPlus className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
         <div className="px-4 py-3">
@@ -200,7 +279,7 @@ export function Messages() {
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               className="flex h-10 w-full rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-primary-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-100"
-              placeholder="Buscar conversas..."
+              placeholder={t("messages.search")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -215,9 +294,9 @@ export function Messages() {
           ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <MessageCircle className="mb-2 h-10 w-10 text-slate-200" />
-              <p className="text-sm font-medium text-slate-600">Nenhuma conversa ainda</p>
+              <p className="text-sm font-medium text-slate-600">{t("messages.noConversations")}</p>
               <p className="mt-0.5 text-xs text-slate-400">
-                Inicie uma conversa na página Equipe
+                {t("messages.inviteSomeone")}
               </p>
             </div>
           ) : (
@@ -272,13 +351,9 @@ export function Messages() {
               <ArrowLeft className="h-5 w-5" />
             </button>
             <Avatar className="h-10 w-10">
-              {activeConv.otherAvatar ? (
-                <AvatarImage src={activeConv.otherAvatar} alt={activeName} />
-              ) : (
-                <AvatarFallback className="bg-primary-100 text-sm font-bold text-primary-700">
-                  {initials(activeName)}
-                </AvatarFallback>
-              )}
+              <AvatarFallback className="bg-primary-100 text-sm font-bold text-primary-700">
+                {initials(activeName)}
+              </AvatarFallback>
             </Avatar>
             <div className="flex-1">
               <p className="text-sm font-semibold text-slate-900">{activeName}</p>
@@ -295,7 +370,7 @@ export function Messages() {
               {messages.length === 0 ? (
                 <div className="flex flex-1 flex-col items-center justify-center py-20 text-center">
                   <MessageCircle className="mb-2 h-10 w-10 text-slate-200" />
-                  <p className="text-sm text-slate-400">Nenhuma mensagem ainda. Diga olá!</p>
+                  <p className="text-sm text-slate-400">{t("messages.noMessagesYet")}</p>
                 </div>
               ) : (
                 messages.map((m) => {
@@ -329,7 +404,7 @@ export function Messages() {
             <div className="mx-auto flex max-w-2xl items-center gap-2">
               <input
                 className="flex-1 rounded-full border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-primary-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-100"
-                placeholder="Digite uma mensagem..."
+                placeholder={t("messages.typeMessage")}
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
                 onKeyDown={(e) => {
@@ -355,13 +430,22 @@ export function Messages() {
             <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary-50">
               <MessageCircle className="h-8 w-8 text-primary-600" />
             </div>
-            <h2 className="text-lg font-semibold text-slate-700">Suas mensagens</h2>
+            <h2 className="text-lg font-semibold text-slate-700">{t("messages.yourMessages")}</h2>
             <p className="mt-1 max-w-xs text-sm text-slate-400">
-              Selecione uma conversa à esquerda para começar a conversar
+              {t("messages.selectConversation")}
             </p>
+            <button
+              onClick={() => setInviteOpen(true)}
+              className="mt-5 flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+            >
+              <UserPlus className="h-4 w-4" />
+              {t("messages.invitePerson")}
+            </button>
           </div>
         </section>
       )}
+
+      <InviteModal open={inviteOpen} onClose={() => setInviteOpen(false)} />
     </div>
   );
 }

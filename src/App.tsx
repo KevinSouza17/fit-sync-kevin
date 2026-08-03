@@ -12,6 +12,11 @@ import { Settings } from "./pages/Settings";
 import { EditProfile } from "./pages/EditProfile";
 import { ProfessionalProfile } from "./pages/ProfessionalProfile";
 import { Messages } from "./pages/Messages";
+import { Notifications } from "./pages/Notifications";
+import { Workout } from "./pages/Workout";
+import { WorkoutProgression } from "./pages/WorkoutProgression";
+import { Appointments } from "./pages/Appointments";
+import { MyClients } from "./pages/MyClients";
 import { DashboardLayout } from "./components/layout/DashboardLayout";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -75,6 +80,11 @@ export default function App() {
           <Route path="/profile" element={<EditProfile />} />
           <Route path="/professional-profile" element={<ProfessionalRoute><ProfessionalProfile /></ProfessionalRoute>} />
           <Route path="/messages" element={<Messages />} />
+          <Route path="/notifications" element={<Notifications />} />
+          <Route path="/workout" element={<Workout />} />
+          <Route path="/workout/progression" element={<WorkoutProgression />} />
+          <Route path="/appointments" element={<Appointments />} />
+          <Route path="/my-clients" element={<ProfessionalRoute><MyClients /></ProfessionalRoute>} />
         </Route>
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>

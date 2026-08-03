@@ -17,6 +17,7 @@ import { Button } from "../components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "../components/ui/avatar";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
+import { useI18n } from "../context/I18nContext";
 
 // ─── Plan data ────────────────────────────────────────────────────────────────
 
@@ -200,6 +201,7 @@ function PlanCard({ plan }: { plan: Plan }) {
 export function ProfessionalProfile() {
   const { profile } = useAuth();
   const navigate = useNavigate();
+  const { t } = useI18n();
   const [copied, setCopied] = useState(false);
 
   const name = profile?.full_name || "Dra. Amanda Costa";
@@ -286,7 +288,7 @@ export function ProfessionalProfile() {
             onClick={() => navigate("/profile")}
           >
             <Pencil className="h-4 w-4" />
-            Editar Perfil
+            {t("profile.title")}
           </Button>
         </div>
       </div>

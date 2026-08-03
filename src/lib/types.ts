@@ -23,6 +23,9 @@ export interface Database {
           rating_avg: number;
           rating_count: number;
           avatar_url: string | null;
+          registration_type: string;
+          document_number: string | null;
+          verified: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -169,6 +172,122 @@ export interface Database {
         };
         Update: Partial<Database["public"]["Tables"]["messages"]["Row"]>;
       };
+      notifications: {
+        Row: {
+          id: string;
+          user_id: string;
+          type: string;
+          title: string;
+          body: string | null;
+          code: string | null;
+          invite_email: string | null;
+          inviter_id: string | null;
+          inviter_name: string | null;
+          conversation_id: string | null;
+          read: boolean;
+          created_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["notifications"]["Row"], "id" | "user_id" | "created_at"> & {
+          id?: string;
+          user_id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["notifications"]["Row"]>;
+      };
+      workout_programs: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          description: string | null;
+          is_active: boolean;
+          created_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["workout_programs"]["Row"], "id" | "user_id" | "created_at"> & {
+          id?: string;
+          user_id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["workout_programs"]["Row"]>;
+      };
+      workout_days: {
+        Row: {
+          id: string;
+          program_id: string;
+          day_of_week: number;
+          label: string;
+          created_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["workout_days"]["Row"], "id" | "created_at"> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["workout_days"]["Row"]>;
+      };
+      workout_exercises: {
+        Row: {
+          id: string;
+          program_day_id: string;
+          exercise_name: string;
+          target_sets: number;
+          target_reps_min: number;
+          target_reps_max: number;
+          rest_seconds: number;
+          sort_order: number;
+          notes: string | null;
+          created_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["workout_exercises"]["Row"], "id" | "created_at"> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["workout_exercises"]["Row"]>;
+      };
+      workout_logs: {
+        Row: {
+          id: string;
+          user_id: string;
+          program_exercise_id: string | null;
+          exercise_name: string;
+          workout_day_id: string | null;
+          sets_completed: number;
+          reps_per_set: string | null;
+          weight_kg: number;
+          logged_date: string;
+          notes: string | null;
+          created_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["workout_logs"]["Row"], "id" | "user_id" | "created_at"> & {
+          id?: string;
+          user_id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["workout_logs"]["Row"]>;
+      };
+      custom_foods: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          category: string;
+          serving_size: string;
+          calories: number;
+          protein_g: number;
+          carbs_g: number;
+          fat_g: number;
+          fiber_g: number;
+          barcode: string | null;
+          is_recipe: boolean;
+          ingredients: string | null;
+          created_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["custom_foods"]["Row"], "id" | "user_id" | "created_at"> & {
+          id?: string;
+          user_id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["custom_foods"]["Row"]>;
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
@@ -185,3 +304,11 @@ export type WeightLog = Database["public"]["Tables"]["weight_logs"]["Row"];
 export type Goal = Database["public"]["Tables"]["goals"]["Row"];
 export type Conversation = Database["public"]["Tables"]["conversations"]["Row"];
 export type Message = Database["public"]["Tables"]["messages"]["Row"];
+export type Notification = Database["public"]["Tables"]["notifications"]["Row"];
+export type WorkoutProgram = Database["public"]["Tables"]["workout_programs"]["Row"];
+export type WorkoutDay = Database["public"]["Tables"]["workout_days"]["Row"];
+export type WorkoutExercise = Database["public"]["Tables"]["workout_exercises"]["Row"];
+export type WorkoutLog = Database["public"]["Tables"]["workout_logs"]["Row"];
+export type CustomFood = Database["public"]["Tables"]["custom_foods"]["Row"];
+export type Appointment = Database["public"]["Tables"]["appointments"]["Row"];
+export type ClientPlan = Database["public"]["Tables"]["client_plans"]["Row"];

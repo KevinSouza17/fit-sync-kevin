@@ -9,7 +9,7 @@ interface AuthContextValue {
   profile: Profile | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
-  signUp: (email: string, password: string, fullName: string, professional?: { role: string; specialty: string; credentials: string }) => Promise<{ error: string | null }>;
+  signUp: (email: string, password: string, fullName: string, professional?: { role: string; specialty: string; credentials: string; registrationType?: string; documentNumber?: string }) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -78,6 +78,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           professional_role: professional?.role ?? null,
           specialty: professional?.specialty ?? null,
           credentials: professional?.credentials ?? null,
+          registration_type: professional?.registrationType ?? 'autonomo',
+          document_number: professional?.documentNumber ?? null,
           available_for_booking: !!professional,
         }, { onConflict: "id" });
       if (profileError) return { error: profileError.message };

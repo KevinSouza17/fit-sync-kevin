@@ -6,23 +6,10 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
+import { useI18n } from "../context/I18nContext";
 import type { Meal } from "../lib/types";
 
 const today = new Date().toISOString().slice(0, 10);
-
-const mealTypeLabels: Record<string, string> = {
-  breakfast: "Café da Manhã",
-  lunch: "Almoço",
-  dinner: "Jantar",
-  snack: "Lanche",
-};
-
-const mealTypeOptions = [
-  { value: "breakfast", label: "Café da Manhã" },
-  { value: "lunch", label: "Almoço" },
-  { value: "dinner", label: "Jantar" },
-  { value: "snack", label: "Lanche" },
-];
 
 interface Food {
   id: string;
@@ -56,6 +43,7 @@ const emptyForm: MealForm = {
 
 export function Dashboard() {
   const { profile } = useAuth();
+  const { t } = useI18n();
   const [meals, setMeals] = useState<Meal[]>([]);
   const [waterTotal, setWaterTotal] = useState(0);
   const [latestWeight, setLatestWeight] = useState<number | null>(null);
@@ -76,6 +64,20 @@ export function Dashboard() {
   const [customEntry, setCustomEntry] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+
+  const mealTypeLabels: Record<string, string> = {
+    breakfast: t("meal.breakfast"),
+    lunch: t("meal.lunch"),
+    dinner: t("meal.dinner"),
+    snack: t("meal.snack"),
+  };
+
+  const mealTypeOptions = [
+    { value: "breakfast", label: t("meal.breakfast") },
+    { value: "lunch", label: t("meal.lunch") },
+    { value: "dinner", label: t("meal.dinner") },
+    { value: "snack", label: t("meal.snack") },
+  ];
 
   const calGoal = profile?.daily_calorie_goal ?? 2400;
   const waterGoal = profile?.daily_water_goal_liters ?? 2.5;
@@ -240,27 +242,27 @@ export function Dashboard() {
 
   const summaryCards = [
     {
-      title: "Ingestão de Água",
+      title: t("dashboard.waterIntake"),
       value: `${waterTotal.toFixed(2).replace(/\.?0+$/, "")}L`,
-      subtitle: `Meta: ${waterGoal}L`,
+      subtitle: `${t("dashboard.goal")}: ${waterGoal}L`,
       icon: Droplets,
       iconBg: "bg-primary-50",
       iconColor: "text-primary-500",
       onClick: () => setShowWaterModal(true),
     },
     {
-      title: "Calorias Consumidas",
+      title: t("dashboard.caloriesConsumed"),
       value: String(totalCalories),
-      subtitle: `Meta: ${calGoal} kcal`,
+      subtitle: `${t("dashboard.goal")}: ${calGoal} kcal`,
       icon: Flame,
       iconBg: "bg-orange-50",
       iconColor: "text-orange-500",
       onClick: openMealModal,
     },
     {
-      title: "Peso Atual",
+      title: t("dashboard.currentWeight"),
       value: latestWeight ? `${latestWeight} kg` : "–",
-      subtitle: profile?.goal_weight_kg ? `Meta: ${profile.goal_weight_kg} kg` : "Registre seu peso",
+      subtitle: profile?.goal_weight_kg ? `${t("dashboard.goal")}: ${profile.goal_weight_kg} kg` : t("dashboard.logWeight"),
       icon: Scale,
       iconBg: "bg-green-50",
       iconColor: "text-green-500",
@@ -269,23 +271,23 @@ export function Dashboard() {
   ];
 
   const macros = [
-    { name: "Proteína", current: totalProtein, goal: proteinGoal, unit: "g", color: "bg-primary-500" },
-    { name: "Carboidratos", current: totalCarbs, goal: carbsGoal, unit: "g", color: "bg-orange-400" },
-    { name: "Gordura", current: totalFat, goal: fatGoal, unit: "g", color: "bg-violet-500" },
+    { name: t("dashboard.protein"), current: totalProtein, goal: proteinGoal, unit: "g", color: "bg-primary-500" },
+    { name: t("dashboard.carbs"), current: totalCarbs, goal: carbsGoal, unit: "g", color: "bg-orange-400" },
+    { name: t("dashboard.fat"), current: totalFat, goal: fatGoal, unit: "g", color: "bg-violet-500" },
   ];
 
   return (
-    <div className="flex flex-col gap-6 p-8">
+    <div className="flex flex-col gap-6 p-4 sm:p-6 lg:p-8">
       <header className="flex items-end justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-content-strong">Resumo do Dia</h1>
+          <h1 className="text-2xl font-bold text-content-strong">{t("dashboard.title")}</h1>
           <p className="mt-0.5 text-sm text-content-muted">
-            {new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })}
+            {new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}
           </p>
         </div>
         <Button className="gap-2" onClick={openMealModal}>
           <Plus className="h-4 w-4" />
-          Registrar Refeição
+          {t("dashboard.addMeal")}
         </Button>
       </header>
 
@@ -338,7 +340,7 @@ export function Dashboard() {
                   </div>
                 </div>
                 <div className="flex flex-1 flex-col gap-5">
-                  <h3 className="text-lg font-semibold text-content-strong">Macronutrientes</h3>
+                  <h3 className="text-lg font-semibold text-content-strong">{t("dashboard.macros")}</h3>
                   {macros.map((m) => (
                     <div key={m.name} className="flex flex-col gap-2">
                       <div className="flex items-center justify-between">
@@ -361,18 +363,18 @@ export function Dashboard() {
             <Card>
               <CardContent className="flex flex-col p-5">
                 <div className="mb-5 flex items-center justify-between">
-                  <h3 className="text-base font-semibold text-content-strong">Refeições</h3>
+                  <h3 className="text-base font-semibold text-content-strong">{t("dashboard.meals")}</h3>
                   <button
                     onClick={openMealModal}
                     className="text-sm font-medium text-primary-600 hover:text-primary-700"
                   >
-                    + Adicionar
+                    + {t("add")}
                   </button>
                 </div>
                 {meals.length === 0 ? (
                   <div className="flex flex-1 flex-col items-center justify-center py-8 text-center">
                     <Flame className="mb-2 h-8 w-8 text-slate-200" />
-                    <p className="text-sm text-content-muted">Nenhuma refeição registrada hoje</p>
+                    <p className="text-sm text-content-muted">{t("dashboard.noMeals")}</p>
                   </div>
                 ) : (
                   <div className="flex flex-col">
@@ -416,7 +418,7 @@ export function Dashboard() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md rounded-2xl bg-surface-card p-6 shadow-xl">
             <div className="mb-5 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-content-strong">Registrar Refeição</h2>
+              <h2 className="text-lg font-bold text-content-strong">{t("dashboard.registerMeal")}</h2>
               <button onClick={() => setShowMealModal(false)} className="text-content-muted hover:text-content-body">
                 <X className="h-5 w-5" />
               </button>
@@ -431,7 +433,7 @@ export function Dashboard() {
                 }`}
               >
                 <Search className="h-4 w-4" />
-                Buscar Alimento
+                {t("dashboard.searchFood")}
               </button>
               <button
                 onClick={() => { setCustomEntry(true); setSelectedFood(null); setFoodResults([]); setForm(emptyForm); }}
@@ -440,7 +442,7 @@ export function Dashboard() {
                 }`}
               >
                 <UtensilsCrossed className="h-4 w-4" />
-                Inserir Manual
+                {t("dashboard.manualEntry")}
               </button>
             </div>
 
@@ -448,12 +450,12 @@ export function Dashboard() {
               {/* Food search */}
               {!customEntry && (
                 <div ref={searchRef} className="relative">
-                  <label className="text-sm font-medium text-content-body">Buscar alimento *</label>
+                  <label className="text-sm font-medium text-content-body">{t("dashboard.searchFood")} *</label>
                   <div className="relative mt-1">
                     <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-content-muted" />
                     <Input
                       className="pl-9"
-                      placeholder="Ex: Frango, Arroz, Banana..."
+                      placeholder={t("dashboard.foodPlaceholder")}
                       value={foodSearch}
                       onChange={(e) => handleFoodSearch(e.target.value)}
                       autoFocus
@@ -487,7 +489,7 @@ export function Dashboard() {
                     </div>
                   )}
                   {foodSearch.trim().length > 2 && foodResults.length === 0 && !searching && (
-                    <p className="mt-1.5 text-xs text-content-muted">Nenhum alimento encontrado. Tente outro termo ou insira manualmente.</p>
+                    <p className="mt-1.5 text-xs text-content-muted">{t("dashboard.noFoodFound")}</p>
                   )}
                 </div>
               )}
@@ -508,7 +510,7 @@ export function Dashboard() {
                     </button>
                   </div>
                   <div className="mt-2 flex items-center gap-2">
-                    <label className="text-xs font-medium text-content-body">Qtd de porções:</label>
+                    <label className="text-xs font-medium text-content-body">{t("dashboard.portions")}</label>
                     <input
                       type="number"
                       step="0.5"
@@ -541,7 +543,7 @@ export function Dashboard() {
 
               {/* Meal type */}
               <div>
-                <label className="text-sm font-medium text-content-body">Tipo de refeição</label>
+                <label className="text-sm font-medium text-content-body">{t("dashboard.mealType")}</label>
                 <select
                   className="mt-1 flex h-10 w-full rounded-lg border border-edge-base bg-surface-card px-3 py-2 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
                   value={form.meal_type}
@@ -557,7 +559,7 @@ export function Dashboard() {
               {customEntry && (
                 <>
                   <div>
-                    <label className="text-sm font-medium text-content-body">Nome *</label>
+                    <label className="text-sm font-medium text-content-body">{t("dashboard.mealName")} *</label>
                     <Input
                       className="mt-1"
                       placeholder="Ex: Frango com arroz"
@@ -567,19 +569,19 @@ export function Dashboard() {
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-sm font-medium text-content-body">Calorias (kcal) *</label>
+                      <label className="text-sm font-medium text-content-body">{t("dashboard.calories")} *</label>
                       <Input className="mt-1" type="number" placeholder="0" value={form.calories} onChange={(e) => setForm({ ...form, calories: e.target.value })} />
                     </div>
                     <div>
-                      <label className="text-sm font-medium text-content-body">Proteína (g)</label>
+                      <label className="text-sm font-medium text-content-body">{t("dashboard.protein")}</label>
                       <Input className="mt-1" type="number" placeholder="0" value={form.protein_g} onChange={(e) => setForm({ ...form, protein_g: e.target.value })} />
                     </div>
                     <div>
-                      <label className="text-sm font-medium text-content-body">Carboidratos (g)</label>
+                      <label className="text-sm font-medium text-content-body">{t("dashboard.carbs")}</label>
                       <Input className="mt-1" type="number" placeholder="0" value={form.carbs_g} onChange={(e) => setForm({ ...form, carbs_g: e.target.value })} />
                     </div>
                     <div>
-                      <label className="text-sm font-medium text-content-body">Gordura (g)</label>
+                      <label className="text-sm font-medium text-content-body">{t("dashboard.fat")}</label>
                       <Input className="mt-1" type="number" placeholder="0" value={form.fat_g} onChange={(e) => setForm({ ...form, fat_g: e.target.value })} />
                     </div>
                   </div>
@@ -588,13 +590,13 @@ export function Dashboard() {
             </div>
 
             <div className="mt-5 flex gap-3">
-              <Button variant="outline" className="flex-1" onClick={() => setShowMealModal(false)}>Cancelar</Button>
+              <Button variant="outline" className="flex-1" onClick={() => setShowMealModal(false)}>{t("cancel")}</Button>
               <Button
                 className="flex-1"
                 onClick={saveMeal}
                 disabled={saving || !form.name || !form.calories}
               >
-                {saving ? "Salvando..." : "Salvar"}
+                {saving ? t("saving") : t("save")}
               </Button>
             </div>
           </div>
@@ -606,7 +608,7 @@ export function Dashboard() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-sm rounded-2xl bg-surface-card p-6 shadow-xl">
             <div className="mb-5 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-content-strong">Registrar Água</h2>
+              <h2 className="text-lg font-bold text-content-strong">{t("dashboard.logWater")}</h2>
               <button onClick={() => setShowWaterModal(false)} className="text-content-muted hover:text-content-body">
                 <X className="h-5 w-5" />
               </button>
@@ -625,7 +627,7 @@ export function Dashboard() {
               ))}
             </div>
             <div>
-              <label className="text-sm font-medium text-content-body">Quantidade personalizada (L)</label>
+              <label className="text-sm font-medium text-content-body">{t("dashboard.customAmount")}</label>
               <Input
                 className="mt-1"
                 type="number"
@@ -636,12 +638,12 @@ export function Dashboard() {
               />
             </div>
             <p className="mt-2 text-xs text-content-muted">
-              Total hoje: {waterTotal.toFixed(2)}L / {waterGoal}L
+              {t("dashboard.totalToday")}: {waterTotal.toFixed(2)}L / {waterGoal}L
             </p>
             <div className="mt-5 flex gap-3">
-              <Button variant="outline" className="flex-1" onClick={() => setShowWaterModal(false)}>Cancelar</Button>
+              <Button variant="outline" className="flex-1" onClick={() => setShowWaterModal(false)}>{t("cancel")}</Button>
               <Button className="flex-1" onClick={logWater} disabled={saving}>
-                {saving ? "Salvando..." : "Registrar"}
+                {saving ? t("saving") : t("dashboard.register")}
               </Button>
             </div>
           </div>
@@ -653,13 +655,13 @@ export function Dashboard() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-sm rounded-2xl bg-surface-card p-6 shadow-xl">
             <div className="mb-5 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-content-strong">Registrar Peso</h2>
+              <h2 className="text-lg font-bold text-content-strong">{t("dashboard.logWeightTitle")}</h2>
               <button onClick={() => setShowWeightModal(false)} className="text-content-muted hover:text-content-body">
                 <X className="h-5 w-5" />
               </button>
             </div>
             <div>
-              <label className="text-sm font-medium text-content-body">Peso (kg)</label>
+              <label className="text-sm font-medium text-content-body">{t("dashboard.weightKg")}</label>
               <Input
                 className="mt-1"
                 type="number"
@@ -671,9 +673,9 @@ export function Dashboard() {
               />
             </div>
             <div className="mt-5 flex gap-3">
-              <Button variant="outline" className="flex-1" onClick={() => setShowWeightModal(false)}>Cancelar</Button>
+              <Button variant="outline" className="flex-1" onClick={() => setShowWeightModal(false)}>{t("cancel")}</Button>
               <Button className="flex-1" onClick={logWeight} disabled={saving || !newWeight}>
-                {saving ? "Salvando..." : "Registrar"}
+                {saving ? t("saving") : t("dashboard.register")}
               </Button>
             </div>
           </div>
