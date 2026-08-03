@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Dumbbell, Plus, X, Pencil, Trash2, Calendar, TrendingUp,
-  Activity, ChevronRight, Check, Flame,
+  Activity, ChevronRight, Check, Flame, UtensilsCrossed, ClipboardList,
 } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -10,6 +10,11 @@ import { Input } from "../components/ui/input";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
+import type { ClientPlan } from "../lib/types";
+
+interface WorkoutPlanContent {
+  days?: { name: string; exercises: string }[];
+}
 
 interface Program {
   id: string; user_id: string; name: string; description: string | null;
@@ -61,6 +66,7 @@ export function Workout() {
   const [exerciseForm, setExerciseForm] = useState(emptyExerciseForm);
   const [showLogModal, setShowLogModal] = useState(false);
   const [logForm, setLogForm] = useState(emptyLogForm);
+  const [assignedPlan, setAssignedPlan] = useState<ClientPlan | null>(null);
   const [stats, setStats] = useState({ total: 0, maxWeight: 0, lastSession: "" });
 
   const daysByDow = useMemo(() => {
@@ -102,8 +108,18 @@ export function Workout() {
   }, []);
 
   useEffect(() => {
-    (async () => { setLoading(true); await loadPrograms(); setLoading(false); })();
-  }, [loadPrograms]);
+    (async () => {
+      setLoading(true); await loadPrograms();
+      if (user) {
+        const { data } = await supabase
+          .from("client_plans").select("*")
+          .eq("client_id", user.id).eq("plan_type", "workout").eq("active", true)
+          .order("created_at", { ascending: false }).limit(1).maybeSingle();
+        if (data) setAssignedPlan(data as ClientPlan);
+      }
+      setLoading(false);
+    })();
+  }, [loadPrograms, user]);
   useEffect(() => { loadDays(activeProgram?.id ?? null); }, [activeProgram, loadDays]);
   useEffect(() => { loadStats(); }, [loadStats]);
 
@@ -264,6 +280,30 @@ export function Workout() {
           </Button>
         </div>
       </header>
+
+      {assignedPlan && (assignedPlan.content as WorkoutPlanContent)?.days?.length ? (
+        <Card className="border-primary-300 bg-surface-card">
+          <CardContent className="p-5">
+            <div className="mb-3 flex items-center gap-2">
+              <ClipboardList className="h-5 w-5 text-primary-600" />
+              <h2 className="text-base font-bold text-content-strong">{assignedPlan.title}</h2>
+            </div>
+            {assignedPlan.description && <p className="mb-4 text-xs text-content-muted">{assignedPlan.description}</p>}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {(assignedPlan.content as WorkoutPlanContent).days!.map((d, i) => (
+                <div key={i} className="rounded-xl border border-edge-base bg-surface-subtle p-4">
+                  <p className="mb-2 text-sm font-bold text-primary-600">{d.name}</p>
+                  {d.exercises ? (
+                    <p className="text-xs text-content-body whitespace-pre-line">{d.exercises}</p>
+                  ) : (
+                    <p className="text-xs italic text-content-muted">{t("workout.restDay")}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {programs.length === 0 ? (
         <Card>

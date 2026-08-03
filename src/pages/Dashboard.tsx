@@ -7,9 +7,13 @@ import { Input } from "../components/ui/input";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
-import type { Meal } from "../lib/types";
+import type { Meal, ClientPlan } from "../lib/types";
 
 const today = new Date().toISOString().slice(0, 10);
+
+interface DietPlanContent {
+  meals?: { name: string; items: string }[];
+}
 
 interface Food {
   id: string;
@@ -79,7 +83,9 @@ export function Dashboard() {
     { value: "snack", label: t("meal.snack") },
   ];
 
-  const calGoal = profile?.daily_calorie_goal ?? 2400;
+  const [dietPlan, setDietPlan] = useState<ClientPlan | null>(null);
+
+  const calGoal = dietPlan?.target_calories ?? profile?.daily_calorie_goal ?? 2400;
   const waterGoal = profile?.daily_water_goal_liters ?? 2.5;
 
   useEffect(() => {
@@ -98,16 +104,18 @@ export function Dashboard() {
 
   async function loadData() {
     setLoading(true);
-    const [mealsRes, waterRes, weightRes] = await Promise.all([
+    const [mealsRes, waterRes, weightRes, planRes] = await Promise.all([
       supabase.from("meals").select("*").eq("logged_date", today).order("created_at"),
       supabase.from("water_logs").select("amount_liters").eq("logged_date", today),
       supabase.from("weight_logs").select("weight_kg, logged_date").order("logged_date", { ascending: false }).limit(1),
+      supabase.from("client_plans").select("*").eq("client_id", user?.id ?? "").eq("plan_type", "diet").eq("active", true).order("created_at", { ascending: false }).limit(1).maybeSingle(),
     ]);
     if (mealsRes.data) setMeals(mealsRes.data);
     if (waterRes.data) {
       setWaterTotal(waterRes.data.reduce((s, r) => s + Number(r.amount_liters), 0));
     }
     if (weightRes.data?.[0]) setLatestWeight(Number(weightRes.data[0].weight_kg));
+    if (planRes.data) setDietPlan(planRes.data as ClientPlan);
     setLoading(false);
   }
 
@@ -182,9 +190,9 @@ export function Dashboard() {
   const totalCarbs = meals.reduce((s, m) => s + Number(m.carbs_g), 0);
   const totalFat = meals.reduce((s, m) => s + Number(m.fat_g), 0);
 
-  const proteinGoal = Math.round(calGoal * 0.3 / 4);
-  const carbsGoal = Math.round(calGoal * 0.45 / 4);
-  const fatGoal = Math.round(calGoal * 0.25 / 9);
+  const proteinGoal = dietPlan?.target_protein_g != null ? Math.round(Number(dietPlan.target_protein_g)) : Math.round(calGoal * 0.3 / 4);
+  const carbsGoal = dietPlan?.target_carbs_g != null ? Math.round(Number(dietPlan.target_carbs_g)) : Math.round(calGoal * 0.45 / 4);
+  const fatGoal = dietPlan?.target_fat_g != null ? Math.round(Number(dietPlan.target_fat_g)) : Math.round(calGoal * 0.25 / 9);
 
   const calPct = Math.min(100, Math.round((totalCalories / calGoal) * 100));
   const radius = 80;
@@ -409,6 +417,26 @@ export function Dashboard() {
                 )}
               </CardContent>
             </Card>
+
+            {dietPlan && (dietPlan.content as DietPlanContent)?.meals?.length ? (
+              <Card>
+                <CardContent className="p-5">
+                  <div className="mb-3 flex items-center gap-2">
+                    <UtensilsCrossed className="h-4 w-4 text-primary-600" />
+                    <h3 className="text-base font-semibold text-content-strong">{dietPlan.title}</h3>
+                  </div>
+                  {dietPlan.description && <p className="mb-3 text-xs text-content-muted">{dietPlan.description}</p>}
+                  <div className="flex flex-col gap-2">
+                    {(dietPlan.content as DietPlanContent).meals!.map((m, i) => (
+                      <div key={i} className="rounded-xl border border-edge-base bg-surface-subtle p-3">
+                        <p className="text-sm font-semibold text-content-strong">{m.name}</p>
+                        {m.items && <p className="mt-1 text-xs text-content-body whitespace-pre-line">{m.items}</p>}
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            ) : null}
           </div>
         </>
       )}
