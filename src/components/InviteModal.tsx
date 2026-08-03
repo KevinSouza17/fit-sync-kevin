@@ -12,7 +12,7 @@ interface InviteModalProps {
   expectedUserId?: string;
 }
 
-const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 export function InviteModal({ open, onClose, hintName, expectedUserId }: InviteModalProps) {
   const { user } = useAuth();

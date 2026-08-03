@@ -385,6 +385,7 @@ const pt: Dict = {
   "pro.myClients": "Meus Clientes",
   "pro.clientCount": "{count} clientes ativos",
   "pro.noClients": "Nenhum cliente ainda",
+  "pro.unnamedClient": "Cliente sem nome",
   "pro.revenue": "Faturamento",
   "pro.thisMonth": "Este mês",
 
@@ -825,6 +826,7 @@ const es: Dict = {
   "pro.myClients": "Mis Clientes",
   "pro.clientCount": "{count} clientes activos",
   "pro.noClients": "Ningún cliente aún",
+  "pro.unnamedClient": "Cliente sin nombre",
   "pro.revenue": "Ingresos",
   "pro.thisMonth": "Este mes",
 
@@ -1265,6 +1267,7 @@ const en: Dict = {
   "pro.myClients": "My Clients",
   "pro.clientCount": "{count} active clients",
   "pro.noClients": "No clients yet",
+  "pro.unnamedClient": "Unnamed client",
   "pro.revenue": "Revenue",
   "pro.thisMonth": "This month",
 

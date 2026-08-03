@@ -158,7 +158,7 @@ export function MyClients() {
   }
 
   const taCls =
-    "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-content-strong placeholder:text-slate-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100";
+    "w-full rounded-lg border border-edge-base bg-surface-base px-3 py-2 text-sm text-content-strong placeholder:text-content-muted focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100 dark:bg-surface-subtle";
 
   function StatCard({ icon: Icon, value, label, tone }: {
     icon: typeof Users; value: number; label: string; tone: string;
@@ -264,7 +264,7 @@ export function MyClients() {
                   <div className="flex items-center gap-3">
                     <ClientAvatar c={selectedClient} size="h-10 w-10" fs="text-sm" />
                     <div>
-                      <p className="text-sm font-bold text-content-strong">{selectedClient.full_name}</p>
+                      <p className="text-sm font-bold text-content-strong">{selectedClient.full_name || t("pro.unnamedClient")}</p>
                       <p className="text-xs text-content-muted">{t("plans.assignTo")} {selectedClient.full_name}</p>
                     </div>
                   </div>
