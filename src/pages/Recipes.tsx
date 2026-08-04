@@ -110,6 +110,7 @@ export function Recipes() {
 
   const [meals, setMeals] = useState<MealLog[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
+  const [reAddedId, setReAddedId] = useState<string | null>(null);
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -306,6 +307,27 @@ export function Recipes() {
         return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
       })
       .map((type) => ({ type, items: byType[type] }));
+  }
+
+  async function reAddToToday(meal: MealLog) {
+    const { data } = await supabase
+      .from("meals")
+      .insert({
+        name: meal.name,
+        meal_type: meal.meal_type,
+        calories: meal.calories,
+        protein_g: meal.protein_g,
+        carbs_g: meal.carbs_g,
+        fat_g: meal.fat_g,
+        logged_date: today,
+      })
+      .select()
+      .single();
+    if (data) {
+      setMeals((prev) => [data, ...prev]);
+      setReAddedId(meal.id);
+      setTimeout(() => setReAddedId(null), 2000);
+    }
   }
 
   const tabConfig: { key: Tab; label: string; icon: typeof UtensilsCrossed }[] = [
@@ -543,7 +565,24 @@ export function Recipes() {
                                       P:{Math.round(Number(meal.protein_g))}g C:{Math.round(Number(meal.carbs_g))}g G:{Math.round(Number(meal.fat_g))}g
                                     </p>
                                   </div>
-                                  <span className="shrink-0 text-sm font-semibold text-content-body">{meal.calories} kcal</span>
+                                  <div className="flex shrink-0 items-center gap-2">
+                                    <span className="text-sm font-semibold text-content-body">{meal.calories} kcal</span>
+                                    <button
+                                      onClick={() => reAddToToday(meal)}
+                                      disabled={reAddedId === meal.id}
+                                      className={`flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium transition-colors ${
+                                        reAddedId === meal.id
+                                          ? "bg-green-50 text-green-600"
+                                          : "bg-primary-50 text-primary-600 hover:bg-primary-100"
+                                      }`}
+                                    >
+                                      {reAddedId === meal.id ? (
+                                        <><Check className="h-3 w-3" />{t("foods.reAdded")}</>
+                                      ) : (
+                                        <><Plus className="h-3 w-3" />{t("foods.reAddToday")}</>
+                                      )}
+                                    </button>
+                                  </div>
                                 </CardContent>
                               </Card>
                             ))}

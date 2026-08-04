@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { UserPlus, MessageCircle, Calendar, Star, MapPin, Search, Award, X, CheckCircle2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { UserPlus, MessageCircle, Calendar, Star, MapPin, Search, Award, X, CheckCircle2, UserCircle } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "../components/ui/avatar";
@@ -40,6 +41,7 @@ function initials(name: string) {
 export function Team() {
   const { user } = useAuth();
   const { t } = useI18n();
+  const navigate = useNavigate();
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -396,14 +398,20 @@ export function Team() {
               </div>
             </div>
 
-            <div className="mt-5 flex gap-3">
-              <Button variant="outline" className="flex-1 gap-2" onClick={() => startConversation(selectedPro)}>
-                <MessageCircle className="h-4 w-4" />
-                {t("team.message")}
-              </Button>
-              <Button className="flex-1 gap-2" disabled={!selectedPro.available_for_booking} onClick={() => openBooking(selectedPro)}>
-                <Calendar className="h-4 w-4" />
-                {t("team.book")}
+            <div className="mt-5 flex flex-col gap-2">
+              <div className="flex gap-3">
+                <Button variant="outline" className="flex-1 gap-2" onClick={() => startConversation(selectedPro)}>
+                  <MessageCircle className="h-4 w-4" />
+                  {t("team.message")}
+                </Button>
+                <Button className="flex-1 gap-2" disabled={!selectedPro.available_for_booking} onClick={() => openBooking(selectedPro)}>
+                  <Calendar className="h-4 w-4" />
+                  {t("team.book")}
+                </Button>
+              </div>
+              <Button variant="ghost" className="w-full gap-2 text-sm" onClick={() => { navigate(`/professional/${selectedPro.id}`); setSelectedPro(null); }}>
+                <UserCircle className="h-4 w-4" />
+                Ver Perfil Completo
               </Button>
             </div>
           </div>
