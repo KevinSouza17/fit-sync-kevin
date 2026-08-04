@@ -46,7 +46,7 @@ const emptyForm: MealForm = {
 };
 
 export function Dashboard() {
-  const { profile } = useAuth();
+  const { user, profile } = useAuth();
   const { t } = useI18n();
   const [meals, setMeals] = useState<Meal[]>([]);
   const [waterTotal, setWaterTotal] = useState(0);
