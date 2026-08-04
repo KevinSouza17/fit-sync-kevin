@@ -10,6 +10,7 @@ interface Food {
   id: string;
   name: string;
   category: string;
+  brand: string | null;
   serving_size: string;
   calories: number;
   protein_g: number;
@@ -22,6 +23,7 @@ interface CustomFood {
   id: string;
   name: string;
   category: string;
+  brand: string | null;
   serving_size: string;
   calories: number;
   protein_g: number;
@@ -86,7 +88,9 @@ export function Recipes() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [activeBrand, setActiveBrand] = useState<string | null>(null);
   const [categories, setCategories] = useState<string[]>([]);
+  const [brands, setBrands] = useState<string[]>([]);
   const [selectedFood, setSelectedFood] = useState<Food | CustomFood | null>(null);
   const [isCustom, setIsCustom] = useState(false);
   const [servings, setServings] = useState("1");
@@ -99,7 +103,7 @@ export function Recipes() {
   const [customFiltered, setCustomFiltered] = useState<CustomFood[]>([]);
   const [showCustomModal, setShowCustomModal] = useState(false);
   const [customForm, setCustomForm] = useState({
-    name: "", category: "Personalizado", serving_size: "100g",
+    name: "", category: "Personalizado", brand: "", serving_size: "100g",
     calories: "", protein_g: "", carbs_g: "", fat_g: "", fiber_g: "",
     barcode: "", is_recipe: false, ingredients: "",
   });
@@ -117,6 +121,8 @@ export function Recipes() {
       setFiltered(data);
       const cats = [...new Set(data.map((f) => f.category))];
       setCategories(cats);
+      const brs = [...new Set(data.map((f) => f.brand).filter(Boolean) as string[])].sort();
+      setBrands(brs);
     }
     setLoading(false);
   }, []);
@@ -151,22 +157,29 @@ export function Recipes() {
   function handleSearch(value: string) {
     setSearch(value);
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => applyFilters(value, activeCategory), 200);
+    debounceRef.current = setTimeout(() => applyFilters(value, activeCategory, activeBrand), 200);
   }
 
   function handleCategoryFilter(cat: string | null) {
     const next = activeCategory === cat ? null : cat;
     setActiveCategory(next);
-    applyFilters(search, next);
+    applyFilters(search, next, activeBrand);
   }
 
-  function applyFilters(query: string, cat: string | null) {
+  function handleBrandFilter(brand: string | null) {
+    const next = activeBrand === brand ? null : brand;
+    setActiveBrand(next);
+    applyFilters(search, activeCategory, next);
+  }
+
+  function applyFilters(query: string, cat: string | null, brand: string | null) {
     let result = foods;
     if (query.trim()) {
       const q = query.toLowerCase();
-      result = result.filter((f) => f.name.toLowerCase().includes(q) || f.category.toLowerCase().includes(q));
+      result = result.filter((f) => f.name.toLowerCase().includes(q) || f.category.toLowerCase().includes(q) || (f.brand && f.brand.toLowerCase().includes(q)));
     }
     if (cat) result = result.filter((f) => f.category === cat);
+    if (brand) result = result.filter((f) => f.brand === brand);
     setFiltered(result);
   }
 
@@ -223,6 +236,7 @@ export function Recipes() {
       .insert({
         name: customForm.name,
         category: customForm.category,
+        brand: customForm.brand || null,
         serving_size: customForm.serving_size,
         calories: parseInt(customForm.calories) || 0,
         protein_g: parseFloat(customForm.protein_g) || 0,
@@ -240,7 +254,7 @@ export function Recipes() {
       setCustomFoods((prev) => [data, ...prev]);
       setCustomFiltered((prev) => [data, ...prev]);
       setShowCustomModal(false);
-      setCustomForm({ name: "", category: "Personalizado", serving_size: "100g", calories: "", protein_g: "", carbs_g: "", fat_g: "", fiber_g: "", barcode: "", is_recipe: false, ingredients: "" });
+      setCustomForm({ name: "", category: "Personalizado", brand: "", serving_size: "100g", calories: "", protein_g: "", carbs_g: "", fat_g: "", fiber_g: "", barcode: "", is_recipe: false, ingredients: "" });
     }
   }
 
@@ -255,7 +269,7 @@ export function Recipes() {
     const { data } = await supabase.from("foods").select("*").eq("barcode", customForm.barcode.trim()).maybeSingle();
     if (data) {
       setCustomForm((prev) => ({
-        ...prev, name: data.name, category: data.category, serving_size: data.serving_size,
+        ...prev, name: data.name, category: data.category, brand: data.brand || "", serving_size: data.serving_size,
         calories: String(data.calories), protein_g: String(data.protein_g), carbs_g: String(data.carbs_g), fat_g: String(data.fat_g), fiber_g: String(data.fiber_g),
       }));
     }
@@ -343,6 +357,27 @@ export function Recipes() {
             })}
           </div>
 
+          {/* Brand filters */}
+          {brands.length > 0 && (
+            <div className="mb-4 flex flex-wrap gap-2">
+              <button
+                onClick={() => handleBrandFilter(null)}
+                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${!activeBrand ? "bg-primary-600 text-white" : "bg-surface-subtle text-content-body hover:bg-slate-200"}`}
+              >
+                {t("foods.allBrands")}
+              </button>
+              {brands.map((br) => (
+                <button
+                  key={br}
+                  onClick={() => handleBrandFilter(br)}
+                  className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${activeBrand === br ? "bg-primary-600 text-white" : "bg-surface-subtle text-content-body hover:bg-slate-200"}`}
+                >
+                  {br}
+                </button>
+              ))}
+            </div>
+          )}
+
           {loading ? (
             <div className="flex h-64 items-center justify-center">
               <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-600 border-t-transparent" />
@@ -361,7 +396,10 @@ export function Recipes() {
                   <Card key={food.id} className="cursor-pointer transition-all hover:shadow-md hover:-translate-y-0.5" onClick={() => openFoodDetail(food, false)}>
                     <CardContent className="p-4">
                       <div className="mb-2 flex items-start justify-between gap-2">
-                        <h3 className="text-sm font-semibold text-content-strong leading-tight">{food.name}</h3>
+                        <div className="min-w-0">
+                          <h3 className="text-sm font-semibold text-content-strong leading-tight">{food.name}</h3>
+                          {food.brand && <p className="text-[11px] font-medium text-primary-500 truncate">{food.brand}</p>}
+                        </div>
                         <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${color.bg} ${color.text}`}>{t(`cat.${food.category}`)}</span>
                       </div>
                       <p className="mb-3 text-xs text-content-muted">{t("foods.serving")}: {food.serving_size}</p>
@@ -403,6 +441,7 @@ export function Recipes() {
                       <div className="mb-2 flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <h3 className="text-sm font-semibold text-content-strong leading-tight">{food.name}</h3>
+                          {food.brand && <p className="text-[11px] font-medium text-primary-500 truncate">{food.brand}</p>}
                           {food.is_recipe && <span className="text-[10px] font-medium text-primary-600">Receita</span>}
                         </div>
                         <div className="flex items-center gap-1.5">
@@ -494,6 +533,7 @@ export function Recipes() {
               <div>
                 <h2 className="text-lg font-bold text-content-strong">{selectedFood.name}</h2>
                 <p className="text-sm text-content-muted">{t(`cat.${selectedFood.category}`)} · {t("foods.serving")}: {selectedFood.serving_size}</p>
+                {selectedFood.brand && <p className="mt-0.5 text-sm font-medium text-primary-500">{selectedFood.brand}</p>}
                 {isCustom && (selectedFood as CustomFood).barcode && <p className="mt-1 flex items-center gap-1 text-xs text-content-muted"><Barcode className="h-3 w-3" />{(selectedFood as CustomFood).barcode}</p>}
               </div>
               <button onClick={() => setSelectedFood(null)} className="text-content-muted hover:text-content-body"><X className="h-5 w-5" /></button>
@@ -611,6 +651,17 @@ export function Recipes() {
                     className="mt-1 flex h-10 w-full rounded-lg border border-edge-base bg-surface-card px-3 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-content-body">{t("foods.brand")}</label>
+                <input
+                  type="text"
+                  placeholder={t("foods.brandPlaceholder")}
+                  value={customForm.brand}
+                  onChange={(e) => setCustomForm({ ...customForm, brand: e.target.value })}
+                  className="mt-1 flex h-10 w-full rounded-lg border border-edge-base bg-surface-card px-3 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">

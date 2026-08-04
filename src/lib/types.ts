@@ -270,6 +270,7 @@ export interface Database {
           user_id: string;
           name: string;
           category: string;
+          brand: string | null;
           serving_size: string;
           calories: number;
           protein_g: number;

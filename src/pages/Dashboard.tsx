@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { Droplets, Flame, Scale, Plus, X, Search, UtensilsCrossed } from "lucide-react";
+import { Droplets, Flame, Scale, Plus, X, Search, UtensilsCrossed, Coffee, Sun, Moon, Cookie } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";
 import { Progress } from "../components/ui/progress";
 import { Button } from "../components/ui/button";
@@ -19,6 +19,7 @@ interface Food {
   id: string;
   name: string;
   category: string;
+  brand: string | null;
   serving_size: string;
   calories: number;
   protein_g: number;
@@ -90,6 +91,26 @@ export function Dashboard() {
 
   useEffect(() => {
     loadData();
+  }, []);
+
+  // Realtime subscriptions for live updates
+  useEffect(() => {
+    const mealsChannel = supabase
+      .channel("meals-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "meals", filter: `logged_date=eq.${today}` },
+        () => loadData()
+      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "water_logs", filter: `logged_date=eq.${today}` },
+        () => loadData()
+      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "weight_logs" },
+        () => loadData()
+      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "client_plans" },
+        () => loadData()
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(mealsChannel); };
   }, []);
 
   useEffect(() => {
@@ -184,6 +205,20 @@ export function Dashboard() {
     setCustomEntry(false);
     setShowMealModal(true);
   }
+
+  const mealTypeIcons: Record<string, React.ReactNode> = {
+    breakfast: <Coffee className="h-3.5 w-3.5 text-amber-500" />,
+    lunch: <Sun className="h-3.5 w-3.5 text-orange-500" />,
+    dinner: <Moon className="h-3.5 w-3.5 text-indigo-400" />,
+    snack: <Cookie className="h-3.5 w-3.5 text-primary-500" />,
+  };
+
+  const mealOrder = ["breakfast", "lunch", "dinner", "snack"];
+  const groupedMeals = mealOrder.map((type) => ({
+    type,
+    label: mealTypeLabels[type] ?? type,
+    items: meals.filter((m) => m.meal_type === type),
+  })).filter((g) => g.items.length > 0);
 
   const totalCalories = meals.reduce((s, m) => s + m.calories, 0);
   const totalProtein = meals.reduce((s, m) => s + Number(m.protein_g), 0);
@@ -385,31 +420,39 @@ export function Dashboard() {
                     <p className="text-sm text-content-muted">{t("dashboard.noMeals")}</p>
                   </div>
                 ) : (
-                  <div className="flex flex-col">
-                    {meals.map((meal, i) => (
-                      <div
-                        key={meal.id}
-                        className={`group flex items-start justify-between py-3.5 ${
-                          i < meals.length - 1 ? "border-b border-edge-base" : ""
-                        }`}
-                      >
-                        <div>
-                          <p className="text-sm font-medium text-content-strong">{meal.name}</p>
-                          <p className="mt-0.5 text-xs text-content-muted">
-                            {mealTypeLabels[meal.meal_type] ?? meal.meal_type}
-                            <span className="ml-2 text-content-muted">
-                              P:{Math.round(Number(meal.protein_g))}g C:{Math.round(Number(meal.carbs_g))}g G:{Math.round(Number(meal.fat_g))}g
-                            </span>
-                          </p>
+                  <div className="flex flex-col gap-4">
+                    {groupedMeals.map((group) => (
+                      <div key={group.type}>
+                        <div className="mb-2 flex items-center gap-1.5">
+                          {mealTypeIcons[group.type]}
+                          <span className="text-xs font-semibold uppercase tracking-wide text-content-muted">{group.label}</span>
+                          <span className="text-xs text-content-muted">({group.items.reduce((s, m) => s + m.calories, 0)} kcal)</span>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-content-body">{meal.calories} kcal</span>
-                          <button
-                            onClick={() => deleteMeal(meal.id)}
-                            className="hidden text-slate-300 hover:text-red-500 group-hover:block"
-                          >
-                            <X className="h-3.5 w-3.5" />
-                          </button>
+                        <div className="flex flex-col">
+                          {group.items.map((meal, i) => (
+                            <div
+                              key={meal.id}
+                              className={`group flex items-start justify-between py-2.5 ${
+                                i < group.items.length - 1 ? "border-b border-edge-base" : ""
+                              }`}
+                            >
+                              <div>
+                                <p className="text-sm font-medium text-content-strong">{meal.name}</p>
+                                <p className="mt-0.5 text-xs text-content-muted">
+                                  P:{Math.round(Number(meal.protein_g))}g C:{Math.round(Number(meal.carbs_g))}g G:{Math.round(Number(meal.fat_g))}g
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm text-content-body">{meal.calories} kcal</span>
+                                <button
+                                  onClick={() => deleteMeal(meal.id)}
+                                  className="hidden text-slate-300 hover:text-red-500 group-hover:block"
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     ))}
@@ -504,7 +547,10 @@ export function Dashboard() {
                         >
                           <div className="min-w-0">
                             <p className="text-sm font-medium text-content-strong truncate">{food.name}</p>
-                            <p className="text-xs text-content-muted">{food.category} · {food.serving_size}</p>
+                            <p className="text-xs text-content-muted">
+                              {food.brand && <span className="font-medium text-primary-500">{food.brand} · </span>}
+                              {food.category} · {food.serving_size}
+                            </p>
                           </div>
                           <div className="shrink-0 text-right">
                             <p className="text-sm font-semibold text-content-body">{food.calories} kcal</p>

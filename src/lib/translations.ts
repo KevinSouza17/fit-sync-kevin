@@ -133,6 +133,9 @@ const pt: Dict = {
   "foods.tabCatalog": "Catálogo",
   "foods.tabMine": "Meus Alimentos",
   "foods.tabHistory": "Histórico",
+  "foods.brand": "Marca",
+  "foods.brandPlaceholder": "Ex: Nestlé, Tyson, Seara",
+  "foods.allBrands": "Todas",
 
   // ── Workout ──
   "workout.title": "Protocolo de Treino",
@@ -594,6 +597,9 @@ const es: Dict = {
   "foods.tabCatalog": "Catálogo",
   "foods.tabMine": "Mis Alimentos",
   "foods.tabHistory": "Historial",
+  "foods.brand": "Marca",
+  "foods.brandPlaceholder": "Ej: Nestlé, Tyson, Seara",
+  "foods.allBrands": "Todas",
 
   // ── Workout ──
   "workout.title": "Protocolo de Entreno",
@@ -1055,6 +1061,9 @@ const en: Dict = {
   "foods.tabCatalog": "Catalog",
   "foods.tabMine": "My Foods",
   "foods.tabHistory": "History",
+  "foods.brand": "Brand",
+  "foods.brandPlaceholder": "E.g: Nestle, Tyson, Seara",
+  "foods.allBrands": "All",
 
   // ── Workout ──
   "workout.title": "Workout Protocol",
