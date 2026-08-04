@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from "react";
-import { Search, UtensilsCrossed, Plus, X, Flame, Barcode, History, BookUser, Clock, Trash2, Check } from "lucide-react";
+import { Search, UtensilsCrossed, Plus, X, Flame, Barcode, History, BookUser, Clock, Trash2, Check, Calendar } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { supabase } from "../lib/supabase";
@@ -275,17 +275,38 @@ export function Recipes() {
     }
   }
 
-  // Group meals by type for history view
-  const mealsByType: Record<string, MealLog[]> = {};
+  // Group meals by date, then by meal type within each date
+  const mealsByDate: Record<string, MealLog[]> = {};
   meals.forEach((m) => {
-    if (!mealsByType[m.meal_type]) mealsByType[m.meal_type] = [];
-    mealsByType[m.meal_type].push(m);
+    const d = m.logged_date;
+    if (!mealsByDate[d]) mealsByDate[d] = [];
+    mealsByDate[d].push(m);
   });
 
-  const sortedMealTypes = Object.keys(mealsByType).sort((a, b) => {
-    const ia = mealOrder.indexOf(a); const ib = mealOrder.indexOf(b);
-    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
-  });
+  const sortedDates = Object.keys(mealsByDate).sort((a, b) => b.localeCompare(a));
+
+  function formatDateLabel(dateStr: string) {
+    const d = new Date(dateStr + "T00:00:00");
+    const today2 = new Date(today + "T00:00:00");
+    const yest = new Date(today2); yest.setDate(yest.getDate() - 1);
+    if (d.toDateString() === today2.toDateString()) return t("foods.today");
+    if (d.toDateString() === yest.toDateString()) return t("foods.yesterday");
+    return d.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
+  }
+
+  function mealsByTypeForDate(dateMeals: MealLog[]) {
+    const byType: Record<string, MealLog[]> = {};
+    dateMeals.forEach((m) => {
+      if (!byType[m.meal_type]) byType[m.meal_type] = [];
+      byType[m.meal_type].push(m);
+    });
+    return Object.keys(byType)
+      .sort((a, b) => {
+        const ia = mealOrder.indexOf(a); const ib = mealOrder.indexOf(b);
+        return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+      })
+      .map((type) => ({ type, items: byType[type] }));
+  }
 
   const tabConfig: { key: Tab; label: string; icon: typeof UtensilsCrossed }[] = [
     { key: "catalog", label: t("foods.tabCatalog"), icon: UtensilsCrossed },
@@ -487,34 +508,47 @@ export function Recipes() {
             </CardContent></Card>
           ) : (
             <div className="flex flex-col gap-6">
-              {sortedMealTypes.map((mType) => {
-                const typeMeals = mealsByType[mType];
-                const totalCal = typeMeals.reduce((s, m) => s + m.calories, 0);
+              {sortedDates.map((date) => {
+                const dateMeals = mealsByDate[date];
+                const dayCal = dateMeals.reduce((s, m) => s + m.calories, 0);
+                const dayProt = dateMeals.reduce((s, m) => s + Number(m.protein_g), 0);
+                const dayCarbs = dateMeals.reduce((s, m) => s + Number(m.carbs_g), 0);
+                const dayFat = dateMeals.reduce((s, m) => s + Number(m.fat_g), 0);
+                const grouped = mealsByTypeForDate(dateMeals);
                 return (
-                  <div key={mType}>
-                    <div className="mb-3 flex items-center justify-between">
-                      <h3 className="flex items-center gap-2 text-base font-semibold text-content-strong">
-                        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary-50 text-primary-600">
-                          <UtensilsCrossed className="h-3.5 w-3.5" />
-                        </span>
-                        {getMealLabel(mType, t)}
+                  <div key={date}>
+                    <div className="mb-3 flex items-center justify-between rounded-xl bg-surface-subtle px-4 py-3">
+                      <h3 className="flex items-center gap-2 text-sm font-semibold capitalize text-content-strong">
+                        <Calendar className="h-4 w-4 text-primary-500" />
+                        {formatDateLabel(date)}
                       </h3>
-                      <span className="text-sm font-medium text-content-muted">{totalCal} kcal</span>
+                      <div className="flex items-center gap-3 text-xs text-content-muted">
+                        <span className="flex items-center gap-1"><Flame className="h-3.5 w-3.5 text-orange-500" />{dayCal} kcal</span>
+                        <span>P:{Math.round(dayProt)}g</span>
+                        <span>C:{Math.round(dayCarbs)}g</span>
+                        <span>G:{Math.round(dayFat)}g</span>
+                      </div>
                     </div>
-                    <div className="flex flex-col gap-2">
-                      {typeMeals.map((meal) => (
-                        <Card key={meal.id}>
-                          <CardContent className="flex items-center justify-between p-3.5">
-                            <div className="min-w-0">
-                              <p className="text-sm font-medium text-content-strong">{meal.name}</p>
-                              <p className="text-xs text-content-muted">
-                                {new Date(meal.logged_date).toLocaleDateString(undefined, { day: "2-digit", month: "short" })}
-                                <span className="ml-2">P:{Math.round(Number(meal.protein_g))}g C:{Math.round(Number(meal.carbs_g))}g G:{Math.round(Number(meal.fat_g))}g</span>
-                              </p>
-                            </div>
-                            <span className="shrink-0 text-sm font-semibold text-content-body">{meal.calories} kcal</span>
-                          </CardContent>
-                        </Card>
+                    <div className="flex flex-col gap-3">
+                      {grouped.map((g) => (
+                        <div key={g.type}>
+                          <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-content-muted">{getMealLabel(g.type, t)}</p>
+                          <div className="flex flex-col gap-1.5">
+                            {g.items.map((meal) => (
+                              <Card key={meal.id}>
+                                <CardContent className="flex items-center justify-between p-3.5">
+                                  <div className="min-w-0">
+                                    <p className="text-sm font-medium text-content-strong">{meal.name}</p>
+                                    <p className="text-xs text-content-muted">
+                                      P:{Math.round(Number(meal.protein_g))}g C:{Math.round(Number(meal.carbs_g))}g G:{Math.round(Number(meal.fat_g))}g
+                                    </p>
+                                  </div>
+                                  <span className="shrink-0 text-sm font-semibold text-content-body">{meal.calories} kcal</span>
+                                </CardContent>
+                              </Card>
+                            ))}
+                          </div>
+                        </div>
                       ))}
                     </div>
                   </div>
