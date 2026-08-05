@@ -493,6 +493,20 @@ const pt: Dict = {
   "feed.likes": "{count} curtidas",
   "feed.delete": "Excluir post",
   "feed.emptyError": "Escreva algo antes de publicar",
+  "reviews.title": "Avaliar Plataforma",
+  "reviews.subtitle": "Compartilhe sua experiência com o FitSync",
+  "reviews.yourRating": "Sua avaliação",
+  "reviews.yourComment": "Seu comentário",
+  "reviews.commentPlaceholder": "Conte como tem sido sua experiência...",
+  "reviews.submit": "Enviar avaliação",
+  "reviews.delete": "Excluir",
+  "reviews.noReviews": "Ainda não há avaliações",
+  "reviews.noReviewsSub": "Seja o primeiro a avaliar!",
+  "reviews.alreadyReviewed": "Você já avaliou",
+  "reviews.update": "Atualizar avaliação",
+  "reviews.average": "Média geral",
+  "reviews.totalReviews": "{count} avaliações",
+  "nav.reviews": "Avaliar",
 };
 
 const es: Dict = {
@@ -986,6 +1000,20 @@ const es: Dict = {
   "feed.likes": "{count} me gusta",
   "feed.delete": "Eliminar publicación",
   "feed.emptyError": "Escribe algo antes de publicar",
+  "reviews.title": "Evaluar Plataforma",
+  "reviews.subtitle": "Comparte tu experiencia con FitSync",
+  "reviews.yourRating": "Tu evaluación",
+  "reviews.yourComment": "Tu comentario",
+  "reviews.commentPlaceholder": "Cuéntanos cómo ha sido tu experiencia...",
+  "reviews.submit": "Enviar evaluación",
+  "reviews.delete": "Eliminar",
+  "reviews.noReviews": "Aún no hay evaluaciones",
+  "reviews.noReviewsSub": "¡Sé el primero en evaluar!",
+  "reviews.alreadyReviewed": "Ya evaluaste",
+  "reviews.update": "Actualizar evaluación",
+  "reviews.average": "Promedio general",
+  "reviews.totalReviews": "{count} evaluaciones",
+  "nav.reviews": "Evaluar",
 };
 
 const en: Dict = {
@@ -1479,6 +1507,20 @@ const en: Dict = {
   "feed.likes": "{count} likes",
   "feed.delete": "Delete post",
   "feed.emptyError": "Write something before posting",
+  "reviews.title": "Rate Platform",
+  "reviews.subtitle": "Share your experience with FitSync",
+  "reviews.yourRating": "Your rating",
+  "reviews.yourComment": "Your comment",
+  "reviews.commentPlaceholder": "Tell us about your experience...",
+  "reviews.submit": "Submit review",
+  "reviews.delete": "Delete",
+  "reviews.noReviews": "No reviews yet",
+  "reviews.noReviewsSub": "Be the first to review!",
+ "reviews.alreadyReviewed": "You already reviewed",
+  "reviews.update": "Update review",
+  "reviews.average": "Overall average",
+  "reviews.totalReviews": "{count} reviews",
+  "nav.reviews": "Reviews",
 };
 
 export const translations: Record<Lang, Dict> = { pt, es, en };

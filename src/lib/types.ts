@@ -289,6 +289,21 @@ export interface Database {
         };
         Update: Partial<Database["public"]["Tables"]["custom_foods"]["Row"]>;
       };
+      site_reviews: {
+        Row: {
+          id: string;
+          user_id: string;
+          rating: number;
+          comment: string;
+          created_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["site_reviews"]["Row"], "id" | "user_id" | "created_at"> & {
+          id?: string;
+          user_id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["site_reviews"]["Row"]>;
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
@@ -316,3 +331,4 @@ export type FeedPost = Database["public"]["Tables"]["feed_posts"]["Row"];
 export type FeedLike = Database["public"]["Tables"]["feed_likes"]["Row"];
 export type Appointment = Database["public"]["Tables"]["appointments"]["Row"];
 export type ClientPlan = Database["public"]["Tables"]["client_plans"]["Row"];
+export type SiteReview = Database["public"]["Tables"]["site_reviews"]["Row"];
