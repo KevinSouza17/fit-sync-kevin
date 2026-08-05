@@ -57,7 +57,7 @@ export function Register() {
   const [emailChecked, setEmailChecked] = useState(false);
 
   async function checkEmail(value: string): Promise<boolean> {
-    if (!value.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+    if (!value.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value)) {
       setEmailChecked(false);
       setEmailExists(false);
       return false;

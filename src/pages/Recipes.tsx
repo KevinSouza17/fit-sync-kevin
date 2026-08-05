@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from "react";
-import { Search, UtensilsCrossed, Plus, X, Flame, Barcode, History, BookUser, Clock, Trash2, Check } from "lucide-react";
+import { Search, UtensilsCrossed, Plus, X, Flame, Barcode, History, BookUser, Clock, Trash2, Check, Calendar } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { supabase } from "../lib/supabase";
@@ -10,6 +10,7 @@ interface Food {
   id: string;
   name: string;
   category: string;
+  brand: string | null;
   serving_size: string;
   calories: number;
   protein_g: number;
@@ -22,6 +23,7 @@ interface CustomFood {
   id: string;
   name: string;
   category: string;
+  brand: string | null;
   serving_size: string;
   calories: number;
   protein_g: number;
@@ -86,7 +88,9 @@ export function Recipes() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [activeBrand, setActiveBrand] = useState<string | null>(null);
   const [categories, setCategories] = useState<string[]>([]);
+  const [brands, setBrands] = useState<string[]>([]);
   const [selectedFood, setSelectedFood] = useState<Food | CustomFood | null>(null);
   const [isCustom, setIsCustom] = useState(false);
   const [servings, setServings] = useState("1");
@@ -99,13 +103,14 @@ export function Recipes() {
   const [customFiltered, setCustomFiltered] = useState<CustomFood[]>([]);
   const [showCustomModal, setShowCustomModal] = useState(false);
   const [customForm, setCustomForm] = useState({
-    name: "", category: "Personalizado", serving_size: "100g",
+    name: "", category: "Personalizado", brand: "", serving_size: "100g",
     calories: "", protein_g: "", carbs_g: "", fat_g: "", fiber_g: "",
     barcode: "", is_recipe: false, ingredients: "",
   });
 
   const [meals, setMeals] = useState<MealLog[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
+  const [reAddedId, setReAddedId] = useState<string | null>(null);
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -117,6 +122,8 @@ export function Recipes() {
       setFiltered(data);
       const cats = [...new Set(data.map((f) => f.category))];
       setCategories(cats);
+      const brs = [...new Set(data.map((f) => f.brand).filter(Boolean) as string[])].sort();
+      setBrands(brs);
     }
     setLoading(false);
   }, []);
@@ -151,22 +158,29 @@ export function Recipes() {
   function handleSearch(value: string) {
     setSearch(value);
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => applyFilters(value, activeCategory), 200);
+    debounceRef.current = setTimeout(() => applyFilters(value, activeCategory, activeBrand), 200);
   }
 
   function handleCategoryFilter(cat: string | null) {
     const next = activeCategory === cat ? null : cat;
     setActiveCategory(next);
-    applyFilters(search, next);
+    applyFilters(search, next, activeBrand);
   }
 
-  function applyFilters(query: string, cat: string | null) {
+  function handleBrandFilter(brand: string | null) {
+    const next = activeBrand === brand ? null : brand;
+    setActiveBrand(next);
+    applyFilters(search, activeCategory, next);
+  }
+
+  function applyFilters(query: string, cat: string | null, brand: string | null) {
     let result = foods;
     if (query.trim()) {
       const q = query.toLowerCase();
-      result = result.filter((f) => f.name.toLowerCase().includes(q) || f.category.toLowerCase().includes(q));
+      result = result.filter((f) => f.name.toLowerCase().includes(q) || f.category.toLowerCase().includes(q) || (f.brand && f.brand.toLowerCase().includes(q)));
     }
     if (cat) result = result.filter((f) => f.category === cat);
+    if (brand) result = result.filter((f) => f.brand === brand);
     setFiltered(result);
   }
 
@@ -223,6 +237,7 @@ export function Recipes() {
       .insert({
         name: customForm.name,
         category: customForm.category,
+        brand: customForm.brand || null,
         serving_size: customForm.serving_size,
         calories: parseInt(customForm.calories) || 0,
         protein_g: parseFloat(customForm.protein_g) || 0,
@@ -240,7 +255,7 @@ export function Recipes() {
       setCustomFoods((prev) => [data, ...prev]);
       setCustomFiltered((prev) => [data, ...prev]);
       setShowCustomModal(false);
-      setCustomForm({ name: "", category: "Personalizado", serving_size: "100g", calories: "", protein_g: "", carbs_g: "", fat_g: "", fiber_g: "", barcode: "", is_recipe: false, ingredients: "" });
+      setCustomForm({ name: "", category: "Personalizado", brand: "", serving_size: "100g", calories: "", protein_g: "", carbs_g: "", fat_g: "", fiber_g: "", barcode: "", is_recipe: false, ingredients: "" });
     }
   }
 
@@ -255,23 +270,65 @@ export function Recipes() {
     const { data } = await supabase.from("foods").select("*").eq("barcode", customForm.barcode.trim()).maybeSingle();
     if (data) {
       setCustomForm((prev) => ({
-        ...prev, name: data.name, category: data.category, serving_size: data.serving_size,
+        ...prev, name: data.name, category: data.category, brand: data.brand || "", serving_size: data.serving_size,
         calories: String(data.calories), protein_g: String(data.protein_g), carbs_g: String(data.carbs_g), fat_g: String(data.fat_g), fiber_g: String(data.fiber_g),
       }));
     }
   }
 
-  // Group meals by type for history view
-  const mealsByType: Record<string, MealLog[]> = {};
+  // Group meals by date, then by meal type within each date
+  const mealsByDate: Record<string, MealLog[]> = {};
   meals.forEach((m) => {
-    if (!mealsByType[m.meal_type]) mealsByType[m.meal_type] = [];
-    mealsByType[m.meal_type].push(m);
+    const d = m.logged_date;
+    if (!mealsByDate[d]) mealsByDate[d] = [];
+    mealsByDate[d].push(m);
   });
 
-  const sortedMealTypes = Object.keys(mealsByType).sort((a, b) => {
-    const ia = mealOrder.indexOf(a); const ib = mealOrder.indexOf(b);
-    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
-  });
+  const sortedDates = Object.keys(mealsByDate).sort((a, b) => b.localeCompare(a));
+
+  function formatDateLabel(dateStr: string) {
+    const d = new Date(dateStr + "T00:00:00");
+    const today2 = new Date(today + "T00:00:00");
+    const yest = new Date(today2); yest.setDate(yest.getDate() - 1);
+    if (d.toDateString() === today2.toDateString()) return t("foods.today");
+    if (d.toDateString() === yest.toDateString()) return t("foods.yesterday");
+    return d.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
+  }
+
+  function mealsByTypeForDate(dateMeals: MealLog[]) {
+    const byType: Record<string, MealLog[]> = {};
+    dateMeals.forEach((m) => {
+      if (!byType[m.meal_type]) byType[m.meal_type] = [];
+      byType[m.meal_type].push(m);
+    });
+    return Object.keys(byType)
+      .sort((a, b) => {
+        const ia = mealOrder.indexOf(a); const ib = mealOrder.indexOf(b);
+        return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+      })
+      .map((type) => ({ type, items: byType[type] }));
+  }
+
+  async function reAddToToday(meal: MealLog) {
+    const { data } = await supabase
+      .from("meals")
+      .insert({
+        name: meal.name,
+        meal_type: meal.meal_type,
+        calories: meal.calories,
+        protein_g: meal.protein_g,
+        carbs_g: meal.carbs_g,
+        fat_g: meal.fat_g,
+        logged_date: today,
+      })
+      .select()
+      .single();
+    if (data) {
+      setMeals((prev) => [data, ...prev]);
+      setReAddedId(meal.id);
+      setTimeout(() => setReAddedId(null), 2000);
+    }
+  }
 
   const tabConfig: { key: Tab; label: string; icon: typeof UtensilsCrossed }[] = [
     { key: "catalog", label: t("foods.tabCatalog"), icon: UtensilsCrossed },
@@ -343,6 +400,27 @@ export function Recipes() {
             })}
           </div>
 
+          {/* Brand filters */}
+          {brands.length > 0 && (
+            <div className="mb-4 flex flex-wrap gap-2">
+              <button
+                onClick={() => handleBrandFilter(null)}
+                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${!activeBrand ? "bg-primary-600 text-white" : "bg-surface-subtle text-content-body hover:bg-slate-200"}`}
+              >
+                {t("foods.allBrands")}
+              </button>
+              {brands.map((br) => (
+                <button
+                  key={br}
+                  onClick={() => handleBrandFilter(br)}
+                  className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${activeBrand === br ? "bg-primary-600 text-white" : "bg-surface-subtle text-content-body hover:bg-slate-200"}`}
+                >
+                  {br}
+                </button>
+              ))}
+            </div>
+          )}
+
           {loading ? (
             <div className="flex h-64 items-center justify-center">
               <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-600 border-t-transparent" />
@@ -361,7 +439,10 @@ export function Recipes() {
                   <Card key={food.id} className="cursor-pointer transition-all hover:shadow-md hover:-translate-y-0.5" onClick={() => openFoodDetail(food, false)}>
                     <CardContent className="p-4">
                       <div className="mb-2 flex items-start justify-between gap-2">
-                        <h3 className="text-sm font-semibold text-content-strong leading-tight">{food.name}</h3>
+                        <div className="min-w-0">
+                          <h3 className="text-sm font-semibold text-content-strong leading-tight">{food.name}</h3>
+                          {food.brand && <p className="text-[11px] font-medium text-primary-500 truncate">{food.brand}</p>}
+                        </div>
                         <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${color.bg} ${color.text}`}>{t(`cat.${food.category}`)}</span>
                       </div>
                       <p className="mb-3 text-xs text-content-muted">{t("foods.serving")}: {food.serving_size}</p>
@@ -403,6 +484,7 @@ export function Recipes() {
                       <div className="mb-2 flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <h3 className="text-sm font-semibold text-content-strong leading-tight">{food.name}</h3>
+                          {food.brand && <p className="text-[11px] font-medium text-primary-500 truncate">{food.brand}</p>}
                           {food.is_recipe && <span className="text-[10px] font-medium text-primary-600">Receita</span>}
                         </div>
                         <div className="flex items-center gap-1.5">
@@ -448,34 +530,64 @@ export function Recipes() {
             </CardContent></Card>
           ) : (
             <div className="flex flex-col gap-6">
-              {sortedMealTypes.map((mType) => {
-                const typeMeals = mealsByType[mType];
-                const totalCal = typeMeals.reduce((s, m) => s + m.calories, 0);
+              {sortedDates.map((date) => {
+                const dateMeals = mealsByDate[date];
+                const dayCal = dateMeals.reduce((s, m) => s + m.calories, 0);
+                const dayProt = dateMeals.reduce((s, m) => s + Number(m.protein_g), 0);
+                const dayCarbs = dateMeals.reduce((s, m) => s + Number(m.carbs_g), 0);
+                const dayFat = dateMeals.reduce((s, m) => s + Number(m.fat_g), 0);
+                const grouped = mealsByTypeForDate(dateMeals);
                 return (
-                  <div key={mType}>
-                    <div className="mb-3 flex items-center justify-between">
-                      <h3 className="flex items-center gap-2 text-base font-semibold text-content-strong">
-                        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary-50 text-primary-600">
-                          <UtensilsCrossed className="h-3.5 w-3.5" />
-                        </span>
-                        {getMealLabel(mType, t)}
+                  <div key={date}>
+                    <div className="mb-3 flex items-center justify-between rounded-xl bg-surface-subtle px-4 py-3">
+                      <h3 className="flex items-center gap-2 text-sm font-semibold capitalize text-content-strong">
+                        <Calendar className="h-4 w-4 text-primary-500" />
+                        {formatDateLabel(date)}
                       </h3>
-                      <span className="text-sm font-medium text-content-muted">{totalCal} kcal</span>
+                      <div className="flex items-center gap-3 text-xs text-content-muted">
+                        <span className="flex items-center gap-1"><Flame className="h-3.5 w-3.5 text-orange-500" />{dayCal} kcal</span>
+                        <span>P:{Math.round(dayProt)}g</span>
+                        <span>C:{Math.round(dayCarbs)}g</span>
+                        <span>G:{Math.round(dayFat)}g</span>
+                      </div>
                     </div>
-                    <div className="flex flex-col gap-2">
-                      {typeMeals.map((meal) => (
-                        <Card key={meal.id}>
-                          <CardContent className="flex items-center justify-between p-3.5">
-                            <div className="min-w-0">
-                              <p className="text-sm font-medium text-content-strong">{meal.name}</p>
-                              <p className="text-xs text-content-muted">
-                                {new Date(meal.logged_date).toLocaleDateString(undefined, { day: "2-digit", month: "short" })}
-                                <span className="ml-2">P:{Math.round(Number(meal.protein_g))}g C:{Math.round(Number(meal.carbs_g))}g G:{Math.round(Number(meal.fat_g))}g</span>
-                              </p>
-                            </div>
-                            <span className="shrink-0 text-sm font-semibold text-content-body">{meal.calories} kcal</span>
-                          </CardContent>
-                        </Card>
+                    <div className="flex flex-col gap-3">
+                      {grouped.map((g) => (
+                        <div key={g.type}>
+                          <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-content-muted">{getMealLabel(g.type, t)}</p>
+                          <div className="flex flex-col gap-1.5">
+                            {g.items.map((meal) => (
+                              <Card key={meal.id}>
+                                <CardContent className="flex items-center justify-between p-3.5">
+                                  <div className="min-w-0">
+                                    <p className="text-sm font-medium text-content-strong">{meal.name}</p>
+                                    <p className="text-xs text-content-muted">
+                                      P:{Math.round(Number(meal.protein_g))}g C:{Math.round(Number(meal.carbs_g))}g G:{Math.round(Number(meal.fat_g))}g
+                                    </p>
+                                  </div>
+                                  <div className="flex shrink-0 items-center gap-2">
+                                    <span className="text-sm font-semibold text-content-body">{meal.calories} kcal</span>
+                                    <button
+                                      onClick={() => reAddToToday(meal)}
+                                      disabled={reAddedId === meal.id}
+                                      className={`flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium transition-colors ${
+                                        reAddedId === meal.id
+                                          ? "bg-green-50 text-green-600"
+                                          : "bg-primary-50 text-primary-600 hover:bg-primary-100"
+                                      }`}
+                                    >
+                                      {reAddedId === meal.id ? (
+                                        <><Check className="h-3 w-3" />{t("foods.reAdded")}</>
+                                      ) : (
+                                        <><Plus className="h-3 w-3" />{t("foods.reAddToday")}</>
+                                      )}
+                                    </button>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            ))}
+                          </div>
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -494,6 +606,7 @@ export function Recipes() {
               <div>
                 <h2 className="text-lg font-bold text-content-strong">{selectedFood.name}</h2>
                 <p className="text-sm text-content-muted">{t(`cat.${selectedFood.category}`)} · {t("foods.serving")}: {selectedFood.serving_size}</p>
+                {selectedFood.brand && <p className="mt-0.5 text-sm font-medium text-primary-500">{selectedFood.brand}</p>}
                 {isCustom && (selectedFood as CustomFood).barcode && <p className="mt-1 flex items-center gap-1 text-xs text-content-muted"><Barcode className="h-3 w-3" />{(selectedFood as CustomFood).barcode}</p>}
               </div>
               <button onClick={() => setSelectedFood(null)} className="text-content-muted hover:text-content-body"><X className="h-5 w-5" /></button>
@@ -611,6 +724,17 @@ export function Recipes() {
                     className="mt-1 flex h-10 w-full rounded-lg border border-edge-base bg-surface-card px-3 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-content-body">{t("foods.brand")}</label>
+                <input
+                  type="text"
+                  placeholder={t("foods.brandPlaceholder")}
+                  value={customForm.brand}
+                  onChange={(e) => setCustomForm({ ...customForm, brand: e.target.value })}
+                  className="mt-1 flex h-10 w-full rounded-lg border border-edge-base bg-surface-card px-3 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">

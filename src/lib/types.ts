@@ -270,6 +270,7 @@ export interface Database {
           user_id: string;
           name: string;
           category: string;
+          brand: string | null;
           serving_size: string;
           calories: number;
           protein_g: number;
@@ -287,6 +288,21 @@ export interface Database {
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["custom_foods"]["Row"]>;
+      };
+      site_reviews: {
+        Row: {
+          id: string;
+          user_id: string;
+          rating: number;
+          comment: string;
+          created_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["site_reviews"]["Row"], "id" | "user_id" | "created_at"> & {
+          id?: string;
+          user_id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["site_reviews"]["Row"]>;
       };
     };
     Views: Record<string, never>;
@@ -310,5 +326,9 @@ export type WorkoutDay = Database["public"]["Tables"]["workout_days"]["Row"];
 export type WorkoutExercise = Database["public"]["Tables"]["workout_exercises"]["Row"];
 export type WorkoutLog = Database["public"]["Tables"]["workout_logs"]["Row"];
 export type CustomFood = Database["public"]["Tables"]["custom_foods"]["Row"];
+export type ProfessionalPlan = Database["public"]["Tables"]["professional_plans"]["Row"];
+export type FeedPost = Database["public"]["Tables"]["feed_posts"]["Row"];
+export type FeedLike = Database["public"]["Tables"]["feed_likes"]["Row"];
 export type Appointment = Database["public"]["Tables"]["appointments"]["Row"];
 export type ClientPlan = Database["public"]["Tables"]["client_plans"]["Row"];
+export type SiteReview = Database["public"]["Tables"]["site_reviews"]["Row"];

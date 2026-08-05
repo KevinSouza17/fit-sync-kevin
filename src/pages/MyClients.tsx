@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  Users, UserPlus, UtensilsCrossed, Dumbbell, Plus, Trash2, X,
-  CheckCircle2, Loader2, Activity, Target, Calendar,
+  Users, UserPlus, UtensilsCrossed, Dumbbell, Plus, Trash2, X, Pencil,
+  CheckCircle2, Loader2, Activity, Target, Calendar, Scale, Flame,
+  Droplets, TrendingUp, ArrowUp, ArrowDown, Bell, Eye, ClipboardList,
 } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -10,16 +11,19 @@ import { Avatar, AvatarImage, AvatarFallback } from "../components/ui/avatar";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
 import { supabase } from "../lib/supabase";
-import type { ClientPlan } from "../lib/types";
+import type { ClientPlan, Meal, WeightLog, WorkoutLog } from "../lib/types";
 import { cn } from "../lib/utils";
 
 interface ClientProfile {
   id: string; full_name: string; avatar_url: string | null;
   health_goal: string; daily_calorie_goal: number;
   weight_kg: number | null; height_cm: number | null; plan: string;
+  goal_weight_kg: number | null; activity_level: string;
 }
 interface MealEntry { name: string; items: string; }
 interface DayEntry { name: string; exercises: string; }
+interface DietPlanContent { meals?: MealEntry[] }
+interface WorkoutPlanContent { days?: DayEntry[] }
 
 const initials = (name: string) =>
   name.split(" ").slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("");
@@ -32,6 +36,7 @@ export function MyClients() {
   const [allPlans, setAllPlans] = useState<ClientPlan[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [editingPlan, setEditingPlan] = useState<ClientPlan | null>(null);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [saveError, setSaveError] = useState("");
@@ -39,31 +44,61 @@ export function MyClients() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [calories, setCalories] = useState("");
-  const [protein, setProtein] = useState("");
-  const [carbs, setCarbs] = useState("");
-  const [fat, setFat] = useState("");
+  const [proteinPct, setProteinPct] = useState("");
+  const [carbsPct, setCarbsPct] = useState("");
+  const [fatPct, setFatPct] = useState("");
   const [meals, setMeals] = useState<MealEntry[]>([{ name: "", items: "" }]);
   const [days, setDays] = useState<DayEntry[]>([{ name: "", exercises: "" }]);
+  const [tab, setTab] = useState<"plans" | "progress" | "profile">("plans");
+
+  // Client progress data
+  const [clientMeals, setClientMeals] = useState<Meal[]>([]);
+  const [clientWeightLogs, setClientWeightLogs] = useState<WeightLog[]>([]);
+  const [clientWorkoutLogs, setClientWorkoutLogs] = useState<WorkoutLog[]>([]);
+  const [progressLoading, setProgressLoading] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifMsg, setNotifMsg] = useState("");
+  const [notifSending, setNotifSending] = useState(false);
+
+  const macroGrams = (() => {
+    const kcal = Number(calories) || 0;
+    const pPct = Number(proteinPct) || 0;
+    const cPct = Number(carbsPct) || 0;
+    const fPct = Number(fatPct) || 0;
+    return {
+      protein: kcal && pPct ? Math.round((kcal * pPct) / 100 / 4) : null,
+      carbs: kcal && cPct ? Math.round((kcal * cPct) / 100 / 4) : null,
+      fat: kcal && fPct ? Math.round((kcal * fPct) / 100 / 9) : null,
+    };
+  })();
+  const macroPctSum = (Number(proteinPct) || 0) + (Number(carbsPct) || 0) + (Number(fatPct) || 0);
 
   useEffect(() => {
     if (!user) return;
     (async () => {
       setLoading(true);
-      const [{ data: aptData }, { data: planData }] = await Promise.all([
+      const [{ data: aptData }, { data: planData }, { data: convData }] = await Promise.all([
         supabase.from("appointments").select("user_id").eq("professional_id", user.id),
         supabase.from("client_plans").select("client_id").eq("professional_id", user.id),
+        supabase.from("conversations").select("user_a_id, user_b_id").or(`user_a_id.eq.${user.id},user_b_id.eq.${user.id}`),
       ]);
       const ids = [...new Set([
         ...(aptData || []).map((a) => a.user_id),
         ...(planData || []).map((p) => p.client_id),
-      ])];
+        ...(convData || []).flatMap((c) =>
+          c.user_a_id === user.id ? [c.user_b_id] : [c.user_a_id]
+        ),
+      ])].filter((id) => id !== user.id);
       if (ids.length) {
         const { data: profiles } = await supabase
           .from("profiles")
-          .select("id, full_name, avatar_url, health_goal, daily_calorie_goal, weight_kg, height_cm, plan")
+          .select("id, full_name, avatar_url, health_goal, daily_calorie_goal, weight_kg, height_cm, plan, goal_weight_kg, activity_level")
           .in("id", ids);
         setClients((profiles as ClientProfile[]) || []);
         setSelectedId(ids[0]);
+      } else {
+        setClients([]);
+        setSelectedId(null);
       }
       const { data: plans } = await supabase
         .from("client_plans").select("*").eq("professional_id", user.id)
@@ -73,6 +108,23 @@ export function MyClients() {
     })();
   }, [user]);
 
+  // Load client progress data when switching tabs or clients
+  useEffect(() => {
+    if (!selectedId || tab !== "progress") return;
+    (async () => {
+      setProgressLoading(true);
+      const [mealsRes, weightRes, workoutRes] = await Promise.all([
+        supabase.from("meals").select("*").eq("user_id", selectedId).order("logged_date", { ascending: false }).limit(20),
+        supabase.from("weight_logs").select("*").eq("user_id", selectedId).order("logged_date", { ascending: false }).limit(20),
+        supabase.from("workout_logs").select("*").eq("user_id", selectedId).order("logged_date", { ascending: false }).limit(20),
+      ]);
+      setClientMeals((mealsRes.data as Meal[]) || []);
+      setClientWeightLogs((weightRes.data as WeightLog[]) || []);
+      setClientWorkoutLogs((workoutRes.data as WorkoutLog[]) || []);
+      setProgressLoading(false);
+    })();
+  }, [selectedId, tab]);
+
   const selectedClient = clients.find((c) => c.id === selectedId) ?? null;
   const clientPlans = useMemo(
     () => allPlans.filter((p) => p.client_id === selectedId),
@@ -80,15 +132,40 @@ export function MyClients() {
   );
   const activePlansCount = allPlans.filter((p) => p.active).length;
 
+  // Progress stats
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayMeals = clientMeals.filter((m) => m.logged_date === todayStr);
+  const todayCalories = todayMeals.reduce((s, m) => s + Number(m.calories), 0);
+  const latestWeight = clientWeightLogs[0];
+  const prevWeight = clientWeightLogs[1];
+  const weightDiff = latestWeight && prevWeight ? (Number(latestWeight.weight_kg) - Number(prevWeight.weight_kg)).toFixed(1) : null;
+
   function resetForm() {
     setPlanType("diet"); setTitle(""); setDescription("");
-    setCalories(""); setProtein(""); setCarbs(""); setFat("");
+    setCalories(""); setProteinPct(""); setCarbsPct(""); setFatPct("");
     setMeals([{ name: "", items: "" }]); setDays([{ name: "", exercises: "" }]);
-    setSuccess(false); setSaveError("");
+    setSuccess(false); setSaveError(""); setEditingPlan(null);
   }
   function openNewPlan() {
     if (!selectedClient) return;
     resetForm();
+    setModalOpen(true);
+  }
+  function openEditPlan(plan: ClientPlan) {
+    setEditingPlan(plan);
+    setPlanType(plan.plan_type as "diet" | "workout");
+    setTitle(plan.title);
+    setDescription(plan.description || "");
+    setCalories(plan.target_calories?.toString() || "");
+    if (plan.plan_type === "diet") {
+      const content = plan.content as DietPlanContent;
+      setMeals(content?.meals?.length ? content.meals : [{ name: "", items: "" }]);
+      setDays([{ name: "", exercises: "" }]);
+    } else {
+      const content = plan.content as WorkoutPlanContent;
+      setDays(content?.days?.length ? content.days : [{ name: "", exercises: "" }]);
+      setMeals([{ name: "", items: "" }]);
+    }
     setModalOpen(true);
   }
   const addMeal = () => setMeals((m) => [...m, { name: "", items: "" }]);
@@ -102,21 +179,32 @@ export function MyClients() {
     const content = planType === "diet"
       ? { meals: meals.filter((m) => m.name.trim()) }
       : { days: days.filter((d) => d.name.trim()) };
-    const { data, error } = await supabase.from("client_plans").insert({
-      professional_id: user.id, client_id: selectedClient.id,
+    const payload = {
       plan_type: planType, title: title.trim(), description: description.trim(),
       target_calories: planType === "diet" ? Number(calories) || null : null,
-      target_protein_g: planType === "diet" ? Number(protein) || null : null,
-      target_carbs_g: planType === "diet" ? Number(carbs) || null : null,
-      target_fat_g: planType === "diet" ? Number(fat) || null : null,
+      target_protein_g: planType === "diet" ? macroGrams.protein : null,
+      target_carbs_g: planType === "diet" ? macroGrams.carbs : null,
+      target_fat_g: planType === "diet" ? macroGrams.fat : null,
       content, active: true,
-    }).select().single();
-    if (error) {
-      setSaveError(error.message);
-    } else if (data) {
-      setAllPlans((prev) => [data as ClientPlan, ...prev]);
-      setSuccess(true);
-      setTimeout(() => { setSuccess(false); setModalOpen(false); resetForm(); }, 1400);
+    };
+    if (editingPlan) {
+      const { data, error } = await supabase.from("client_plans").update(payload).eq("id", editingPlan.id).select().single();
+      if (error) { setSaveError(error.message); }
+      else if (data) {
+        setAllPlans((prev) => prev.map((p) => p.id === data.id ? data as ClientPlan : p));
+        setSuccess(true);
+        setTimeout(() => { setSuccess(false); setModalOpen(false); resetForm(); }, 1400);
+      }
+    } else {
+      const { data, error } = await supabase.from("client_plans").insert({
+        professional_id: user.id, client_id: selectedClient.id, ...payload,
+      }).select().single();
+      if (error) { setSaveError(error.message); }
+      else if (data) {
+        setAllPlans((prev) => [data as ClientPlan, ...prev]);
+        setSuccess(true);
+        setTimeout(() => { setSuccess(false); setModalOpen(false); resetForm(); }, 1400);
+      }
     }
     setSaving(false);
   }
@@ -124,6 +212,21 @@ export function MyClients() {
   async function deletePlan(id: string) {
     const { error } = await supabase.from("client_plans").delete().eq("id", id);
     if (!error) setAllPlans((prev) => prev.filter((p) => p.id !== id));
+  }
+
+  async function sendNotification() {
+    if (!user || !selectedClient || !notifMsg.trim()) return;
+    setNotifSending(true);
+    const { error } = await supabase.from("notifications").insert({
+      user_id: selectedClient.id,
+      type: "pro_message",
+      title: `${t("notifications.newFromPro")}`,
+      body: notifMsg.trim(),
+    });
+    if (!error) {
+      setNotifMsg(""); setNotifOpen(false);
+    }
+    setNotifSending(false);
   }
 
   if (loading) {
@@ -136,57 +239,7 @@ export function MyClients() {
   }
 
   const taCls =
-    "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-content-strong placeholder:text-slate-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100";
-
-  function StatCard({ icon: Icon, value, label, tone }: {
-    icon: typeof Users; value: number; label: string; tone: string;
-  }) {
-    return (
-      <Card className="bg-surface-card">
-        <CardContent className="flex items-center gap-3 p-4">
-          <span className={cn("flex h-10 w-10 items-center justify-center rounded-xl", tone)}>
-            <Icon className="h-5 w-5" />
-          </span>
-          <div>
-            <p className="text-2xl font-bold text-content-strong">{value}</p>
-            <p className="text-xs text-content-muted">{label}</p>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  function EmptyState({ icon: Icon, text, sub }: {
-    icon: typeof Users; text: string; sub?: string;
-  }) {
-    return (
-      <Card className="mt-6 bg-surface-card">
-        <CardContent className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-          <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-surface-subtle text-content-muted">
-            <Icon className="h-7 w-7" />
-          </span>
-          <p className="text-base font-semibold text-content-strong">{text}</p>
-          {sub && <p className="text-xs text-content-muted">{sub}</p>}
-        </CardContent>
-      </Card>
-    );
-  }
-
-  function ClientAvatar({ c, size = "h-11 w-11", fs = "text-sm" }: {
-    c: ClientProfile; size?: string; fs?: string;
-  }) {
-    return (
-      <Avatar className={size}>
-        {c.avatar_url ? (
-          <AvatarImage src={c.avatar_url} alt={c.full_name} />
-        ) : (
-          <AvatarFallback className={cn("bg-primary-50 font-bold text-primary-600", fs)}>
-            {initials(c.full_name)}
-          </AvatarFallback>
-        )}
-      </Avatar>
-    );
-  }
+    "w-full rounded-lg border border-edge-base bg-surface-base px-3 py-2 text-sm text-content-strong placeholder:text-content-muted focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100 dark:bg-surface-subtle";
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
@@ -196,12 +249,39 @@ export function MyClients() {
       </div>
 
       <div className="mt-5 grid grid-cols-2 gap-3 sm:max-w-md sm:gap-4">
-        <StatCard icon={Users} value={clients.length} label={t("pro.clientCount")} tone="bg-primary-50 text-primary-600" />
-        <StatCard icon={Activity} value={activePlansCount} label={t("plans.active")} tone="bg-emerald-50 text-emerald-600" />
+        <Card className="bg-surface-card">
+          <CardContent className="flex items-center gap-3 p-4">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-50 text-primary-600">
+              <Users className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="text-2xl font-bold text-content-strong">{clients.length}</p>
+              <p className="text-xs text-content-muted">{t("pro.clientCount")}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-surface-card">
+          <CardContent className="flex items-center gap-3 p-4">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+              <Activity className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="text-2xl font-bold text-content-strong">{activePlansCount}</p>
+              <p className="text-xs text-content-muted">{t("plans.active")}</p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {clients.length === 0 ? (
-        <EmptyState icon={UserPlus} text={t("pro.noClients")} />
+        <Card className="mt-6 bg-surface-card">
+          <CardContent className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+            <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-surface-subtle text-content-muted">
+              <UserPlus className="h-7 w-7" />
+            </span>
+            <p className="text-base font-semibold text-content-strong">{t("pro.noClients")}</p>
+          </CardContent>
+        </Card>
       ) : (
         <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-[340px_1fr]">
           {/* Client list */}
@@ -213,14 +293,22 @@ export function MyClients() {
               const count = allPlans.filter((p) => p.client_id === c.id && p.active).length;
               const active = c.id === selectedId;
               return (
-                <button key={c.id} onClick={() => setSelectedId(c.id)}
+                <button key={c.id} onClick={() => { setSelectedId(c.id); setTab("plans"); }}
                   className="text-left transition-all duration-200 hover:scale-[1.01] data-[on=true]:scale-[1.01]">
                   <Card className={cn("bg-surface-card transition-colors",
                     active ? "border-primary-500 ring-2 ring-primary-100" : "border-edge-base hover:border-primary-300")}>
                     <CardContent className="flex items-center gap-3 p-4">
-                      <ClientAvatar c={c} />
+                      <Avatar className="h-11 w-11">
+                        {c.avatar_url ? (
+                          <AvatarImage src={c.avatar_url} alt={c.full_name} />
+                        ) : (
+                          <AvatarFallback className="bg-primary-50 font-bold text-sm text-primary-600">
+                            {initials(c.full_name)}
+                          </AvatarFallback>
+                        )}
+                      </Avatar>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold text-content-strong">{c.full_name}</p>
+                        <p className="truncate text-sm font-semibold text-content-strong">{c.full_name || t("pro.unnamedClient")}</p>
                         <p className="truncate text-xs text-content-muted">{c.health_goal || "—"}</p>
                         <div className="mt-1.5 flex items-center gap-3 text-[11px] text-content-muted">
                           <span className="flex items-center gap-1"><Target className="h-3 w-3" />{c.daily_calorie_goal || 0} kcal</span>
@@ -234,81 +322,320 @@ export function MyClients() {
             })}
           </div>
 
-          {/* Plans panel */}
+          {/* Detail panel */}
           <div className="flex flex-col gap-4">
             {selectedClient ? (
               <>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-3">
-                    <ClientAvatar c={selectedClient} size="h-10 w-10" fs="text-sm" />
+                    <Avatar className="h-10 w-10">
+                      {selectedClient.avatar_url ? (
+                        <AvatarImage src={selectedClient.avatar_url} alt={selectedClient.full_name} />
+                      ) : (
+                        <AvatarFallback className="bg-primary-50 font-bold text-sm text-primary-600">
+                          {initials(selectedClient.full_name)}
+                        </AvatarFallback>
+                      )}
+                    </Avatar>
                     <div>
-                      <p className="text-sm font-bold text-content-strong">{selectedClient.full_name}</p>
-                      <p className="text-xs text-content-muted">{t("plans.assignTo")} {selectedClient.full_name}</p>
+                      <p className="text-sm font-bold text-content-strong">{selectedClient.full_name || t("pro.unnamedClient")}</p>
+                      <p className="text-xs text-content-muted">{t("plans.assignTo")} {selectedClient.full_name || t("pro.unnamedClient")}</p>
                     </div>
                   </div>
-                  <Button onClick={openNewPlan} className="gap-2"><Plus className="h-4 w-4" />{t("plans.new")}</Button>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setNotifOpen(true)} className="gap-1.5">
+                      <Bell className="h-4 w-4" />{t("notifications.send")}
+                    </Button>
+                    <Button onClick={openNewPlan} className="gap-2"><Plus className="h-4 w-4" />{t("plans.new")}</Button>
+                  </div>
                 </div>
 
-                {clientPlans.length === 0 ? (
-                  <EmptyState icon={Dumbbell} text={t("plans.noPlans")} sub={t("plans.noPlansSub")} />
-                ) : (
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    {clientPlans.map((p) => {
-                      const diet = p.plan_type === "diet";
-                      return (
-                        <Card key={p.id} className="bg-surface-card">
-                          <CardContent className="flex flex-col gap-3 p-4">
-                            <div className="flex items-start justify-between gap-2">
-                              <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
-                                diet ? "bg-orange-50 text-orange-600" : "bg-cyan-50 text-cyan-600")}>
-                                {diet ? <UtensilsCrossed className="h-5 w-5" /> : <Dumbbell className="h-5 w-5" />}
-                              </span>
-                              <div className="flex items-center gap-2">
-                                <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium",
-                                  p.active ? "bg-green-50 text-green-600" : "bg-slate-100 text-slate-500")}>
-                                  {p.active ? t("plans.active") : t("plans.inactive")}
+                {/* Tabs */}
+                <div className="flex gap-1 rounded-xl bg-surface-subtle p-1">
+                  {([
+                    { k: "plans" as const, label: t("plans.title"), icon: ClipboardList },
+                    { k: "progress" as const, label: t("progress.title"), icon: TrendingUp },
+                    { k: "profile" as const, label: t("profile.title"), icon: Eye },
+                  ]).map((tb) => (
+                    <button key={tb.k} onClick={() => setTab(tb.k)}
+                      className={cn("flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                        tab === tb.k ? "bg-surface-card text-primary-600 shadow-sm" : "text-content-muted hover:text-content-strong")}>
+                      <tb.icon className="h-4 w-4" />{tb.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Plans tab */}
+                {tab === "plans" && (
+                  clientPlans.length === 0 ? (
+                    <Card className="bg-surface-card">
+                      <CardContent className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+                        <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-surface-subtle text-content-muted">
+                          <Dumbbell className="h-7 w-7" />
+                        </span>
+                        <p className="text-base font-semibold text-content-strong">{t("plans.noPlans")}</p>
+                        <p className="text-xs text-content-muted">{t("plans.noPlansSub")}</p>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      {clientPlans.map((p) => {
+                        const diet = p.plan_type === "diet";
+                        return (
+                          <Card key={p.id} className="bg-surface-card">
+                            <CardContent className="flex flex-col gap-3 p-4">
+                              <div className="flex items-start justify-between gap-2">
+                                <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
+                                  diet ? "bg-orange-50 text-orange-600" : "bg-cyan-50 text-cyan-600")}>
+                                  {diet ? <UtensilsCrossed className="h-5 w-5" /> : <Dumbbell className="h-5 w-5" />}
                                 </span>
-                                <button onClick={() => deletePlan(p.id)} aria-label={t("plans.deletePlan")}
-                                  className="text-content-muted transition-colors hover:text-red-500">
-                                  <Trash2 className="h-4 w-4" />
-                                </button>
+                                <div className="flex items-center gap-2">
+                                  <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium",
+                                    p.active ? "bg-green-50 text-green-600" : "bg-slate-100 text-slate-500")}>
+                                    {p.active ? t("plans.active") : t("plans.inactive")}
+                                  </span>
+                                  <button onClick={() => openEditPlan(p)} aria-label={t("plans.editPlan")}
+                                    className="text-content-muted transition-colors hover:text-primary-600">
+                                    <Pencil className="h-4 w-4" />
+                                  </button>
+                                  <button onClick={() => deletePlan(p.id)} aria-label={t("plans.deletePlan")}
+                                    className="text-content-muted transition-colors hover:text-red-500">
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                </div>
                               </div>
-                            </div>
-                            <div>
-                              <p className="text-sm font-semibold text-content-strong">{p.title}</p>
-                              {p.description && <p className="mt-1 text-xs text-content-muted">{p.description}</p>}
-                            </div>
-                            {diet && (
-                              <div className="flex flex-wrap gap-2 text-[11px]">
-                                {p.target_calories != null && <span className="rounded-md bg-surface-subtle px-2 py-1 text-content-body">{p.target_calories} kcal</span>}
-                                {p.target_protein_g != null && <span className="rounded-md bg-surface-subtle px-2 py-1 text-content-body">P {p.target_protein_g}g</span>}
-                                {p.target_carbs_g != null && <span className="rounded-md bg-surface-subtle px-2 py-1 text-content-body">C {p.target_carbs_g}g</span>}
-                                {p.target_fat_g != null && <span className="rounded-md bg-surface-subtle px-2 py-1 text-content-body">G {p.target_fat_g}g</span>}
+                              <div>
+                                <p className="text-sm font-semibold text-content-strong">{p.title}</p>
+                                {p.description && <p className="mt-1 text-xs text-content-muted">{p.description}</p>}
                               </div>
+                              {diet && (
+                                <div className="flex flex-wrap gap-2 text-[11px]">
+                                  {p.target_calories != null && <span className="rounded-md bg-surface-subtle px-2 py-1 text-content-body">{p.target_calories} kcal</span>}
+                                  {p.target_protein_g != null && <span className="rounded-md bg-surface-subtle px-2 py-1 text-content-body">P {p.target_protein_g}g</span>}
+                                  {p.target_carbs_g != null && <span className="rounded-md bg-surface-subtle px-2 py-1 text-content-body">C {p.target_carbs_g}g</span>}
+                                  {p.target_fat_g != null && <span className="rounded-md bg-surface-subtle px-2 py-1 text-content-body">G {p.target_fat_g}g</span>}
+                                </div>
+                              )}
+                              {/* Show plan content preview */}
+                              {diet && (p.content as DietPlanContent)?.meals?.length ? (
+                                <div className="flex flex-col gap-1.5 border-t border-edge-base pt-2">
+                                  {(p.content as DietPlanContent).meals!.slice(0, 3).map((m, i) => (
+                                    <div key={i} className="text-xs">
+                                      <span className="font-medium text-content-strong">{m.name}</span>
+                                      {m.items && <span className="text-content-muted"> — {m.items}</span>}
+                                    </div>
+                                  ))}
+                                  {(p.content as DietPlanContent).meals!.length > 3 && (
+                                    <span className="text-[11px] text-content-muted">+{(p.content as DietPlanContent).meals!.length - 3} {t("plans.more")}</span>
+                                  )}
+                                </div>
+                              ) : null}
+                              {!diet && (p.content as WorkoutPlanContent)?.days?.length ? (
+                                <div className="flex flex-col gap-1.5 border-t border-edge-base pt-2">
+                                  {(p.content as WorkoutPlanContent).days!.slice(0, 3).map((d, i) => (
+                                    <div key={i} className="text-xs">
+                                      <span className="font-medium text-primary-600">{d.name}</span>
+                                      {d.exercises && <span className="text-content-muted"> — {d.exercises.slice(0, 60)}{d.exercises.length > 60 ? "…" : ""}</span>}
+                                    </div>
+                                  ))}
+                                  {(p.content as WorkoutPlanContent).days!.length > 3 && (
+                                    <span className="text-[11px] text-content-muted">+{(p.content as WorkoutPlanContent).days!.length - 3} {t("plans.more")}</span>
+                                  )}
+                                </div>
+                              ) : null}
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
+                    </div>
+                  )
+                )}
+
+                {/* Progress tab */}
+                {tab === "progress" && (
+                  progressLoading ? (
+                    <div className="flex h-48 items-center justify-center">
+                      <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-4">
+                      {/* Stats cards */}
+                      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                        <Card className="bg-surface-card">
+                          <CardContent className="p-4">
+                            <div className="flex items-center gap-2 text-content-muted"><Flame className="h-4 w-4" /><span className="text-xs">{t("dashboard.caloriesToday")}</span></div>
+                            <p className="mt-1 text-2xl font-bold text-content-strong">{todayCalories}</p>
+                            <p className="text-xs text-content-muted">kcal</p>
+                          </CardContent>
+                        </Card>
+                        <Card className="bg-surface-card">
+                          <CardContent className="p-4">
+                            <div className="flex items-center gap-2 text-content-muted"><Scale className="h-4 w-4" /><span className="text-xs">{t("progress.currentWeight")}</span></div>
+                            <p className="mt-1 text-2xl font-bold text-content-strong">{latestWeight ? `${latestWeight.weight_kg} kg` : "—"}</p>
+                            {weightDiff && (
+                              <span className={cn("flex items-center gap-1 text-xs font-medium", Number(weightDiff) > 0 ? "text-red-500" : "text-green-600")}>
+                                {Number(weightDiff) > 0 ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
+                                {weightDiff} kg
+                              </span>
                             )}
                           </CardContent>
                         </Card>
-                      );
-                    })}
-                  </div>
+                        <Card className="bg-surface-card">
+                          <CardContent className="p-4">
+                            <div className="flex items-center gap-2 text-content-muted"><UtensilsCrossed className="h-4 w-4" /><span className="text-xs">{t("dashboard.mealsToday")}</span></div>
+                            <p className="mt-1 text-2xl font-bold text-content-strong">{todayMeals.length}</p>
+                          </CardContent>
+                        </Card>
+                        <Card className="bg-surface-card">
+                          <CardContent className="p-4">
+                            <div className="flex items-center gap-2 text-content-muted"><Dumbbell className="h-4 w-4" /><span className="text-xs">{t("workout.sessions")}</span></div>
+                            <p className="mt-1 text-2xl font-bold text-content-strong">{clientWorkoutLogs.length}</p>
+                            <p className="text-xs text-content-muted">{t("progress.totalLogs")}</p>
+                          </CardContent>
+                        </Card>
+                      </div>
+
+                      {/* Weight history */}
+                      <Card className="bg-surface-card">
+                        <CardContent className="p-5">
+                          <h3 className="mb-3 text-sm font-bold text-content-strong">{t("progress.weightHistory")}</h3>
+                          {clientWeightLogs.length === 0 ? (
+                            <p className="py-4 text-center text-sm text-content-muted">{t("progress.noWeightLogs")}</p>
+                          ) : (
+                            <div className="flex flex-col gap-2 max-h-48 overflow-y-auto">
+                              {clientWeightLogs.slice(0, 10).map((log, i) => {
+                                const prev = clientWeightLogs[i + 1];
+                                const diff = prev ? (Number(log.weight_kg) - Number(prev.weight_kg)).toFixed(1) : null;
+                                return (
+                                  <div key={log.id} className="flex items-center justify-between rounded-lg px-3 py-2 hover:bg-surface-base">
+                                    <div>
+                                      <p className="text-sm font-medium text-content-strong">{log.weight_kg} kg</p>
+                                      <p className="text-xs text-content-muted">{new Date(log.logged_date).toLocaleDateString(undefined, { day: "numeric", month: "short" })}</p>
+                                    </div>
+                                    {diff !== null && Number(diff) !== 0 && (
+                                      <span className={cn("flex items-center gap-1 text-xs font-medium", Number(diff) > 0 ? "text-red-500" : "text-green-600")}>
+                                        {Number(diff) > 0 ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
+                                        {Number(diff) > 0 ? "+" : ""}{diff} kg
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+
+                      {/* Recent meals */}
+                      <Card className="bg-surface-card">
+                        <CardContent className="p-5">
+                          <h3 className="mb-3 text-sm font-bold text-content-strong">{t("progress.recentMeals")}</h3>
+                          {clientMeals.length === 0 ? (
+                            <p className="py-4 text-center text-sm text-content-muted">{t("progress.noMeals")}</p>
+                          ) : (
+                            <div className="flex flex-col gap-2 max-h-48 overflow-y-auto">
+                              {clientMeals.slice(0, 10).map((m) => (
+                                <div key={m.id} className="flex items-center justify-between rounded-lg px-3 py-2 hover:bg-surface-base">
+                                  <div>
+                                    <p className="text-sm font-medium text-content-strong">{m.name}</p>
+                                    <p className="text-xs text-content-muted">{m.meal_type} · {new Date(m.logged_date).toLocaleDateString(undefined, { day: "numeric", month: "short" })}</p>
+                                  </div>
+                                  <span className="text-xs font-medium text-content-body">{m.calories} kcal</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+
+                      {/* Recent workouts */}
+                      <Card className="bg-surface-card">
+                        <CardContent className="p-5">
+                          <h3 className="mb-3 text-sm font-bold text-content-strong">{t("progress.recentWorkouts")}</h3>
+                          {clientWorkoutLogs.length === 0 ? (
+                            <p className="py-4 text-center text-sm text-content-muted">{t("progress.noWorkouts")}</p>
+                          ) : (
+                            <div className="flex flex-col gap-2 max-h-48 overflow-y-auto">
+                              {clientWorkoutLogs.slice(0, 10).map((w) => (
+                                <div key={w.id} className="flex items-center justify-between rounded-lg px-3 py-2 hover:bg-surface-base">
+                                  <div>
+                                    <p className="text-sm font-medium text-content-strong">{w.exercise_name}</p>
+                                    <p className="text-xs text-content-muted">{w.sets_completed} sets · {new Date(w.logged_date).toLocaleDateString(undefined, { day: "numeric", month: "short" })}</p>
+                                  </div>
+                                  <span className="text-xs font-medium text-content-body">{w.weight_kg} kg</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </div>
+                  )
+                )}
+
+                {/* Profile tab */}
+                {tab === "profile" && (
+                  <Card className="bg-surface-card">
+                    <CardContent className="p-5">
+                      <div className="flex flex-col gap-4">
+                        <div className="flex items-center gap-4">
+                          <Avatar className="h-16 w-16">
+                            {selectedClient.avatar_url ? (
+                              <AvatarImage src={selectedClient.avatar_url} alt={selectedClient.full_name} />
+                            ) : (
+                              <AvatarFallback className="bg-primary-50 font-bold text-lg text-primary-600">
+                                {initials(selectedClient.full_name)}
+                              </AvatarFallback>
+                            )}
+                          </Avatar>
+                          <div>
+                            <h3 className="text-lg font-bold text-content-strong">{selectedClient.full_name || t("pro.unnamedClient")}</h3>
+                            <p className="text-sm text-content-muted">{selectedClient.health_goal || "—"}</p>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                          {[
+                            { label: t("profile.weight"), value: selectedClient.weight_kg ? `${selectedClient.weight_kg} kg` : "—" },
+                            { label: t("profile.height"), value: selectedClient.height_cm ? `${selectedClient.height_cm} cm` : "—" },
+                            { label: t("profile.goalWeight"), value: selectedClient.goal_weight_kg ? `${selectedClient.goal_weight_kg} kg` : "—" },
+                            { label: t("dashboard.calorieGoal"), value: `${selectedClient.daily_calorie_goal || 0} kcal` },
+                            { label: t("profile.activityLevel"), value: selectedClient.activity_level || "—" },
+                            { label: t("profile.plan"), value: selectedClient.plan || "—" },
+                          ].map((s) => (
+                            <div key={s.label} className="rounded-xl bg-surface-subtle p-3">
+                              <p className="text-xs text-content-muted">{s.label}</p>
+                              <p className="mt-0.5 text-sm font-semibold text-content-strong">{s.value}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
                 )}
               </>
             ) : (
-              <EmptyState icon={Users} text={t("plans.selectClientFirst")} />
+              <Card className="bg-surface-card">
+                <CardContent className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+                  <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-surface-subtle text-content-muted">
+                    <Users className="h-7 w-7" />
+                  </span>
+                  <p className="text-base font-semibold text-content-strong">{t("plans.selectClientFirst")}</p>
+                </CardContent>
+              </Card>
             )}
           </div>
         </div>
       )}
 
-      {/* New Plan Modal */}
+      {/* Plan Modal (create + edit) */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center sm:p-4"
-          onClick={() => setModalOpen(false)}>
+          onClick={() => { setModalOpen(false); resetForm(); }}>
           <Card className="w-full max-w-lg overflow-hidden rounded-b-none border-edge-base bg-surface-card shadow-2xl sm:rounded-2xl"
             onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between border-b border-edge-base p-4">
-              <h3 className="text-base font-bold text-content-strong">{t("plans.new")}</h3>
-              <button onClick={() => setModalOpen(false)} className="text-content-muted transition-colors hover:text-content-strong">
+              <h3 className="text-base font-bold text-content-strong">{editingPlan ? t("plans.editPlan") : t("plans.new")}</h3>
+              <button onClick={() => { setModalOpen(false); resetForm(); }} className="text-content-muted transition-colors hover:text-content-strong">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -353,14 +680,20 @@ export function MyClients() {
                         <label className="text-xs font-medium text-content-muted">{t("plans.targetCalories")}</label>
                         <Input type="number" value={calories} onChange={(e) => setCalories(e.target.value)} placeholder="2000" />
                       </div>
-                      <p className="text-xs font-semibold uppercase tracking-wide text-content-muted">{t("plans.macros")}</p>
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-content-muted">{t("plans.macros")}</p>
+                        <span className={`text-xs font-medium ${macroPctSum === 100 ? "text-green-600" : macroPctSum > 0 ? "text-amber-600" : "text-content-muted"}`}>
+                          {macroPctSum}%{macroPctSum === 100 ? " ✓" : "/100%"}
+                        </span>
+                      </div>
                       <div className="grid grid-cols-3 gap-3">
-                        {[{ v: protein, set: setProtein, k: "plans.protein" },
-                          { v: carbs, set: setCarbs, k: "plans.carbs" },
-                          { v: fat, set: setFat, k: "plans.fat" }].map((m) => (
+                        {[{ v: proteinPct, set: setProteinPct, k: "plans.protein", g: macroGrams.protein },
+                          { v: carbsPct, set: setCarbsPct, k: "plans.carbs", g: macroGrams.carbs },
+                          { v: fatPct, set: setFatPct, k: "plans.fat", g: macroGrams.fat }].map((m) => (
                           <div key={m.k} className="flex flex-col gap-1.5">
-                            <label className="text-xs font-medium text-content-muted">{t(m.k)} (g)</label>
-                            <Input type="number" value={m.v} onChange={(e) => m.set(e.target.value)} placeholder="0" />
+                            <label className="text-xs font-medium text-content-muted">{t(m.k)} (%)</label>
+                            <Input type="number" min="0" max="100" value={m.v} onChange={(e) => m.set(e.target.value)} placeholder="0" />
+                            <span className="text-[11px] text-content-muted">≈ {m.g ?? 0}g</span>
                           </div>
                         ))}
                       </div>
@@ -425,13 +758,40 @@ export function MyClients() {
 
             {!success && (
               <div className="flex items-center justify-end gap-2 border-t border-edge-base p-4">
-                <Button variant="outline" onClick={() => setModalOpen(false)}>{t("cancel")}</Button>
+                <Button variant="outline" onClick={() => { setModalOpen(false); resetForm(); }}>{t("cancel")}</Button>
                 <Button onClick={savePlan} disabled={saving || !title.trim()} className="gap-2">
                   {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                  {t("plans.save")}
+                  {editingPlan ? t("save") : t("plans.save")}
                 </Button>
               </div>
             )}
+          </Card>
+        </div>
+      )}
+
+      {/* Notification modal */}
+      {notifOpen && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center sm:p-4"
+          onClick={() => setNotifOpen(false)}>
+          <Card className="w-full max-w-md overflow-hidden rounded-b-none border-edge-base bg-surface-card shadow-2xl sm:rounded-2xl"
+            onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-edge-base p-4">
+              <h3 className="text-base font-bold text-content-strong">{t("notifications.sendTo")} {selectedClient?.full_name || t("pro.unnamedClient")}</h3>
+              <button onClick={() => setNotifOpen(false)} className="text-content-muted transition-colors hover:text-content-strong">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-4">
+              <textarea value={notifMsg} onChange={(e) => setNotifMsg(e.target.value)}
+                placeholder={t("notifications.messagePlaceholder")} rows={4} className={taCls} />
+            </div>
+            <div className="flex items-center justify-end gap-2 border-t border-edge-base p-4">
+              <Button variant="outline" onClick={() => setNotifOpen(false)}>{t("cancel")}</Button>
+              <Button onClick={sendNotification} disabled={notifSending || !notifMsg.trim()} className="gap-2">
+                {notifSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bell className="h-4 w-4" />}
+                {t("notifications.send")}
+              </Button>
+            </div>
           </Card>
         </div>
       )}

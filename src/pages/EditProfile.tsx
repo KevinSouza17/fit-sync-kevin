@@ -101,6 +101,21 @@ export function EditProfile() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Realtime: refresh profile when it changes in the database
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel("profile-realtime")
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "profiles", filter: `id=eq.${user.id}` },
+        () => { refreshProfile(); }
+      )
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "weight_logs", filter: `user_id=eq.${user.id}` },
+        () => { refreshProfile(); }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user, refreshProfile]);
+
   useEffect(() => {
     if (profile) {
       setForm({

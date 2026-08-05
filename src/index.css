@@ -42,25 +42,25 @@
 
 /* ── Dark mode ── */
 .dark {
-  --bg-base: 12 18 30;
-  --bg-card: 23 33 50;
-  --bg-subtle: 30 41 59;
-  --bg-elevated: 30 41 59;
-  --border-base: 45 55 72;
-  --border-strong: 51 65 85;
-  --text-strong: 241 245 249;
-  --text-body: 203 213 225;
-  --text-muted: 148 163 184;
+  --bg-base: 9 11 16;
+  --bg-card: 17 21 28;
+  --bg-subtle: 24 29 38;
+  --bg-elevated: 31 38 50;
+  --border-base: 38 45 58;
+  --border-strong: 51 61 78;
+  --text-strong: 245 248 252;
+  --text-body: 196 203 214;
+  --text-muted: 128 139 156;
 
-  --primary-50:  20 30 50;
-  --primary-100: 23 37 66;
-  --primary-200: 29 78 216;
-  --primary-300: 59 130 246;
-  --primary-400: 96 165 250;
+  --primary-50:  12 22 40;
+  --primary-100: 16 30 56;
+  --primary-200: 22 43 80;
+  --primary-300: 30 64 120;
+  --primary-400: 51 108 196;
   --primary-500: 59 130 246;
-  --primary-600: 37 99 235;
-  --primary-700: 29 78 216;
-  --primary-800: 30 64 175;
+  --primary-600: 69 142 255;
+  --primary-700: 96 165 250;
+  --primary-800: 125 186 252;
 
   --shadow-color: 0 0 0 / 0.3;
 }
@@ -111,6 +111,7 @@
 }
 
 /* ── Dark mode overrides for Tailwind utility classes ── */
+.dark .bg-white     { background-color: rgb(var(--bg-card)) !important; }
 .dark .bg-slate-50  { background-color: rgb(var(--bg-subtle)) !important; }
 .dark .bg-slate-100 { background-color: rgb(var(--bg-subtle)) !important; }
 .dark .bg-slate-200 { background-color: rgb(var(--bg-elevated)) !important; }
@@ -118,6 +119,24 @@
 .dark .hover\:bg-slate-100:hover { background-color: rgb(var(--bg-subtle)) !important; }
 .dark .hover\:bg-slate-200:hover { background-color: rgb(var(--bg-elevated)) !important; }
 
+.dark .bg-red-50     { background-color: rgb(69 10 10) !important; }
+.dark .bg-red-100    { background-color: rgb(127 29 29) !important; }
+.dark .bg-cyan-50    { background-color: rgb(8 47 47) !important; }
+.dark .bg-amber-50   { background-color: rgb(69 32 8) !important; }
+.dark .bg-amber-100  { background-color: rgb(120 53 15) !important; }
+.dark .bg-yellow-50  { background-color: rgb(54 42 3) !important; }
+.dark .bg-green-50   { background-color: rgb(5 46 22) !important; }
+.dark .bg-green-100  { background-color: rgb(20 83 45) !important; }
+.dark .bg-emerald-50 { background-color: rgb(2 44 29) !important; }
+.dark .bg-orange-50  { background-color: rgb(57 28 8) !important; }
+.dark .bg-pink-50    { background-color: rgb(69 10 34) !important; }
+.dark .bg-violet-50  { background-color: rgb(46 16 76) !important; }
+.dark .bg-teal-50    { background-color: rgb(2 44 44) !important; }
+.dark .bg-primary-50 { background-color: rgb(var(--primary-50)) !important; }
+.dark .bg-primary-100 { background-color: rgb(var(--primary-100)) !important; }
+
+.dark .text-black   { color: rgb(var(--text-strong)) !important; }
+.dark .text-slate-100 { color: rgb(var(--text-body)) !important; }
 .dark .text-slate-200 { color: rgb(var(--text-muted)) !important; }
 .dark .text-slate-300 { color: rgb(var(--text-muted)) !important; }
 .dark .text-slate-400 { color: rgb(var(--text-muted)) !important; }
@@ -127,33 +146,57 @@
 .dark .text-slate-800 { color: rgb(var(--text-strong)) !important; }
 .dark .text-slate-900 { color: rgb(var(--text-strong)) !important; }
 
-.dark .border-slate-100 { border-color: rgb(var(--border-base)) !important; }
-.dark .border-slate-200 { border-color: rgb(var(--border-base)) !important; }
-.dark .border-slate-300 { border-color: rgb(var(--border-strong)) !important; }
-
-/* Dark mode: override hardcoded category colors */
-.dark .bg-red-50     { background-color: rgb(69 10 10) !important; }
-.dark .bg-cyan-50    { background-color: rgb(8 47 47) !important; }
-.dark .bg-amber-50   { background-color: rgb(69 32 8) !important; }
-.dark .bg-yellow-50  { background-color: rgb(54 42 3) !important; }
-.dark .bg-green-50   { background-color: rgb(5 46 22) !important; }
-.dark .bg-emerald-50 { background-color: rgb(2 44 29) !important; }
-.dark .bg-orange-50  { background-color: rgb(57 28 8) !important; }
-.dark .bg-pink-50    { background-color: rgb(69 10 34) !important; }
-.dark .bg-violet-50  { background-color: rgb(46 16 76) !important; }
-.dark .bg-teal-50    { background-color: rgb(2 44 44) !important; }
-.dark .bg-primary-50 { background-color: rgb(var(--primary-50)) !important; }
-
+.dark .text-red-400    { color: rgb(248 113 113) !important; }
+.dark .text-red-500    { color: rgb(239 68 68) !important; }
 .dark .text-red-600     { color: rgb(252 165 165) !important; }
+.dark .text-red-700     { color: rgb(252 165 165) !important; }
 .dark .text-cyan-600    { color: rgb(103 232 249) !important; }
 .dark .text-amber-600   { color: rgb(252 211 77) !important; }
+.dark .text-amber-700   { color: rgb(252 211 77) !important; }
 .dark .text-yellow-700  { color: rgb(253 224 71) !important; }
 .dark .text-green-600   { color: rgb(134 239 172) !important; }
+.dark .text-green-700   { color: rgb(134 239 172) !important; }
 .dark .text-emerald-600 { color: rgb(110 231 183) !important; }
 .dark .text-orange-600  { color: rgb(253 186 116) !important; }
 .dark .text-pink-600    { color: rgb(249 168 212) !important; }
 .dark .text-violet-600  { color: rgb(196 181 253) !important; }
 .dark .text-teal-600    { color: rgb(94 234 212) !important; }
+
+.dark .border-black\/5 { border-color: rgb(var(--border-base)) !important; }
+.dark .border-black\/10 { border-color: rgb(var(--border-base)) !important; }
+.dark .border-slate-100 { border-color: rgb(var(--border-base)) !important; }
+.dark .border-slate-200 { border-color: rgb(var(--border-base)) !important; }
+.dark .border-slate-300 { border-color: rgb(var(--border-strong)) !important; }
+
+.dark .ring-primary-100 { --tw-ring-color: rgb(var(--primary-800)) !important; }
+.dark .ring-primary-200 { --tw-ring-color: rgb(var(--primary-700)) !important; }
+
+/* Dark mode: inputs and selects that hardcode bg-white */
+.dark input[type="text"],
+.dark input[type="email"],
+.dark input[type="password"],
+.dark input[type="number"],
+.dark input[type="tel"],
+.dark input[type="date"],
+.dark input[type="time"],
+.dark input[type="search"],
+.dark textarea,
+.dark select {
+  background-color: rgb(var(--bg-card)) !important;
+  color: rgb(var(--text-strong)) !important;
+  border-color: rgb(var(--border-base)) !important;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: rgb(var(--text-muted)) !important;
+  opacity: 0.7;
+}
+
+.dark select option {
+  background-color: rgb(var(--bg-card));
+  color: rgb(var(--text-strong));
+}
 
 /* Dark mode scrollbar */
 .dark ::-webkit-scrollbar { width: 8px; height: 8px; }

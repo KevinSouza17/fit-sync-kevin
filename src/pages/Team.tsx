@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { UserPlus, MessageCircle, Calendar, Star, MapPin, Search, Award, X, CheckCircle2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { UserPlus, MessageCircle, Calendar, Star, MapPin, Search, Award, X, CheckCircle2, UserCircle } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "../components/ui/avatar";
@@ -40,6 +41,7 @@ function initials(name: string) {
 export function Team() {
   const { user } = useAuth();
   const { t } = useI18n();
+  const navigate = useNavigate();
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -77,10 +79,13 @@ export function Team() {
     setBookingSuccess(false);
   }
 
+  const [bookingError, setBookingError] = useState("");
+
   async function submitBooking() {
-    if (!bookingTarget || !bookingForm.date) return;
+    if (!bookingTarget || !bookingForm.date || !user) return;
     setBookingSaving(true);
-    const { data } = await supabase
+    setBookingError("");
+    const { data, error } = await supabase
       .from("appointments")
       .insert({
         professional_id: bookingTarget.id,
@@ -92,7 +97,24 @@ export function Team() {
       .select()
       .single();
     setBookingSaving(false);
+    if (error) {
+      setBookingError(error.message);
+      return;
+    }
     if (data) {
+      const { data: meProfile } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", user.id)
+        .maybeSingle();
+      const myName = meProfile?.full_name || "Um cliente";
+      await supabase.from("notifications").insert({
+        user_id: bookingTarget.id,
+        type: "appointment",
+        title: t("appointments.notifTitle"),
+        body: t("appointments.notifBody", { name: myName, date: bookingForm.date, time: bookingForm.time }),
+        read: false,
+      });
       setBookingSuccess(true);
       setTimeout(() => { setBookingTarget(null); setBookingSuccess(false); }, 2000);
     }
@@ -270,6 +292,9 @@ export function Team() {
               </div>
             ) : (
               <div className="space-y-4">
+                {bookingError && (
+                  <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{bookingError}</div>
+                )}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-sm font-medium text-content-body">{t("appointments.date")}</label>
@@ -373,14 +398,20 @@ export function Team() {
               </div>
             </div>
 
-            <div className="mt-5 flex gap-3">
-              <Button variant="outline" className="flex-1 gap-2" onClick={() => startConversation(selectedPro)}>
-                <MessageCircle className="h-4 w-4" />
-                {t("team.message")}
-              </Button>
-              <Button className="flex-1 gap-2" disabled={!selectedPro.available_for_booking} onClick={() => openBooking(selectedPro)}>
-                <Calendar className="h-4 w-4" />
-                {t("team.book")}
+            <div className="mt-5 flex flex-col gap-2">
+              <div className="flex gap-3">
+                <Button variant="outline" className="flex-1 gap-2" onClick={() => startConversation(selectedPro)}>
+                  <MessageCircle className="h-4 w-4" />
+                  {t("team.message")}
+                </Button>
+                <Button className="flex-1 gap-2" disabled={!selectedPro.available_for_booking} onClick={() => openBooking(selectedPro)}>
+                  <Calendar className="h-4 w-4" />
+                  {t("team.book")}
+                </Button>
+              </div>
+              <Button variant="ghost" className="w-full gap-2 text-sm" onClick={() => { navigate(`/professional/${selectedPro.id}`); setSelectedPro(null); }}>
+                <UserCircle className="h-4 w-4" />
+                Ver Perfil Completo
               </Button>
             </div>
           </div>

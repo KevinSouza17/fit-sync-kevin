@@ -14,6 +14,16 @@ export function Progress() {
 
   useEffect(() => {
     loadData();
+    const channel = supabase
+      .channel("progress-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "weight_logs" },
+        () => loadData()
+      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "profiles" },
+        () => loadData()
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   async function loadData() {

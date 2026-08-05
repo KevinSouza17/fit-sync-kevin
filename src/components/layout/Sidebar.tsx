@@ -18,6 +18,8 @@ import {
   Menu,
   X,
   CalendarCheck,
+  Newspaper,
+  Star,
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { Avatar, AvatarImage, AvatarFallback } from "../ui/avatar";
@@ -34,6 +36,8 @@ interface NavItem {
 
 const navKeys: NavItem[] = [
   { to: "/dashboard", key: "nav.dashboard", icon: LayoutDashboard },
+  { to: "/feed", key: "nav.feed", icon: Newspaper },
+  { to: "/reviews", key: "nav.reviews", icon: Star },
   { to: "/diary", key: "nav.diary", icon: BookOpen },
   { to: "/goals", key: "nav.goals", icon: Target },
   { to: "/team", key: "nav.team", icon: Users },
