@@ -46,10 +46,6 @@ export function Login() {
             Acompanhe sua nutrição, monitore seus treinos e alcance seus objetivos com nossa plataforma completa de saúde e bem-estar.
           </p>
         </div>
-        <div className="flex gap-3">
-          <div className="rounded-full bg-white/20 px-4 py-2 text-sm text-white">+12k usuários ativos</div>
-          <div className="rounded-full bg-white/20 px-4 py-2 text-sm text-white">98% satisfação</div>
-        </div>
       </div>
 
       <div className="flex w-full flex-col justify-center bg-surface-card px-8 py-12 lg:w-1/2 lg:px-16">

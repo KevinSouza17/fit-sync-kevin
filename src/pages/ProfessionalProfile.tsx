@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import {
-  Star, MapPin, Users, Pencil, Check, X, Copy, Mail, Instagram, Phone,
-  QrCode, Plus, Trash2, Loader2,
+  Star, MapPin, Users, Pencil, Check, X, Plus, Trash2, Loader2,
 } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -46,37 +45,7 @@ function initials(name: string) {
   return name.split(" ").slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("");
 }
 
-function FakeQR() {
-  const cells = [
-    [1,1,1,1,1,1,1,0,1,0,1,1,1,1,1,1,1],
-    [1,0,0,0,0,0,1,0,1,0,1,0,0,0,0,0,1],
-    [1,0,1,1,1,0,1,0,0,1,1,0,1,1,1,0,1],
-    [1,0,1,1,1,0,1,1,0,0,1,0,1,1,1,0,1],
-    [1,0,1,1,1,0,1,0,1,1,0,0,1,1,1,0,1],
-    [1,0,0,0,0,0,1,1,0,1,1,0,0,0,0,0,1],
-    [1,1,1,1,1,1,1,0,1,0,1,1,1,1,1,1,1],
-    [0,0,0,1,0,0,0,0,1,0,0,1,0,0,1,0,0],
-    [1,1,0,0,1,0,1,1,0,1,0,1,1,0,0,1,1],
-    [0,1,0,1,0,1,0,0,1,0,1,0,1,0,1,0,0],
-    [1,0,1,1,0,0,1,0,0,1,1,1,0,0,0,1,1],
-    [0,0,0,1,0,0,0,0,1,0,0,1,0,1,0,0,1],
-    [1,1,1,1,1,1,1,0,1,1,1,0,0,0,1,0,0],
-    [1,0,0,0,0,0,1,0,0,1,0,0,1,0,0,1,1],
-    [1,0,1,1,1,0,1,0,1,0,1,0,0,1,1,0,1],
-    [1,0,0,0,0,0,1,1,0,0,0,1,0,0,0,1,0],
-    [1,1,1,1,1,1,1,0,1,1,0,0,1,0,1,0,1],
-  ];
-  const size = 7;
-  return (
-    <svg viewBox={`0 0 ${cells[0].length * size} ${cells.length * size}`} className="h-full w-full">
-      {cells.map((row, y) =>
-        row.map((cell, x) =>
-          cell ? <rect key={`${x}-${y}`} x={x * size} y={y * size} width={size} height={size} fill="#1e293b" /> : null
-        )
-      )}
-    </svg>
-  );
-}
+
 
 function PlanCardDisplay({ plan, popular }: { plan: { name: string; price: number; tagline: string; features: PlanFeature[] }; popular: boolean }) {
   if (popular) {
@@ -131,7 +100,6 @@ export function ProfessionalProfile() {
   const navigate = useNavigate();
   const { id: paramId } = useParams();
   const { t } = useI18n();
-  const [copied, setCopied] = useState(false);
   const [proProfile, setProProfile] = useState<ProProfile | null>(null);
   const [plans, setPlans] = useState<ProfessionalPlan[]>([]);
   const [loading, setLoading] = useState(true);
@@ -139,6 +107,7 @@ export function ProfessionalProfile() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<PlanForm>(initialForm);
   const [saving, setSaving] = useState(false);
+  const [clientCount, setClientCount] = useState(0);
 
   const viewingOther = !!paramId && paramId !== user?.id;
   const profileId = paramId || user?.id || "";
@@ -147,7 +116,7 @@ export function ProfessionalProfile() {
     if (!profileId) return;
     (async () => {
       setLoading(true);
-      const [{ data: pData }, { data: planData }] = await Promise.all([
+      const [{ data: pData }, { data: planData }, { count: planCount }, { count: aptCount }] = await Promise.all([
         supabase
           .from("profiles")
           .select("id, full_name, avatar_url, professional_role, specialty, credentials, location_city, bio, rating_avg, rating_count")
@@ -158,9 +127,18 @@ export function ProfessionalProfile() {
           .select("*")
           .eq("professional_id", profileId)
           .order("sort_order", { ascending: true }),
+        supabase
+          .from("client_plans")
+          .select("client_id", { count: "exact", head: true })
+          .eq("professional_id", profileId),
+        supabase
+          .from("appointments")
+          .select("user_id", { count: "exact", head: true })
+          .eq("professional_id", profileId),
       ]);
       setProProfile(pData as ProProfile | null);
       setPlans((planData as ProfessionalPlan[]) || []);
+      setClientCount((planCount ?? 0) + (aptCount ?? 0));
       setLoading(false);
     })();
   }, [profileId]);
@@ -171,15 +149,8 @@ export function ProfessionalProfile() {
   const credentials = proProfile?.credentials || (viewingOther ? "" : (profile?.credentials || ""));
   const city = proProfile?.location_city || (viewingOther ? "" : (profile?.location_city || ""));
   const bio = proProfile?.bio || (viewingOther ? "" : (profile?.bio || ""));
-  const rating = proProfile?.rating_avg ?? 4.9;
+  const rating = proProfile?.rating_avg;
   const ratingCount = proProfile?.rating_count ?? 0;
-  const pixKey = proProfile?.full_name ? `${proProfile.full_name.toLowerCase().replace(/\s+/g, "")}@fitsync.com` : "profissional@fitsync.com";
-
-  function handleCopy() {
-    navigator.clipboard.writeText(pixKey).catch(() => {});
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
 
   function openNewPlan() {
     setEditingId(null);
@@ -267,12 +238,16 @@ export function ProfessionalProfile() {
                 {role}{credentials ? ` · ${credentials}` : ""}
               </p>
               <div className="mt-1.5 flex flex-wrap items-center gap-3 text-xs text-slate-500">
-                <span className="flex items-center gap-1">
-                  <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                  <span className="font-semibold text-slate-700">{rating}</span>
-                  {ratingCount > 0 && <span>({ratingCount} avaliações)</span>}
-                </span>
-                <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5" />24 pacientes ativos</span>
+                {rating != null && (
+                  <span className="flex items-center gap-1">
+                    <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                    <span className="font-semibold text-slate-700">{Number(rating).toFixed(1)}</span>
+                    {ratingCount > 0 && <span>({ratingCount} avaliações)</span>}
+                  </span>
+                )}
+                {clientCount > 0 && (
+                  <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5" />{clientCount} pacientes</span>
+                )}
                 {city && <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" />{city}</span>}
               </div>
             </div>
@@ -330,26 +305,6 @@ export function ProfessionalProfile() {
 
         {/* Right sidebar */}
         <div className="flex w-full flex-col gap-4 xl:w-72 xl:shrink-0">
-          {!viewingOther && (
-            <Card>
-              <CardContent className="p-5">
-                <div className="mb-4 flex items-center gap-2">
-                  <QrCode className="h-5 w-5 text-slate-600" />
-                  <h3 className="text-sm font-semibold text-slate-900">Pix — QR Code</h3>
-                </div>
-                <div className="mx-auto h-40 w-40"><FakeQR /></div>
-                <div className="mt-4 text-center">
-                  <p className="text-xs text-slate-500">Chave Pix</p>
-                  <p className="mt-0.5 text-sm font-semibold text-primary-600">{pixKey}</p>
-                </div>
-                <button onClick={handleCopy} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50">
-                  {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
-                  {copied ? "Copiado!" : "Copiar Chave"}
-                </button>
-              </CardContent>
-            </Card>
-          )}
-
           {bio && (
             <Card>
               <CardContent className="p-5">
@@ -366,19 +321,6 @@ export function ProfessionalProfile() {
             </Card>
           )}
 
-          <Card>
-            <CardContent className="p-5">
-              <h3 className="mb-3 text-sm font-semibold text-slate-900">Contato</h3>
-              <ul className="flex flex-col gap-2.5">
-                <li className="flex items-center gap-2 text-sm text-primary-600">
-                  <Mail className="h-4 w-4 shrink-0 text-slate-400" />{pixKey}
-                </li>
-                <li className="flex items-center gap-2 text-sm text-primary-600">
-                  <Instagram className="h-4 w-4 shrink-0 text-slate-400" />@{name.toLowerCase().replace(/\s+/g, "")}
-                </li>
-              </ul>
-            </CardContent>
-          </Card>
         </div>
       </div>
 

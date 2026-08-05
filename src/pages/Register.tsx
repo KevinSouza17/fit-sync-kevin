@@ -453,24 +453,6 @@ export function Register() {
             </>
           )}
         </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="rounded-2xl bg-white/10 p-4">
-            <div className="text-2xl font-bold text-white">12k+</div>
-            <div className="mt-1 text-sm text-white/70">Usuários ativos</div>
-          </div>
-          <div className="rounded-2xl bg-white/10 p-4">
-            <div className="text-2xl font-bold text-white">500+</div>
-            <div className="mt-1 text-sm text-white/70">Profissionais</div>
-          </div>
-          <div className="rounded-2xl bg-white/10 p-4">
-            <div className="text-2xl font-bold text-white">98%</div>
-            <div className="mt-1 text-sm text-white/70">Satisfação</div>
-          </div>
-          <div className="rounded-2xl bg-white/10 p-4">
-            <div className="text-2xl font-bold text-white">50+</div>
-            <div className="mt-1 text-sm text-white/70">Especialidades</div>
-          </div>
-        </div>
       </div>
     </div>
   );
