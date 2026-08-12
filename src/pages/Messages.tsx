@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Send, Search, ArrowLeft, MessageCircle, UserCircle, UserPlus, ImagePlus, Mic, Loader2, X, Play, Pause } from "lucide-react";
+import { Send, Search, ArrowLeft, MessageCircle, UserCircle, UserPlus, ImagePlus, Mic, Loader2, X } from "lucide-react";
+import { AudioPlayer } from "../components/AudioPlayer";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
 import { useNotifications } from "../context/NotificationsContext";
@@ -62,8 +63,6 @@ export function Messages() {
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
   const [recordedUrl, setRecordedUrl] = useState<string | null>(null);
   const [sendingAudio, setSendingAudio] = useState(false);
-  const [playingId, setPlayingId] = useState<string | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -268,18 +267,6 @@ export function Messages() {
     setSendingAudio(false);
   }
 
-  function togglePlayAudio(msgId: string, url: string) {
-    if (!audioRef.current) return;
-    if (playingId === msgId) {
-      audioRef.current.pause();
-      setPlayingId(null);
-    } else {
-      audioRef.current.src = url;
-      audioRef.current.play();
-      setPlayingId(msgId);
-    }
-  }
-
   async function fireMessageEmail(convId: string, content: string) {
     const { data: sessionData } = await supabase.auth.getSession();
     const token = sessionData.session?.access_token;
@@ -306,7 +293,7 @@ export function Messages() {
   );
 
   return (
-    <div className="flex h-screen">
+    <div className="flex h-full overflow-hidden">
       <aside className={`flex w-full flex-col border-r border-slate-200 bg-white md:w-80 xl:w-96 ${activeId ? "hidden md:flex" : "flex"}`}>
         <div className="border-b border-slate-100 px-5 py-4">
           <div className="flex items-center justify-between">
@@ -380,11 +367,8 @@ export function Messages() {
                           <img src={m.media_url} alt="" className="mb-1 max-h-60 rounded-lg object-cover" />
                         )}
                         {m.media_type === "audio" && m.media_url && (
-                          <div className="flex items-center gap-2 py-1">
-                            <button onClick={() => togglePlayAudio(m.id, m.media_url!)} className={`flex h-9 w-9 items-center justify-center rounded-full ${isMine ? "bg-white/20" : "bg-primary-50"}`}>
-                              {playingId === m.id ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                            </button>
-                            <span className="text-xs font-medium">{t("messages.audio")}</span>
+                          <div className="min-w-[200px]">
+                            <AudioPlayer url={m.media_url} isMine={isMine} label={t("messages.audio")} />
                           </div>
                         )}
                         {m.content && <p className="whitespace-pre-wrap break-words">{m.content}</p>}
@@ -450,7 +434,6 @@ export function Messages() {
           </div>
         </section>
       )}
-      <audio ref={audioRef} onEnded={() => setPlayingId(null)} className="hidden" />
       <InviteModal open={inviteOpen} onClose={() => setInviteOpen(false)} />
     </div>
   );

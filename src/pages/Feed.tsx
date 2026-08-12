@@ -11,6 +11,7 @@ import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
 import { supabase } from "../lib/supabase";
 import { useNavigate } from "react-router-dom";
+import { StoryViewer } from "../components/StoryViewer";
 
 interface PostWithProfile {
   id: string;
@@ -75,7 +76,8 @@ export function Feed() {
   const [fileInput, setFileInput] = useState<HTMLInputElement | null>(null);
   const [storyInput, setStoryInput] = useState<HTMLInputElement | null>(null);
   const [storyUploading, setStoryUploading] = useState(false);
-  const [activeStory, setActiveStory] = useState<StoryWithProfile | null>(null);
+  const [activeStoryGroup, setActiveStoryGroup] = useState<{ userId: string; stories: StoryWithProfile[] } | null>(null);
+  const [activeStoryIndex, setActiveStoryIndex] = useState(0);
   const [followStatuses, setFollowStatuses] = useState<Record<string, string>>({});
   const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
   const [commentsByPost, setCommentsByPost] = useState<Record<string, CommentWithProfile[]>>({});
@@ -344,7 +346,7 @@ export function Feed() {
           const name = first.profiles?.full_name || "Usuario";
           const isOwn = uid === user?.id;
           return (
-            <button key={uid} onClick={() => setActiveStory(first)} className="flex flex-col items-center gap-1.5">
+            <button key={uid} onClick={() => { setActiveStoryGroup({ userId: uid, stories: userStories }); setActiveStoryIndex(0); }} className="flex flex-col items-center gap-1.5">
               <div className="relative h-16 w-16 rounded-full bg-gradient-to-tr from-primary-400 to-primary-600 p-0.5">
                 <div className="h-full w-full overflow-hidden rounded-full border-2 border-white">
                   {first.profiles?.avatar_url ? (
@@ -363,22 +365,15 @@ export function Feed() {
       </div>
 
       {/* Story viewer */}
-      {activeStory && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90" onClick={() => setActiveStory(null)}>
-          <button className="absolute right-4 top-4 z-10 rounded-full bg-white/20 p-2 text-white hover:bg-white/30">
-            <X className="h-5 w-5" />
-          </button>
-          <div className="relative max-h-[90vh] max-w-md" onClick={(e) => e.stopPropagation()}>
-            {activeStory.media_type === "video" ? (
-              <video src={activeStory.media_url} controls autoPlay className="max-h-[90vh] rounded-xl" />
-            ) : (
-              <img src={activeStory.media_url} alt="" className="max-h-[90vh] rounded-xl object-contain" />
-            )}
-            {activeStory.caption && (
-              <p className="absolute bottom-4 left-4 right-4 rounded-lg bg-black/50 px-3 py-2 text-sm text-white">{activeStory.caption}</p>
-            )}
-          </div>
-        </div>
+      {activeStoryGroup && (
+        <StoryViewer
+          group={activeStoryGroup}
+          index={activeStoryIndex}
+          onIndexChange={setActiveStoryIndex}
+          onClose={() => { setActiveStoryGroup(null); setActiveStoryIndex(0); }}
+          allGroups={Object.entries(storiesByUser).map(([uid, ss]) => ({ userId: uid, stories: ss }))}
+          onGroupChange={(g) => { setActiveStoryGroup(g); setActiveStoryIndex(0); }}
+        />
       )}
 
       {/* Composer */}

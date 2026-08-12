@@ -7,6 +7,8 @@ import {
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "../components/ui/avatar";
+import { StoryViewer } from "../components/StoryViewer";
+import type { StoryItem, StoryGroup } from "../components/StoryViewer";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
 import { supabase } from "../lib/supabase";
@@ -66,6 +68,9 @@ export function UserProfile() {
   const [followingCount, setFollowingCount] = useState(0);
   const [isOwner, setIsOwner] = useState(false);
   const [canView, setCanView] = useState(true);
+  const [profileStories, setProfileStories] = useState<StoryItem[]>([]);
+  const [activeStoryGroup, setActiveStoryGroup] = useState<StoryGroup | null>(null);
+  const [activeStoryIndex, setActiveStoryIndex] = useState(0);
 
   const profileId = paramId || user?.id || "";
   const isOwnProfile = profileId === user?.id;
@@ -118,6 +123,16 @@ export function UserProfile() {
     } else {
       setCanView(true);
     }
+
+    // Load stories for this profile
+    const now = new Date().toISOString();
+    const { data: sData } = await supabase
+      .from("stories")
+      .select("*, profiles:user_id(full_name, avatar_url)")
+      .eq("user_id", profileId)
+      .gt("expires_at", now)
+      .order("created_at", { ascending: false });
+    setProfileStories((sData ?? []) as StoryItem[]);
 
     // Load posts
     if (canView || isOwnProfile) {
@@ -222,13 +237,26 @@ export function UserProfile() {
           <div className="h-32 w-full overflow-hidden rounded-t-2xl bg-gradient-to-br from-primary-600 via-primary-500 to-primary-400" />
           <div className="px-6 pb-5">
             <div className="flex items-start justify-between">
-              <Avatar className="-mt-10 h-20 w-20 ring-4 ring-white shadow-lg">
-                {profileData?.avatar_url ? (
-                  <AvatarImage src={profileData.avatar_url} alt={name} />
-                ) : (
-                  <AvatarFallback className="bg-primary-50 text-2xl font-bold text-primary-600">{initials(name)}</AvatarFallback>
-                )}
-              </Avatar>
+              <button
+                onClick={() => {
+                  if (profileStories.length > 0) {
+                    setActiveStoryGroup({ userId: profileId, stories: profileStories });
+                    setActiveStoryIndex(0);
+                  }
+                }}
+                className={`-mt-10 shrink-0 ${profileStories.length > 0 ? "cursor-pointer" : "cursor-default"}`}
+                title={profileStories.length > 0 ? "Ver stories" : undefined}
+              >
+                <div className={`h-20 w-20 rounded-full ring-4 ring-white shadow-lg ${profileStories.length > 0 ? "bg-gradient-to-tr from-primary-400 to-primary-600 p-0.5" : ""}`}>
+                  <Avatar className="h-full w-full overflow-hidden rounded-full border-2 border-white">
+                    {profileData?.avatar_url ? (
+                      <AvatarImage src={profileData.avatar_url} alt={name} />
+                    ) : (
+                      <AvatarFallback className="bg-primary-50 text-2xl font-bold text-primary-600">{initials(name)}</AvatarFallback>
+                    )}
+                  </Avatar>
+                </div>
+              </button>
               <div className="flex items-center gap-2">
                 {isOwnProfile ? (
                   <Button variant="outline" size="sm" onClick={togglePrivacy} className="gap-2">
@@ -356,6 +384,17 @@ export function UserProfile() {
             );
           })}
         </div>
+      )}
+      {/* Story viewer */}
+      {activeStoryGroup && (
+        <StoryViewer
+          group={activeStoryGroup}
+          index={activeStoryIndex}
+          onIndexChange={setActiveStoryIndex}
+          onClose={() => { setActiveStoryGroup(null); setActiveStoryIndex(0); }}
+          allGroups={[activeStoryGroup]}
+          onGroupChange={() => {}}
+        />
       )}
     </div>
   );
