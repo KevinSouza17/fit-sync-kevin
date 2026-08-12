@@ -162,6 +162,8 @@ export interface Database {
           conversation_id: string;
           sender_id: string;
           content: string;
+          media_url: string | null;
+          media_type: string | null;
           read: boolean;
           created_at: string;
         };
@@ -304,6 +306,38 @@ export interface Database {
         };
         Update: Partial<Database["public"]["Tables"]["site_reviews"]["Row"]>;
       };
+      stories: {
+        Row: {
+          id: string;
+          user_id: string;
+          media_url: string;
+          media_type: string;
+          caption: string | null;
+          created_at: string;
+          expires_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["stories"]["Row"], "id" | "user_id" | "created_at"> & {
+          id?: string;
+          user_id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["stories"]["Row"]>;
+      };
+      follows: {
+        Row: {
+          id: string;
+          follower_id: string;
+          followee_id: string;
+          status: string;
+          created_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["follows"]["Row"], "id" | "follower_id" | "created_at"> & {
+          id?: string;
+          follower_id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["follows"]["Row"]>;
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
@@ -332,3 +366,5 @@ export type FeedLike = Database["public"]["Tables"]["feed_likes"]["Row"];
 export type Appointment = Database["public"]["Tables"]["appointments"]["Row"];
 export type ClientPlan = Database["public"]["Tables"]["client_plans"]["Row"];
 export type SiteReview = Database["public"]["Tables"]["site_reviews"]["Row"];
+export type Story = Database["public"]["Tables"]["stories"]["Row"];
+export type Follow = Database["public"]["Tables"]["follows"]["Row"];

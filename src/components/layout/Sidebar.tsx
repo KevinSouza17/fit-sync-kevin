@@ -34,22 +34,47 @@ interface NavItem {
   proOnly?: boolean;
 }
 
-const navKeys: NavItem[] = [
-  { to: "/dashboard", key: "nav.dashboard", icon: LayoutDashboard },
-  { to: "/feed", key: "nav.feed", icon: Newspaper },
-  { to: "/reviews", key: "nav.reviews", icon: Star },
-  { to: "/diary", key: "nav.diary", icon: BookOpen },
-  { to: "/goals", key: "nav.goals", icon: Target },
-  { to: "/team", key: "nav.team", icon: Users },
-  { to: "/professional-profile", key: "nav.professionalProfile", icon: UserCircle, proOnly: true },
-  { to: "/workout", key: "nav.workout", icon: Dumbbell },
-  { to: "/appointments", key: "nav.appointments", icon: CalendarCheck },
-  { to: "/my-clients", key: "nav.myClients", icon: Users, proOnly: true },
-  { to: "/messages", key: "nav.messages", icon: MessageCircle },
-  { to: "/notifications", key: "nav.notifications", icon: Bell },
-  { to: "/progress", key: "nav.progress", icon: TrendingUp },
-  { to: "/recipes", key: "nav.recipes", icon: UtensilsCrossed },
-  { to: "/settings", key: "nav.settings", icon: Settings },
+interface NavSection {
+  labelKey: string;
+  items: NavItem[];
+}
+
+const navSections: NavSection[] = [
+  {
+    labelKey: "nav.sectionMain",
+    items: [
+      { to: "/dashboard", key: "nav.dashboard", icon: LayoutDashboard },
+      { to: "/feed", key: "nav.feed", icon: Newspaper },
+      { to: "/reviews", key: "nav.reviews", icon: Star },
+    ],
+  },
+  {
+    labelKey: "nav.sectionHealth",
+    items: [
+      { to: "/diary", key: "nav.diary", icon: BookOpen },
+      { to: "/goals", key: "nav.goals", icon: Target },
+      { to: "/workout", key: "nav.workout", icon: Dumbbell },
+      { to: "/progress", key: "nav.progress", icon: TrendingUp },
+      { to: "/recipes", key: "nav.recipes", icon: UtensilsCrossed },
+    ],
+  },
+  {
+    labelKey: "nav.sectionPro",
+    items: [
+      { to: "/team", key: "nav.team", icon: Users },
+      { to: "/professional-profile", key: "nav.professionalProfile", icon: UserCircle, proOnly: true },
+      { to: "/appointments", key: "nav.appointments", icon: CalendarCheck },
+      { to: "/my-clients", key: "nav.myClients", icon: Users, proOnly: true },
+      { to: "/messages", key: "nav.messages", icon: MessageCircle },
+    ],
+  },
+  {
+    labelKey: "nav.sectionAccount",
+    items: [
+      { to: "/notifications", key: "nav.notifications", icon: Bell },
+      { to: "/settings", key: "nav.settings", icon: Settings },
+    ],
+  },
 ];
 
 function initials(name: string) {
@@ -67,7 +92,12 @@ export function Sidebar() {
   const plan = profile?.plan === "pro" ? t("nav.planPro") : t("nav.planFree");
   const isPro = profile?.is_professional;
 
-  const visibleNavItems = navKeys.filter((item) => !item.proOnly || isPro);
+  const visibleSections = navSections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => !item.proOnly || isPro),
+    }))
+    .filter((section) => section.items.length > 0);
 
   async function handleSignOut() {
     await signOut();
@@ -86,31 +116,38 @@ export function Sidebar() {
         </button>
       </header>
 
-      <nav className="flex flex-1 flex-col gap-1 overflow-y-auto">
-        {visibleNavItems.map(({ to, key, icon: Icon }) => {
-          const showBadge = to === "/notifications" && unreadCount > 0;
-          return (
-            <NavLink
-              key={to}
-              to={to}
-              onClick={() => setMobileOpen(false)}
-              className={({ isActive }) =>
-                cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                  isActive ? "bg-primary-50 text-primary-600" : "text-content-body hover:bg-surface-subtle hover:text-content-strong"
-                )
-              }
-            >
-              <Icon className="h-5 w-5 shrink-0" />
-              {t(key)}
-              {showBadge && (
-                <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-primary-600 px-1.5 text-[10px] font-bold text-white">
-                  {unreadCount > 9 ? "9+" : unreadCount}
-                </span>
-              )}
-            </NavLink>
-          );
-        })}
+      <nav className="flex flex-1 flex-col gap-4 overflow-y-auto">
+        {visibleSections.map((section) => (
+          <div key={section.labelKey} className="flex flex-col gap-0.5">
+            <span className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-content-muted">
+              {t(section.labelKey)}
+            </span>
+            {section.items.map(({ to, key, icon: Icon }) => {
+              const showBadge = to === "/notifications" && unreadCount > 0;
+              return (
+                <NavLink
+                  key={to}
+                  to={to}
+                  onClick={() => setMobileOpen(false)}
+                  className={({ isActive }) =>
+                    cn(
+                      "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                      isActive ? "bg-primary-50 text-primary-600" : "text-content-body hover:bg-surface-subtle hover:text-content-strong"
+                    )
+                  }
+                >
+                  <Icon className="h-5 w-5 shrink-0" />
+                  {t(key)}
+                  {showBadge && (
+                    <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-primary-600 px-1.5 text-[10px] font-bold text-white">
+                      {unreadCount > 9 ? "9+" : unreadCount}
+                    </span>
+                  )}
+                </NavLink>
+              );
+            })}
+          </div>
+        ))}
       </nav>
 
       <footer className="border-t border-edge-base pt-4">

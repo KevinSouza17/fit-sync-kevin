@@ -16,6 +16,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "../components/ui/avatar";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
+import { AutoTextarea } from "../components/ui/textarea";
 
 type AppointmentStatus = "pending" | "confirmed" | "completed" | "cancelled";
 
@@ -604,9 +605,9 @@ export function Appointments() {
 
                   <div className="flex flex-col gap-1.5">
                     <label className="text-xs font-medium text-content-muted">{t("appointments.notes")}</label>
-                    <textarea
+                    <AutoTextarea
                       className={taCls}
-                      rows={3}
+                      minRows={3}
                       placeholder={t("appointments.notesPlaceholder")}
                       value={bookForm.notes}
                       onChange={(e) => setBookForm((f) => ({ ...f, notes: e.target.value }))}

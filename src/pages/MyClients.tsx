@@ -10,6 +10,7 @@ import { Input } from "../components/ui/input";
 import { Avatar, AvatarImage, AvatarFallback } from "../components/ui/avatar";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
+import { AutoTextarea } from "../components/ui/textarea";
 import { supabase } from "../lib/supabase";
 import type { ClientPlan, Meal, WeightLog, WorkoutLog } from "../lib/types";
 import { cn } from "../lib/utils";
@@ -670,8 +671,8 @@ export function MyClients() {
 
                   <div className="flex flex-col gap-1.5">
                     <label className="text-xs font-medium text-content-muted">{t("plans.description")}</label>
-                    <textarea value={description} onChange={(e) => setDescription(e.target.value)}
-                      placeholder={t("plans.descriptionPlaceholder")} rows={2} className={taCls} />
+                    <AutoTextarea value={description} onChange={(e) => setDescription(e.target.value)}
+                      placeholder={t("plans.descriptionPlaceholder")} minRows={2} className={taCls} />
                   </div>
 
                   {planType === "diet" ? (
@@ -716,9 +717,9 @@ export function MyClients() {
                                 </button>
                               )}
                             </div>
-                            <textarea value={meal.items}
+                            <AutoTextarea value={meal.items}
                               onChange={(e) => setMeals((m) => m.map((x, idx) => idx === i ? { ...x, items: e.target.value } : x))}
-                              placeholder={t("plans.mealItemsPlaceholder")} rows={2} className={cn("mt-2", taCls)} />
+                              placeholder={t("plans.mealItemsPlaceholder")} minRows={2} className={cn("mt-2", taCls)} />
                           </div>
                         ))}
                       </div>
@@ -744,9 +745,9 @@ export function MyClients() {
                                 </button>
                               )}
                             </div>
-                            <textarea value={day.exercises}
+                            <AutoTextarea value={day.exercises}
                               onChange={(e) => setDays((d) => d.map((x, idx) => idx === i ? { ...x, exercises: e.target.value } : x))}
-                              placeholder={t("plans.exercisePlaceholder")} rows={3} className={cn("mt-2", taCls)} />
+                              placeholder={t("plans.exercisePlaceholder")} minRows={3} className={cn("mt-2", taCls)} />
                           </div>
                         ))}
                       </div>
@@ -782,8 +783,8 @@ export function MyClients() {
               </button>
             </div>
             <div className="p-4">
-              <textarea value={notifMsg} onChange={(e) => setNotifMsg(e.target.value)}
-                placeholder={t("notifications.messagePlaceholder")} rows={4} className={taCls} />
+              <AutoTextarea value={notifMsg} onChange={(e) => setNotifMsg(e.target.value)}
+                placeholder={t("notifications.messagePlaceholder")} minRows={4} className={taCls} />
             </div>
             <div className="flex items-center justify-end gap-2 border-t border-edge-base p-4">
               <Button variant="outline" onClick={() => setNotifOpen(false)}>{t("cancel")}</Button>

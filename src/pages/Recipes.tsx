@@ -5,6 +5,7 @@ import { Button } from "../components/ui/button";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
+import { AutoTextarea } from "../components/ui/textarea";
 
 interface Food {
   id: string;
@@ -773,8 +774,8 @@ export function Recipes() {
               {customForm.is_recipe && (
                 <div>
                   <label className="text-sm font-medium text-content-body">{t("foods.ingredients")}</label>
-                  <textarea
-                    rows={3}
+                  <AutoTextarea
+                    minRows={3}
                     placeholder={t("foods.ingredientsPlaceholder")}
                     value={customForm.ingredients}
                     onChange={(e) => setCustomForm({ ...customForm, ingredients: e.target.value })}

@@ -7,6 +7,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "../components/ui/avatar";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
+import { AutoTextarea } from "../components/ui/textarea";
 
 const healthGoals = [
   "Perda de Peso",
@@ -553,8 +554,8 @@ export function EditProfile() {
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-sm font-medium text-content-body">Bio Profissional</label>
-                    <textarea
-                      rows={3}
+                    <AutoTextarea
+                      minRows={3}
                       placeholder="Descreva sua experiência e abordagem profissional..."
                       value={form.bio}
                       onChange={(e) => setField("bio", e.target.value)}

@@ -6,6 +6,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "../components/ui/avatar";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
 import { supabase } from "../lib/supabase";
+import { AutoTextarea } from "../components/ui/textarea";
 import type { SiteReview } from "../lib/types";
 import { cn } from "../lib/utils";
 
@@ -165,11 +166,11 @@ export function Reviews() {
             )}
           </div>
           <StarRow value={rating} onChange={setRating} />
-          <textarea
+          <AutoTextarea
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             placeholder={t("reviews.commentPlaceholder")}
-            rows={3}
+            minRows={3}
             className={taCls}
           />
           {error && <p className="text-sm text-red-500">{error}</p>}
