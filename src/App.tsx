@@ -20,6 +20,7 @@ import { MyClients } from "./pages/MyClients";
 import { Feed } from "./pages/Feed";
 import { Reviews } from "./pages/Reviews";
 import { UserProfile } from "./pages/UserProfile";
+import { MyProfile } from "./pages/MyProfile";
 import { Moderation } from "./pages/Moderation";
 import { DashboardLayout } from "./components/layout/DashboardLayout";
 
@@ -86,6 +87,7 @@ export default function App() {
           <Route path="/professional/:id" element={<ProtectedRoute><ProfessionalProfile /></ProtectedRoute>} />
           <Route path="/feed" element={<Feed />} />
           <Route path="/profile/:id" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
+          <Route path="/my-profile" element={<MyProfile />} />
           <Route path="/moderation" element={<ProtectedRoute><Moderation /></ProtectedRoute>} />
           <Route path="/reviews" element={<Reviews />} />
           <Route path="/messages" element={<Messages />} />

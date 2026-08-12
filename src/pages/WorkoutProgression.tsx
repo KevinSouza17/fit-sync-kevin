@@ -52,20 +52,35 @@ export function WorkoutProgression() {
     if (exercises.length && !selected) setSelected(exercises[0]);
   }, [exercises, selected]);
 
-  const series = useMemo(
-    () => logs.filter((l) => l.exercise_name === selected),
-    [logs, selected]
-  );
+  const series = useMemo(() => {
+    const filtered = logs.filter((l) => l.exercise_name === selected);
+    // Group by day, taking max weight per day
+    const byDay = new Map<string, { date: string; weight: number; sets: number; reps: string }>();
+    filtered.forEach((l) => {
+      const existing = byDay.get(l.logged_date);
+      if (!existing || l.weight_kg > existing.weight) {
+        byDay.set(l.logged_date, {
+          date: l.logged_date,
+          weight: l.weight_kg,
+          sets: l.sets_completed,
+          reps: l.reps_per_set,
+        });
+      }
+    });
+    return Array.from(byDay.values()).sort((a, b) => a.date.localeCompare(b.date));
+  }, [logs, selected]);
+
+  const dailySeries = series;
 
   const stats = useMemo(() => {
-    if (!series.length) return null;
-    const weights = series.map((s) => s.weight_kg);
+    if (!dailySeries.length) return null;
+    const weights = dailySeries.map((s) => s.weight);
     const max = Math.max(...weights);
     const current = weights[weights.length - 1];
     const first = weights[0];
     const change = Number((current - first).toFixed(1));
-    return { max, current, first, change, sessions: series.length };
-  }, [series]);
+    return { max, current, first, change, sessions: dailySeries.length };
+  }, [dailySeries]);
 
   const fmtDate = (d: string) =>
     new Date(d + "T00:00:00").toLocaleDateString(
@@ -125,7 +140,7 @@ export function WorkoutProgression() {
             </select>
           </div>
 
-          {stats && series.length > 0 && (
+          {stats && dailySeries.length > 0 && (
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
               <StatCard
                 icon={<TrendingUp className="h-4 w-4" />}
@@ -151,11 +166,11 @@ export function WorkoutProgression() {
             </div>
           )}
 
-          {series.length > 1 && (
+          {dailySeries.length > 1 && (
             <Card>
               <CardContent className="p-4 sm:p-6">
                 <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" preserveAspectRatio="xMidYMid meet">
-                  <Chart series={series} fmtDate={fmtDate} />
+                  <Chart series={dailySeries} fmtDate={fmtDate} />
                 </svg>
               </CardContent>
             </Card>
@@ -176,12 +191,12 @@ export function WorkoutProgression() {
                     </tr>
                   </thead>
                   <tbody>
-                    {[...series].reverse().map((s) => (
-                      <tr key={s.id} className="border-b border-edge-base last:border-0 hover:bg-surface-subtle">
-                        <td className="py-3 pr-4 text-content-body">{fmtDate(s.logged_date)}</td>
-                        <td className="py-3 px-4 font-medium text-content-strong">{s.weight_kg} kg</td>
-                        <td className="py-3 px-4 text-content-body">{s.sets_completed}</td>
-                        <td className="py-3 pl-4 text-content-body">{s.reps_per_set}</td>
+                    {[...dailySeries].reverse().map((s, i) => (
+                      <tr key={i} className="border-b border-edge-base last:border-0 hover:bg-surface-subtle">
+                        <td className="py-3 pr-4 text-content-body">{fmtDate(s.date)}</td>
+                        <td className="py-3 px-4 font-medium text-content-strong">{s.weight} kg</td>
+                        <td className="py-3 px-4 text-content-body">{s.sets}</td>
+                        <td className="py-3 pl-4 text-content-body">{s.reps}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -223,11 +238,11 @@ function StatCard({
   );
 }
 
-function Chart({ series, fmtDate }: { series: WorkoutLog[]; fmtDate: (d: string) => string }) {
+function Chart({ series, fmtDate }: { series: { date: string; weight: number }[]; fmtDate: (d: string) => string }) {
   const innerW = W - PAD.left - PAD.right;
   const innerH = H - PAD.top - PAD.bottom;
 
-  const weights = series.map((s) => s.weight_kg);
+  const weights = series.map((s) => s.weight);
   const rawMax = Math.max(...weights);
   const rawMin = Math.min(...weights);
   const span = rawMax - rawMin || 1;
@@ -240,7 +255,7 @@ function Chart({ series, fmtDate }: { series: WorkoutLog[]; fmtDate: (d: string)
   const x = (i: number) => PAD.left + (n === 1 ? innerW / 2 : (i / (n - 1)) * innerW);
   const y = (v: number) => PAD.top + innerH - ((v - yMin) / ySpan) * innerH;
 
-  const linePath = series.map((s, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(s.weight_kg).toFixed(1)}`).join(" ");
+  const linePath = series.map((s, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(s.weight).toFixed(1)}`).join(" ");
   const areaPath = `${linePath} L${x(n - 1).toFixed(1)},${(PAD.top + innerH).toFixed(1)} L${x(0).toFixed(1)},${(PAD.top + innerH).toFixed(1)} Z`;
 
   const gridLines = 5;
@@ -276,22 +291,22 @@ function Chart({ series, fmtDate }: { series: WorkoutLog[]; fmtDate: (d: string)
 
       {series.map((s, i) => {
         const cx = x(i);
-        const cy = y(s.weight_kg);
+        const cy = y(s.weight);
         const labelEvery = Math.max(1, Math.ceil(n / 8));
         const showLabel = i % labelEvery === 0 || i === n - 1;
         return (
-          <g key={s.id}>
+          <g key={i}>
             {showLabel && (
               <text x={cx} y={H - PAD.bottom + 20} textAnchor="middle" fontSize={10} className="fill-content-muted">
-                {fmtDate(s.logged_date)}
+                {fmtDate(s.date)}
               </text>
             )}
             <circle cx={cx} cy={cy} r={4} fill="rgb(99 102 241)" stroke="white" strokeWidth={2} className="[stroke:rgb(255_255_255)] dark:[stroke:rgb(30_41_59)]" />
             <text x={cx} y={cy - 12} textAnchor="middle" fontSize={10} className="fill-content-strong font-medium" opacity={0}>
-              {s.weight_kg}
+              {s.weight}
             </text>
             <circle cx={cx} cy={cy} r={14} fill="transparent">
-              <title>{`${fmtDate(s.logged_date)}: ${s.weight_kg} kg`}</title>
+              <title>{`${fmtDate(s.date)}: ${s.weight} kg`}</title>
             </circle>
           </g>
         );

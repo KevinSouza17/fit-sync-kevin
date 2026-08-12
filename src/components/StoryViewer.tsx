@@ -105,6 +105,17 @@ export function StoryViewer({ group, index, onIndexChange, onClose, allGroups, o
   if (!story) return null;
   const name = story.profiles?.full_name || "Usuario";
 
+  function storyTimeAgo(dateStr: string) {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return "agora";
+    if (mins < 60) return `${mins}min`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h`;
+    const days = Math.floor(hrs / 24);
+    return `${days}d`;
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black">
       {/* Close */}
@@ -144,6 +155,7 @@ export function StoryViewer({ group, index, onIndexChange, onClose, allGroups, o
             </div>
           )}
           <span className="text-sm font-semibold text-white drop-shadow">{name}</span>
+          <span className="ml-1.5 text-xs text-white/70 drop-shadow">{storyTimeAgo(story.created_at)}</span>
         </div>
 
         {/* Media */}

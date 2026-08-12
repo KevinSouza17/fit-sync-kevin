@@ -74,6 +74,7 @@ const navSections: NavSection[] = [
   {
     labelKey: "nav.sectionAccount",
     items: [
+      { to: "/my-profile", key: "nav.myProfile", icon: UserCircle },
       { to: "/notifications", key: "nav.notifications", icon: Bell },
       { to: "/settings", key: "nav.settings", icon: Settings },
     ],
