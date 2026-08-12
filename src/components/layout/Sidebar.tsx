@@ -19,6 +19,7 @@ import {
   X,
   CalendarCheck,
   Newspaper,
+  Shield,
   Star,
 } from "lucide-react";
 import { cn } from "../../lib/utils";
@@ -32,6 +33,7 @@ interface NavItem {
   key: string;
   icon: typeof LayoutDashboard;
   proOnly?: boolean;
+  ownerOnly?: boolean;
 }
 
 interface NavSection {
@@ -46,6 +48,7 @@ const navSections: NavSection[] = [
       { to: "/dashboard", key: "nav.dashboard", icon: LayoutDashboard },
       { to: "/feed", key: "nav.feed", icon: Newspaper },
       { to: "/reviews", key: "nav.reviews", icon: Star },
+      { to: "/moderation", key: "nav.moderation", icon: Shield, ownerOnly: true },
     ],
   },
   {
@@ -91,11 +94,12 @@ export function Sidebar() {
   const displayName = profile?.full_name || user?.email?.split("@")[0] || "FitSync";
   const plan = profile?.plan === "pro" ? t("nav.planPro") : t("nav.planFree");
   const isPro = profile?.is_professional;
+  const isOwner = profile?.role === "owner";
 
   const visibleSections = navSections
     .map((section) => ({
       ...section,
-      items: section.items.filter((item) => !item.proOnly || isPro),
+      items: section.items.filter((item) => (!item.proOnly || isPro) && (!item.ownerOnly || isOwner)),
     }))
     .filter((section) => section.items.length > 0);
 

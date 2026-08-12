@@ -26,6 +26,9 @@ export interface Database {
           registration_type: string;
           document_number: string | null;
           verified: boolean;
+          is_private: boolean;
+          role: string;
+          is_banned: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -338,6 +341,21 @@ export interface Database {
         };
         Update: Partial<Database["public"]["Tables"]["follows"]["Row"]>;
       };
+      feed_comments: {
+        Row: {
+          id: string;
+          post_id: string;
+          user_id: string;
+          content: string;
+          created_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["feed_comments"]["Row"], "id" | "user_id" | "created_at"> & {
+          id?: string;
+          user_id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["feed_comments"]["Row"]>;
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
@@ -368,3 +386,4 @@ export type ClientPlan = Database["public"]["Tables"]["client_plans"]["Row"];
 export type SiteReview = Database["public"]["Tables"]["site_reviews"]["Row"];
 export type Story = Database["public"]["Tables"]["stories"]["Row"];
 export type Follow = Database["public"]["Tables"]["follows"]["Row"];
+export type FeedComment = Database["public"]["Tables"]["feed_comments"]["Row"];

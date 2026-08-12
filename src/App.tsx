@@ -19,6 +19,8 @@ import { Appointments } from "./pages/Appointments";
 import { MyClients } from "./pages/MyClients";
 import { Feed } from "./pages/Feed";
 import { Reviews } from "./pages/Reviews";
+import { UserProfile } from "./pages/UserProfile";
+import { Moderation } from "./pages/Moderation";
 import { DashboardLayout } from "./components/layout/DashboardLayout";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -83,6 +85,8 @@ export default function App() {
           <Route path="/professional-profile" element={<ProfessionalRoute><ProfessionalProfile /></ProfessionalRoute>} />
           <Route path="/professional/:id" element={<ProtectedRoute><ProfessionalProfile /></ProtectedRoute>} />
           <Route path="/feed" element={<Feed />} />
+          <Route path="/profile/:id" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
+          <Route path="/moderation" element={<ProtectedRoute><Moderation /></ProtectedRoute>} />
           <Route path="/reviews" element={<Reviews />} />
           <Route path="/messages" element={<Messages />} />
           <Route path="/notifications" element={<Notifications />} />

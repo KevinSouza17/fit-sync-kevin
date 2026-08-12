@@ -1,5 +1,8 @@
-import { useEffect, useState, useRef } from "react";
-import { Heart, Send, Trash2, ImagePlus, X, Loader2, Plus, Eye } from "lucide-react";
+import { useEffect, useState, useRef, useCallback } from "react";
+import {
+  Heart, Send, Trash2, ImagePlus, X, Loader2, Plus,
+  MessageCircle, Share2, Eye, Lock, Unlock, Ban, Shield,
+} from "lucide-react";
 import { AutoTextarea } from "../components/ui/textarea";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -7,6 +10,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "../components/ui/avatar";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
 import { supabase } from "../lib/supabase";
+import { useNavigate } from "react-router-dom";
 
 interface PostWithProfile {
   id: string;
@@ -17,6 +21,16 @@ interface PostWithProfile {
   profiles: { full_name: string | null; avatar_url: string | null } | null;
   like_count: number;
   liked_by_me: boolean;
+  comment_count: number;
+}
+
+interface CommentWithProfile {
+  id: string;
+  post_id: string;
+  user_id: string;
+  content: string;
+  created_at: string;
+  profiles: { full_name: string | null; avatar_url: string | null } | null;
 }
 
 interface StoryWithProfile {
@@ -49,6 +63,7 @@ function timeAgo(dateStr: string) {
 export function Feed() {
   const { user, profile } = useAuth();
   const { t } = useI18n();
+  const navigate = useNavigate();
   const [posts, setPosts] = useState<PostWithProfile[]>([]);
   const [stories, setStories] = useState<StoryWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,8 +76,60 @@ export function Feed() {
   const [storyInput, setStoryInput] = useState<HTMLInputElement | null>(null);
   const [storyUploading, setStoryUploading] = useState(false);
   const [activeStory, setActiveStory] = useState<StoryWithProfile | null>(null);
-  const [storyIndex, setStoryIndex] = useState(0);
   const [followStatuses, setFollowStatuses] = useState<Record<string, string>>({});
+  const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
+  const [commentsByPost, setCommentsByPost] = useState<Record<string, CommentWithProfile[]>>({});
+  const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
+  const [commentLoading, setCommentLoading] = useState<Set<string>>(new Set());
+  const [isBanned, setIsBanned] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
+
+  useEffect(() => {
+    if (profile) {
+      setIsBanned(!!profile.is_banned);
+      setIsOwner(profile.role === "owner");
+    }
+  }, [profile]);
+
+  const loadPosts = useCallback(async () => {
+    const { data: postData } = await supabase
+      .from("feed_posts")
+      .select("*, profiles:user_id(full_name, avatar_url)")
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (!postData) { setLoading(false); return; }
+    const postIds = postData.map((p) => p.id);
+    if (postIds.length === 0) { setPosts([]); setLoading(false); return; }
+    const [{ data: likes }, { data: myLikes }, { data: commentCounts }] = await Promise.all([
+      supabase.from("feed_likes").select("post_id").in("post_id", postIds),
+      supabase.from("feed_likes").select("post_id").eq("user_id", user?.id ?? "").in("post_id", postIds),
+      supabase.from("feed_comments").select("post_id").in("post_id", postIds),
+    ]);
+    const likeMap: Record<string, number> = {};
+    (likes || []).forEach((l) => { likeMap[l.post_id] = (likeMap[l.post_id] || 0) + 1; });
+    const myLikeSet = new Set((myLikes || []).map((l) => l.post_id));
+    const commentMap: Record<string, number> = {};
+    (commentCounts || []).forEach((c) => { commentMap[c.post_id] = (commentMap[c.post_id] || 0) + 1; });
+    setPosts(postData.map((p) => ({
+      ...p,
+      profiles: p.profiles as PostWithProfile["profiles"],
+      like_count: likeMap[p.id] || 0,
+      liked_by_me: myLikeSet.has(p.id),
+      comment_count: commentMap[p.id] || 0,
+    })) as PostWithProfile[]);
+    setLoading(false);
+  }, [user]);
+
+  const loadStories = useCallback(async () => {
+    const now = new Date().toISOString();
+    const { data } = await supabase
+      .from("stories")
+      .select("*, profiles:user_id(full_name, avatar_url)")
+      .gt("expires_at", now)
+      .order("created_at", { ascending: false })
+      .limit(30);
+    setStories((data ?? []) as StoryWithProfile[]);
+  }, []);
 
   useEffect(() => {
     loadPosts();
@@ -73,44 +140,10 @@ export function Feed() {
       .on("postgres_changes", { event: "DELETE", schema: "public", table: "feed_posts" }, () => loadPosts())
       .on("postgres_changes", { event: "*", schema: "public", table: "feed_likes" }, () => loadPosts())
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "stories" }, () => loadStories())
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "feed_comments" }, () => loadPosts())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, []);
-
-  async function loadPosts() {
-    const { data: postData } = await supabase
-      .from("feed_posts")
-      .select("*, profiles:user_id(full_name, avatar_url)")
-      .order("created_at", { ascending: false })
-      .limit(50);
-    if (!postData) { setLoading(false); return; }
-    const postIds = postData.map((p) => p.id);
-    const [{ data: likes }, { data: myLikes }] = await Promise.all([
-      supabase.from("feed_likes").select("post_id").in("post_id", postIds),
-      supabase.from("feed_likes").select("post_id").eq("user_id", user?.id ?? "").in("post_id", postIds),
-    ]);
-    const likeMap: Record<string, number> = {};
-    (likes || []).forEach((l) => { likeMap[l.post_id] = (likeMap[l.post_id] || 0) + 1; });
-    const myLikeSet = new Set((myLikes || []).map((l) => l.post_id));
-    setPosts(postData.map((p) => ({
-      ...p,
-      profiles: p.profiles as PostWithProfile["profiles"],
-      like_count: likeMap[p.id] || 0,
-      liked_by_me: myLikeSet.has(p.id),
-    })) as PostWithProfile[]);
-    setLoading(false);
-  }
-
-  async function loadStories() {
-    const now = new Date().toISOString();
-    const { data } = await supabase
-      .from("stories")
-      .select("*, profiles:user_id(full_name, avatar_url)")
-      .gt("expires_at", now)
-      .order("created_at", { ascending: false })
-      .limit(30);
-    setStories((data ?? []) as StoryWithProfile[]);
-  }
+  }, [loadPosts, loadStories]);
 
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -145,6 +178,7 @@ export function Feed() {
 
   async function createPost() {
     if (!content.trim() && !imageUrl) { setError(t("feed.emptyError")); return; }
+    if (isBanned) { setError(t("feed.userBanned")); return; }
     setPosting(true);
     setError("");
     const { data } = await supabase
@@ -158,6 +192,7 @@ export function Feed() {
         profiles: data.profiles as PostWithProfile["profiles"],
         like_count: 0,
         liked_by_me: false,
+        comment_count: 0,
       } as PostWithProfile, ...prev]);
       setContent("");
       setImageUrl(null);
@@ -181,7 +216,11 @@ export function Feed() {
     setPosts((prev) => prev.filter((p) => p.id !== id));
   }
 
-  // ── Follow system ──
+  async function deletePostAsOwner(id: string) {
+    await supabase.from("feed_posts").delete().eq("id", id);
+    setPosts((prev) => prev.filter((p) => p.id !== id));
+  }
+
   async function handleFollow(targetUserId: string) {
     if (!user) return;
     setFollowStatuses((prev) => ({ ...prev, [targetUserId]: "pending" }));
@@ -201,7 +240,70 @@ export function Feed() {
       .eq("followee_id", targetUserId);
   }
 
-  // Group stories by user
+  async function toggleComments(postId: string) {
+    const next = new Set(expandedComments);
+    if (next.has(postId)) {
+      next.delete(postId);
+    } else {
+      next.add(postId);
+      if (!commentsByPost[postId]) {
+        const { data } = await supabase
+          .from("feed_comments")
+          .select("*, profiles:user_id(full_name, avatar_url)")
+          .eq("post_id", postId)
+          .order("created_at", { ascending: true });
+        setCommentsByPost((prev) => ({ ...prev, [postId]: (data ?? []) as CommentWithProfile[] }));
+      }
+    }
+    setExpandedComments(next);
+  }
+
+  async function submitComment(postId: string) {
+    const text = (commentDrafts[postId] || "").trim();
+    if (!text || !user) return;
+    setCommentLoading((prev) => new Set(prev).add(postId));
+    const { data } = await supabase
+      .from("feed_comments")
+      .insert({ post_id: postId, content: text })
+      .select("*, profiles:user_id(full_name, avatar_url)")
+      .single();
+    if (data) {
+      setCommentsByPost((prev) => ({
+        ...prev,
+        [postId]: [...(prev[postId] || []), data as CommentWithProfile],
+      }));
+      setCommentDrafts((prev) => ({ ...prev, [postId]: "" }));
+      setPosts((prev) => prev.map((p) => p.id === postId ? { ...p, comment_count: p.comment_count + 1 } : p));
+    }
+    setCommentLoading((prev) => { const n = new Set(prev); n.delete(postId); return n; });
+  }
+
+  async function deleteComment(commentId: string, postId: string) {
+    await supabase.from("feed_comments").delete().eq("id", commentId);
+    setCommentsByPost((prev) => ({
+      ...prev,
+      [postId]: (prev[postId] || []).filter((c) => c.id !== commentId),
+    }));
+    setPosts((prev) => prev.map((p) => p.id === postId ? { ...p, comment_count: p.comment_count - 1 } : p));
+  }
+
+  async function handleShare(post: PostWithProfile) {
+    const url = `${window.location.origin}/profile/${post.user_id}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "FitSync", text: post.content, url });
+      } else {
+        await navigator.clipboard.writeText(url);
+        alert("Link copiado!");
+      }
+    } catch { /* user cancelled */ }
+  }
+
+  async function handleBanUser(userId: string) {
+    await supabase.from("profiles").update({ is_banned: true }).eq("id", userId);
+    alert(t("feed.banUser"));
+  }
+
   const storiesByUser = stories.reduce((acc, s) => {
     if (!acc[s.user_id]) acc[s.user_id] = [];
     acc[s.user_id].push(s);
@@ -219,13 +321,12 @@ export function Feed() {
 
       {/* Stories bar */}
       <div className="flex gap-3 overflow-x-auto pb-2">
-        {/* Add story button */}
         <button
           onClick={() => storyInput?.click()}
-          disabled={storyUploading}
+          disabled={storyUploading || isBanned}
           className="flex flex-col items-center gap-1.5"
         >
-          <div className="relative flex h-16 w-16 items-center justify-center rounded-full border-2 border-dashed border-primary-300 bg-primary-50 transition-colors hover:border-primary-500 hover:bg-primary-100">
+          <div className="relative flex h-16 w-16 items-center justify-center rounded-full border-2 border-dashed border-primary-300 bg-primary-50 transition-colors hover:border-primary-500 hover:bg-primary-100 disabled:opacity-40">
             {storyUploading ? (
               <Loader2 className="h-6 w-6 animate-spin text-primary-500" />
             ) : (
@@ -236,44 +337,32 @@ export function Feed() {
             {storyUploading ? "..." : t("feed.addStory")}
           </span>
         </button>
-        <input
-          ref={(el) => setStoryInput(el)}
-          type="file"
-          accept="image/*,video/*"
-          onChange={handleStoryUpload}
-          className="hidden"
-        />
+        <input ref={(el) => setStoryInput(el)} type="file" accept="image/*,video/*" onChange={handleStoryUpload} className="hidden" />
 
         {Object.entries(storiesByUser).map(([uid, userStories]) => {
           const first = userStories[0];
-          const name = first.profiles?.full_name || "Usuário";
+          const name = first.profiles?.full_name || "Usuario";
           const isOwn = uid === user?.id;
           return (
-            <button
-              key={uid}
-              onClick={() => { setActiveStory(first); setStoryIndex(0); }}
-              className="flex flex-col items-center gap-1.5"
-            >
+            <button key={uid} onClick={() => setActiveStory(first)} className="flex flex-col items-center gap-1.5">
               <div className="relative h-16 w-16 rounded-full bg-gradient-to-tr from-primary-400 to-primary-600 p-0.5">
                 <div className="h-full w-full overflow-hidden rounded-full border-2 border-white">
                   {first.profiles?.avatar_url ? (
                     <img src={first.profiles.avatar_url} alt={name} className="h-full w-full object-cover" />
                   ) : (
-                    <div className="flex h-full w-full items-center justify-center bg-primary-100 text-sm font-bold text-primary-600">
-                      {initials(name)}
-                    </div>
+                    <div className="flex h-full w-full items-center justify-center bg-primary-100 text-sm font-bold text-primary-600">{initials(name)}</div>
                   )}
                 </div>
               </div>
               <span className="max-w-[64px] truncate text-[10px] font-medium text-content-muted">
-                {isOwn ? "Você" : name.split(" ")[0]}
+                {isOwn ? "Voce" : name.split(" ")[0]}
               </span>
             </button>
           );
         })}
       </div>
 
-      {/* Story viewer modal */}
+      {/* Story viewer */}
       {activeStory && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90" onClick={() => setActiveStory(null)}>
           <button className="absolute right-4 top-4 z-10 rounded-full bg-white/20 p-2 text-white hover:bg-white/30">
@@ -286,62 +375,56 @@ export function Feed() {
               <img src={activeStory.media_url} alt="" className="max-h-[90vh] rounded-xl object-contain" />
             )}
             {activeStory.caption && (
-              <p className="absolute bottom-4 left-4 right-4 rounded-lg bg-black/50 px-3 py-2 text-sm text-white">
-                {activeStory.caption}
-              </p>
+              <p className="absolute bottom-4 left-4 right-4 rounded-lg bg-black/50 px-3 py-2 text-sm text-white">{activeStory.caption}</p>
             )}
           </div>
         </div>
       )}
 
       {/* Composer */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-col gap-3">
-            <AutoTextarea
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder={t("feed.placeholder")}
-              minRows={3}
-              className={taCls}
-            />
-            {imageUrl && (
-              <div className="relative">
-                <img src={imageUrl} alt="" className="max-h-64 rounded-xl object-cover" />
-                <button onClick={() => setImageUrl(null)} className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 text-white">
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-            )}
-            {error && <p className="text-sm text-red-500">{error}</p>}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <input
-                  ref={(el) => setFileInput(el)}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="hidden"
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => fileInput?.click()}
-                  disabled={uploading}
-                  className="gap-2"
-                >
-                  {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
-                  Imagem
+      {!isBanned && (
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex flex-col gap-3">
+              <AutoTextarea
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                placeholder={t("feed.placeholder")}
+                minRows={3}
+                className={taCls}
+              />
+              {imageUrl && (
+                <div className="relative">
+                  <img src={imageUrl} alt="" className="max-h-64 rounded-xl object-cover" />
+                  <button onClick={() => setImageUrl(null)} className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 text-white">
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
+              {error && <p className="text-sm text-red-500">{error}</p>}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <input ref={(el) => setFileInput(el)} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+                  <Button variant="outline" size="sm" onClick={() => fileInput?.click()} disabled={uploading} className="gap-2">
+                    {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
+                    Imagem
+                  </Button>
+                </div>
+                <Button onClick={createPost} disabled={posting} className="gap-2">
+                  {posting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                  {t("feed.post")}
                 </Button>
               </div>
-              <Button onClick={createPost} disabled={posting} className="gap-2">
-                {posting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                {t("feed.post")}
-              </Button>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
+      {isBanned && (
+        <Card><CardContent className="flex items-center gap-3 py-4 text-sm text-red-600">
+          <Ban className="h-5 w-5 shrink-0" />
+          {t("feed.userBanned")}
+        </CardContent></Card>
+      )}
 
       {/* Posts */}
       {loading ? (
@@ -357,14 +440,18 @@ export function Feed() {
       ) : (
         <div className="flex flex-col gap-4">
           {posts.map((post) => {
-            const name = post.profiles?.full_name || "Usuário";
+            const name = post.profiles?.full_name || "Usuario";
             const isOwn = post.user_id === user?.id;
             const followStatus = followStatuses[post.user_id];
+            const showComments = expandedComments.has(post.id);
             return (
               <Card key={post.id}>
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => navigate(`/profile/${post.user_id}`)}
+                      className="flex items-center gap-3 text-left"
+                    >
                       <Avatar className="h-10 w-10">
                         {post.profiles?.avatar_url ? (
                           <AvatarImage src={post.profiles.avatar_url} alt={name} />
@@ -373,48 +460,121 @@ export function Feed() {
                         )}
                       </Avatar>
                       <div>
-                        <p className="text-sm font-semibold text-content-strong">{name}</p>
+                        <p className="text-sm font-semibold text-content-strong hover:underline">{name}</p>
                         <p className="text-xs text-content-muted">{timeAgo(post.created_at)}</p>
                       </div>
-                    </div>
+                    </button>
                     <div className="flex items-center gap-2">
                       {!isOwn && (
                         followStatus === "pending" || followStatus === "accepted" ? (
-                          <button
-                            onClick={() => handleUnfollow(post.user_id)}
-                            className="rounded-lg px-3 py-1 text-xs font-medium text-content-muted transition-colors hover:bg-surface-subtle"
-                          >
+                          <button onClick={() => handleUnfollow(post.user_id)} className="rounded-lg px-3 py-1 text-xs font-medium text-content-muted transition-colors hover:bg-surface-subtle">
                             {followStatus === "accepted" ? t("feed.following") : t("feed.followPending")}
                           </button>
                         ) : (
-                          <button
-                            onClick={() => handleFollow(post.user_id)}
-                            className="rounded-lg bg-primary-50 px-3 py-1 text-xs font-semibold text-primary-600 transition-colors hover:bg-primary-100"
-                          >
+                          <button onClick={() => handleFollow(post.user_id)} className="rounded-lg bg-primary-50 px-3 py-1 text-xs font-semibold text-primary-600 transition-colors hover:bg-primary-100">
                             {t("feed.follow")}
                           </button>
                         )
                       )}
-                      {isOwn && (
+                      {isOwn ? (
                         <button onClick={() => deletePost(post.id)} className="text-content-muted transition-colors hover:text-red-500">
                           <Trash2 className="h-4 w-4" />
                         </button>
-                      )}
+                      ) : isOwner ? (
+                        <div className="flex items-center gap-1">
+                          <button onClick={() => handleBanUser(post.user_id)} className="rounded-lg p-1.5 text-content-muted transition-colors hover:bg-red-50 hover:text-red-600" title={t("feed.banUser")}>
+                            <Ban className="h-4 w-4" />
+                          </button>
+                          <button onClick={() => deletePostAsOwner(post.id)} className="rounded-lg p-1.5 text-content-muted transition-colors hover:bg-red-50 hover:text-red-600" title={t("feed.deletePostModeration")}>
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                   {post.content && <p className="mt-3 break-words text-sm leading-relaxed text-content-body">{post.content}</p>}
                   {post.image_url && <img src={post.image_url} alt="" className="mt-3 max-h-96 rounded-xl object-cover" />}
-                  <div className="mt-3 flex items-center gap-1.5">
+
+                  {/* Action bar */}
+                  <div className="mt-3 flex items-center gap-4 border-t border-slate-100 pt-3">
                     <button
                       onClick={() => toggleLike(post.id, post.liked_by_me)}
-                      className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors ${
-                        post.liked_by_me ? "text-rose-600" : "text-content-muted hover:text-rose-500"
-                      }`}
+                      className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${post.liked_by_me ? "text-rose-600" : "text-content-muted hover:text-rose-500"}`}
                     >
                       <Heart className={`h-4 w-4 ${post.liked_by_me ? "fill-rose-500" : ""}`} />
                       {post.like_count > 0 && <span>{post.like_count}</span>}
                     </button>
+                    <button
+                      onClick={() => toggleComments(post.id)}
+                      className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${showComments ? "text-primary-600" : "text-content-muted hover:text-primary-500"}`}
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                      {post.comment_count > 0 && <span>{post.comment_count}</span>}
+                    </button>
+                    <button
+                      onClick={() => handleShare(post)}
+                      className="flex items-center gap-1.5 text-sm font-medium text-content-muted transition-colors hover:text-primary-500"
+                    >
+                      <Share2 className="h-4 w-4" />
+                    </button>
                   </div>
+
+                  {/* Comments section */}
+                  {showComments && (
+                    <div className="mt-3 flex flex-col gap-3 border-t border-slate-100 pt-3">
+                      {(commentsByPost[post.id] || []).length === 0 ? (
+                        <p className="text-xs text-content-muted">{t("feed.noComments")}</p>
+                      ) : (
+                        (commentsByPost[post.id] || []).map((c) => {
+                          const cName = c.profiles?.full_name || "Usuario";
+                          const cIsOwn = c.user_id === user?.id;
+                          return (
+                            <div key={c.id} className="flex items-start gap-2">
+                              <Avatar className="h-7 w-7 shrink-0">
+                                {c.profiles?.avatar_url ? (
+                                  <AvatarImage src={c.profiles.avatar_url} alt={cName} />
+                                ) : (
+                                  <AvatarFallback className="bg-primary-50 text-[10px] font-bold text-primary-600">{initials(cName)}</AvatarFallback>
+                                )}
+                              </Avatar>
+                              <div className="flex-1">
+                                <div className="rounded-xl bg-slate-50 px-3 py-2">
+                                  <div className="flex items-center justify-between">
+                                    <button onClick={() => navigate(`/profile/${c.user_id}`)} className="text-xs font-semibold text-content-strong hover:underline">{cName}</button>
+                                    {(cIsOwn || isOwner) && (
+                                      <button onClick={() => deleteComment(c.id, post.id)} className="text-content-muted transition-colors hover:text-red-500">
+                                        <Trash2 className="h-3 w-3" />
+                                      </button>
+                                    )}
+                                  </div>
+                                  <p className="mt-0.5 break-words text-sm text-content-body">{c.content}</p>
+                                </div>
+                                <p className="mt-0.5 pl-3 text-[10px] text-content-muted">{timeAgo(c.created_at)}</p>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                      {!isBanned && (
+                        <div className="flex items-center gap-2">
+                          <input
+                            value={commentDrafts[post.id] || ""}
+                            onChange={(e) => setCommentDrafts((prev) => ({ ...prev, [post.id]: e.target.value }))}
+                            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); submitComment(post.id); } }}
+                            placeholder={t("feed.commentPlaceholder")}
+                            className="flex-1 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-primary-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-100"
+                          />
+                          <button
+                            onClick={() => submitComment(post.id)}
+                            disabled={!(commentDrafts[post.id] || "").trim() || commentLoading.has(post.id)}
+                            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-600 text-white transition-colors hover:bg-primary-700 disabled:opacity-40"
+                          >
+                            {commentLoading.has(post.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             );
