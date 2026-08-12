@@ -18,6 +18,8 @@ interface PostWithProfile {
   user_id: string;
   content: string;
   image_url: string | null;
+  video_url: string | null;
+  media_type: string | null;
   created_at: string;
   profiles: { full_name: string | null; avatar_url: string | null } | null;
   like_count: number;
@@ -317,6 +319,11 @@ export function MyProfile() {
                 {post.image_url && (
                   <div className="aspect-square w-full overflow-hidden bg-surface-subtle">
                     <img src={post.image_url} alt="" className="h-full w-full object-cover" />
+                  </div>
+                )}
+                {post.video_url && (
+                  <div className="aspect-video w-full overflow-hidden bg-black">
+                    <video src={post.video_url} controls playsInline className="h-full w-full object-cover" />
                   </div>
                 )}
                 <CardContent className="flex flex-1 flex-col p-4">

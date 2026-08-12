@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import {
   Heart, Send, Trash2, ImagePlus, X, Loader2, Plus,
-  MessageCircle, Share2, Eye, Lock, Unlock, Ban, Shield,
+  MessageCircle, Share2, Eye, Lock, Unlock, Ban, Shield, Video,
 } from "lucide-react";
 import { AutoTextarea } from "../components/ui/textarea";
 import { Card, CardContent } from "../components/ui/card";
@@ -18,6 +18,8 @@ interface PostWithProfile {
   user_id: string;
   content: string;
   image_url: string | null;
+  video_url: string | null;
+  media_type: string | null;
   created_at: string;
   profiles: { full_name: string | null; avatar_url: string | null } | null;
   like_count: number;
@@ -70,6 +72,8 @@ export function Feed() {
   const [loading, setLoading] = useState(true);
   const [content, setContent] = useState("");
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [mediaType, setMediaType] = useState<string>("image");
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -147,16 +151,26 @@ export function Feed() {
     return () => { supabase.removeChannel(channel); };
   }, [loadPosts, loadStories]);
 
-  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleMediaUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file || !user) return;
     setUploading(true);
+    const isVideo = file.type.startsWith("video");
     const ext = file.name.split(".").pop();
     const fileName = `${user.id}/feed-${Date.now()}.${ext}`;
     const { error: upErr } = await supabase.storage.from("avatars").upload(fileName, file);
-    if (upErr) { setError("Erro ao enviar imagem"); setUploading(false); return; }
+    if (upErr) { setError("Erro ao enviar arquivo"); setUploading(false); return; }
     const { data } = supabase.storage.from("avatars").getPublicUrl(fileName);
-    setImageUrl(`${data.publicUrl}?t=${Date.now()}`);
+    const url = `${data.publicUrl}?t=${Date.now()}`;
+    if (isVideo) {
+      setVideoUrl(url);
+      setMediaType("video");
+      setImageUrl(null);
+    } else {
+      setImageUrl(url);
+      setMediaType("image");
+      setVideoUrl(null);
+    }
     setUploading(false);
   }
 
@@ -179,13 +193,16 @@ export function Feed() {
   }
 
   async function createPost() {
-    if (!content.trim() && !imageUrl) { setError(t("feed.emptyError")); return; }
+    if (!content.trim() && !imageUrl && !videoUrl) { setError(t("feed.emptyError")); return; }
     if (isBanned) { setError(t("feed.userBanned")); return; }
     setPosting(true);
     setError("");
+    const insertData: Record<string, unknown> = { content: content.trim(), media_type: mediaType };
+    if (mediaType === "video" && videoUrl) insertData.video_url = videoUrl;
+    else if (imageUrl) insertData.image_url = imageUrl;
     const { data } = await supabase
       .from("feed_posts")
-      .insert({ content: content.trim(), image_url: imageUrl })
+      .insert(insertData)
       .select("*, profiles:user_id(full_name, avatar_url)")
       .single();
     if (data) {
@@ -198,6 +215,8 @@ export function Feed() {
       } as PostWithProfile, ...prev]);
       setContent("");
       setImageUrl(null);
+      setVideoUrl(null);
+      setMediaType("image");
     }
     setPosting(false);
   }
@@ -219,7 +238,7 @@ export function Feed() {
   }
 
   async function deletePostAsOwner(id: string) {
-    await supabase.from("feed_posts").delete().eq("id", id);
+    await supabase.rpc("delete_post_as_owner", { p_post_id: id });
     setPosts((prev) => prev.filter((p) => p.id !== id));
   }
 
@@ -302,7 +321,7 @@ export function Feed() {
   }
 
   async function handleBanUser(userId: string) {
-    await supabase.from("profiles").update({ is_banned: true }).eq("id", userId);
+    await supabase.rpc("ban_user", { p_target: userId, p_ban: true });
     alert(t("feed.banUser"));
   }
 
@@ -391,7 +410,15 @@ export function Feed() {
               {imageUrl && (
                 <div className="relative">
                   <img src={imageUrl} alt="" className="max-h-64 rounded-xl object-cover" />
-                  <button onClick={() => setImageUrl(null)} className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 text-white">
+                  <button onClick={() => { setImageUrl(null); setMediaType("image"); }} className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 text-white">
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
+              {videoUrl && (
+                <div className="relative">
+                  <video src={videoUrl} controls className="max-h-64 rounded-xl" />
+                  <button onClick={() => { setVideoUrl(null); setMediaType("image"); }} className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 text-white">
                     <X className="h-4 w-4" />
                   </button>
                 </div>
@@ -399,10 +426,10 @@ export function Feed() {
               {error && <p className="text-sm text-red-500">{error}</p>}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <input ref={(el) => setFileInput(el)} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+                  <input ref={(el) => setFileInput(el)} type="file" accept="image/*,video/*" onChange={handleMediaUpload} className="hidden" />
                   <Button variant="outline" size="sm" onClick={() => fileInput?.click()} disabled={uploading} className="gap-2">
                     {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
-                    Imagem
+                    Foto/Vídeo
                   </Button>
                 </div>
                 <Button onClick={createPost} disabled={posting} className="gap-2">
@@ -440,7 +467,7 @@ export function Feed() {
             const followStatus = followStatuses[post.user_id];
             const showComments = expandedComments.has(post.id);
             return (
-              <Card key={post.id}>
+              <Card key={post.id} className="overflow-hidden">
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between">
                     <button
@@ -488,7 +515,10 @@ export function Feed() {
                     </div>
                   </div>
                   {post.content && <p className="mt-3 break-words text-sm leading-relaxed text-content-body">{post.content}</p>}
-                  {post.image_url && <img src={post.image_url} alt="" className="mt-3 max-h-96 rounded-xl object-cover" />}
+                  {post.image_url && <img src={post.image_url} alt="" className="mt-3 max-h-96 w-full rounded-xl object-cover" />}
+                  {post.video_url && (
+                    <video src={post.video_url} controls playsInline className="mt-3 max-h-96 w-full rounded-xl" />
+                  )}
 
                   {/* Action bar */}
                   <div className="mt-3 flex items-center gap-4 border-t border-slate-100 pt-3">

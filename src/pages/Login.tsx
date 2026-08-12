@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Activity, Mail, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
+import { Activity, Mail, Lock, Eye, EyeOff, Loader2, Users, GraduationCap, Star } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
+import { supabase } from "../lib/supabase";
 
 function GoogleIcon({ className }: { className?: string }) {
   return (
@@ -24,9 +25,28 @@ export function Login() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [stats, setStats] = useState<{ users: number; professionals: number; rating: string } | null>(null);
   const { signIn, signInWithGoogle } = useAuth();
   const { t } = useI18n();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    async function fetchStats() {
+      const [{ count: userCount }, { count: proCount }, { data: ratingData }] = await Promise.all([
+        supabase.from("profiles").select("id", { count: "exact", head: true }),
+        supabase.from("profiles").select("id", { count: "exact", head: true }).eq("is_professional", true),
+        supabase.from("site_reviews").select("rating"),
+      ]);
+      const ratings = ratingData || [];
+      const avg = ratings.length > 0 ? (ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length).toFixed(1) : "—";
+      setStats({
+        users: userCount ?? 0,
+        professionals: proCount ?? 0,
+        rating: avg,
+      });
+    }
+    fetchStats();
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -49,6 +69,14 @@ export function Login() {
     setGoogleLoading(false);
   }
 
+  const statItems = stats
+    ? [
+        { icon: Users, stat: stats.users.toLocaleString("pt-BR"), label: "Usuários ativos" },
+        { icon: GraduationCap, stat: stats.professionals.toLocaleString("pt-BR"), label: "Profissionais cadastrados" },
+        { icon: Star, stat: `${stats.rating}/5`, label: "Avaliação dos usuários" },
+      ]
+    : [];
+
   return (
     <div className="flex min-h-screen">
       {/* Left brand panel */}
@@ -67,21 +95,30 @@ export function Login() {
             Acompanhe sua nutrição, monitore seus treinos e alcance seus objetivos com nossa plataforma completa de saúde e bem-estar.
           </p>
           <div className="flex flex-col gap-3 pt-4">
-            {[
-              { stat: "+50 mil", label: "Usuários ativos" },
-              { stat: "+1.200", label: "Profissionais cadastrados" },
-              { stat: "4.8/5", label: "Avaliação dos usuários" },
-            ].map((item) => (
-              <div key={item.label} className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 text-lg font-bold text-white">
-                  {item.stat.split("")[0]}
+            {statItems.length > 0 ? statItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <div key={item.label} className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/15">
+                    <Icon className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-lg font-bold text-white">{item.stat}</p>
+                    <p className="text-sm text-primary-100">{item.label}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-lg font-bold text-white">{item.stat}</p>
-                  <p className="text-sm text-primary-100">{item.label}</p>
+              );
+            }) : (
+              [0, 1, 2].map((i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <div className="h-10 w-10 animate-pulse rounded-xl bg-white/10" />
+                  <div className="space-y-1.5">
+                    <div className="h-5 w-24 animate-pulse rounded bg-white/10" />
+                    <div className="h-3 w-40 animate-pulse rounded bg-white/10" />
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
         <p className="text-sm text-primary-200">© 2026 FitSync. Todos os direitos reservados.</p>

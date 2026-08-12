@@ -356,6 +356,37 @@ export interface Database {
         };
         Update: Partial<Database["public"]["Tables"]["feed_comments"]["Row"]>;
       };
+      feed_posts: {
+        Row: {
+          id: string;
+          user_id: string;
+          content: string;
+          image_url: string | null;
+          video_url: string | null;
+          media_type: string | null;
+          created_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["feed_posts"]["Row"], "id" | "user_id" | "created_at"> & {
+          id?: string;
+          user_id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["feed_posts"]["Row"]>;
+      };
+      feed_likes: {
+        Row: {
+          id: string;
+          post_id: string;
+          user_id: string;
+          created_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["feed_likes"]["Row"], "id" | "user_id" | "created_at"> & {
+          id?: string;
+          user_id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["feed_likes"]["Row"]>;
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
