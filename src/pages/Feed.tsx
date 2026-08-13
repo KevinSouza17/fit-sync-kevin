@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import {
   Heart, Send, Trash2, ImagePlus, X, Loader2, Plus,
-  MessageCircle, Share2, Eye, Lock, Unlock, Ban, Shield, Video,
+  MessageCircle, Share2, Eye, Lock, Unlock, Ban, Shield, Video, Flag,
 } from "lucide-react";
 import { AutoTextarea } from "../components/ui/textarea";
 import { Card, CardContent } from "../components/ui/card";
@@ -89,6 +89,10 @@ export function Feed() {
   const [commentLoading, setCommentLoading] = useState<Set<string>>(new Set());
   const [isBanned, setIsBanned] = useState(false);
   const [isOwner, setIsOwner] = useState(false);
+  const [reportingPost, setReportingPost] = useState<string | null>(null);
+  const [reportReason, setReportReason] = useState("");
+  const [reportDesc, setReportDesc] = useState("");
+  const [reportSubmitting, setReportSubmitting] = useState(false);
 
   useEffect(() => {
     if (profile) {
@@ -244,12 +248,9 @@ export function Feed() {
 
   async function handleFollow(targetUserId: string) {
     if (!user) return;
-    setFollowStatuses((prev) => ({ ...prev, [targetUserId]: "pending" }));
-    await supabase.from("follows").insert({
-      follower_id: user.id,
-      followee_id: targetUserId,
-      status: "pending",
-    });
+    const { data } = await supabase.rpc("follow_user", { p_followee_id: targetUserId });
+    const status = data || "pending";
+    setFollowStatuses((prev) => ({ ...prev, [targetUserId]: status }));
   }
 
   async function handleUnfollow(targetUserId: string) {
@@ -323,6 +324,21 @@ export function Feed() {
   async function handleBanUser(userId: string) {
     await supabase.rpc("ban_user", { p_target: userId, p_ban: true });
     alert(t("feed.banUser"));
+  }
+
+  async function submitReport(postId: string) {
+    if (!reportReason.trim()) return;
+    setReportSubmitting(true);
+    await supabase.from("post_reports").insert({
+      post_id: postId,
+      reason: reportReason.trim(),
+      description: reportDesc.trim() || null,
+    });
+    setReportingPost(null);
+    setReportReason("");
+    setReportDesc("");
+    setReportSubmitting(false);
+    alert("Denúncia enviada. O administrador irá analisar.");
   }
 
   const storiesByUser = stories.reduce((acc, s) => {
@@ -498,26 +514,72 @@ export function Feed() {
                           </button>
                         )
                       )}
-                      {isOwn ? (
-                        <button onClick={() => deletePost(post.id)} className="text-content-muted transition-colors hover:text-red-500">
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      ) : isOwner ? (
-                        <div className="flex items-center gap-1">
-                          <button onClick={() => handleBanUser(post.user_id)} className="rounded-lg p-1.5 text-content-muted transition-colors hover:bg-red-50 hover:text-red-600" title={t("feed.banUser")}>
-                            <Ban className="h-4 w-4" />
+                      <div className="flex items-center gap-1">
+                        {!isOwn && (
+                          <button onClick={() => setReportingPost(post.id)} className="rounded-lg p-1.5 text-content-muted transition-colors hover:bg-amber-50 hover:text-amber-600" title="Denunciar">
+                            <Flag className="h-4 w-4" />
                           </button>
-                          <button onClick={() => deletePostAsOwner(post.id)} className="rounded-lg p-1.5 text-content-muted transition-colors hover:bg-red-50 hover:text-red-600" title={t("feed.deletePostModeration")}>
+                        )}
+                        {isOwn ? (
+                          <button onClick={() => deletePost(post.id)} className="rounded-lg p-1.5 text-content-muted transition-colors hover:bg-red-50 hover:text-red-600">
                             <Trash2 className="h-4 w-4" />
                           </button>
-                        </div>
-                      ) : null}
+                        ) : isOwner ? (
+                          <>
+                            <button onClick={() => handleBanUser(post.user_id)} className="rounded-lg p-1.5 text-content-muted transition-colors hover:bg-red-50 hover:text-red-600" title={t("feed.banUser")}>
+                              <Ban className="h-4 w-4" />
+                            </button>
+                            <button onClick={() => deletePostAsOwner(post.id)} className="rounded-lg p-1.5 text-content-muted transition-colors hover:bg-red-50 hover:text-red-600" title={t("feed.deletePostModeration")}>
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </>
+                        ) : null}
+                      </div>
                     </div>
                   </div>
                   {post.content && <p className="mt-3 break-words text-sm leading-relaxed text-content-body">{post.content}</p>}
                   {post.image_url && <img src={post.image_url} alt="" className="mt-3 max-h-96 w-full rounded-xl object-cover" />}
                   {post.video_url && (
                     <video src={post.video_url} controls playsInline className="mt-3 max-h-96 w-full rounded-xl" />
+                  )}
+
+                  {/* Report modal */}
+                  {reportingPost === post.id && (
+                    <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-sm font-semibold text-amber-900">Denunciar postagem</h4>
+                        <button onClick={() => setReportingPost(null)} className="text-amber-700 hover:text-amber-900">
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                      <select
+                        value={reportReason}
+                        onChange={(e) => setReportReason(e.target.value)}
+                        className="mt-3 w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm text-content-strong focus:outline-none"
+                      >
+                        <option value="">Selecione o motivo</option>
+                        <option value="spam">Spam ou conteúdo repetitivo</option>
+                        <option value="harassment">Assédio ou bullying</option>
+                        <option value="inappropriate">Conteúdo inadequado</option>
+                        <option value="misinformation">Desinformação</option>
+                        <option value="violence">Ameaça ou violência</option>
+                        <option value="other">Outro</option>
+                      </select>
+                      <textarea
+                        value={reportDesc}
+                        onChange={(e) => setReportDesc(e.target.value)}
+                        placeholder="Descreva o problema (opcional)..."
+                        rows={2}
+                        className="mt-2 w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm text-content-strong placeholder:text-content-muted focus:outline-none"
+                      />
+                      <div className="mt-3 flex justify-end gap-2">
+                        <Button variant="outline" size="sm" onClick={() => setReportingPost(null)}>Cancelar</Button>
+                        <Button size="sm" onClick={() => submitReport(post.id)} disabled={!reportReason || reportSubmitting} className="gap-2">
+                          {reportSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Flag className="h-4 w-4" />}
+                          Enviar denúncia
+                        </Button>
+                      </div>
+                    </div>
                   )}
 
                   {/* Action bar */}

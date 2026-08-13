@@ -197,10 +197,10 @@ export function MyProfile() {
   }
 
   async function togglePrivacy() {
-    if (!profile) return;
+    if (!profile || !user) return;
     const newPrivate = !profile.is_private;
-    await supabase.from("profiles").update({ is_private: newPrivate }).eq("id", user?.id);
-    window.location.reload();
+    await supabase.from("profiles").update({ is_private: newPrivate }).eq("id", user.id);
+    await refreshProfile();
   }
 
   const name = profile?.full_name || user?.email?.split("@")[0] || "Usuario";

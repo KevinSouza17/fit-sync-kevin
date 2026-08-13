@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { Ban, Shield, Trash2, Loader2, Search, ShieldCheck } from "lucide-react";
+import { Ban, Shield, Trash2, Loader2, Search, ShieldCheck, Flag, Check, X } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "../components/ui/avatar";
@@ -22,8 +22,21 @@ interface PostRow {
   user_id: string;
   content: string;
   image_url: string | null;
+  video_url: string | null;
   created_at: string;
   profiles: { full_name: string | null; avatar_url: string | null } | null;
+}
+
+interface ReportRow {
+  id: string;
+  post_id: string;
+  reporter_id: string;
+  reason: string;
+  description: string | null;
+  status: string;
+  created_at: string;
+  post: PostRow | null;
+  reporter: { full_name: string | null; avatar_url: string | null } | null;
 }
 
 function initials(name: string) {
@@ -35,25 +48,37 @@ function timeAgo(dateStr: string) {
   return d.toLocaleDateString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
+const reasonLabels: Record<string, string> = {
+  spam: "Spam ou conteúdo repetitivo",
+  harassment: "Assédio ou bullying",
+  inappropriate: "Conteúdo inadequado",
+  misinformation: "Desinformação",
+  violence: "Ameaça ou violência",
+  other: "Outro",
+};
+
 export function Moderation() {
   const { profile } = useAuth();
   const { t } = useI18n();
   const navigate = useNavigate();
   const [users, setUsers] = useState<UserRow[]>([]);
   const [posts, setPosts] = useState<PostRow[]>([]);
+  const [reports, setReports] = useState<ReportRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [tab, setTab] = useState<"users" | "posts">("users");
+  const [tab, setTab] = useState<"users" | "posts" | "reports">("reports");
 
   const isOwner = profile?.role === "owner";
 
   const loadData = useCallback(async () => {
-    const [{ data: userData }, { data: postData }] = await Promise.all([
+    const [{ data: userData }, { data: postData }, { data: reportData }] = await Promise.all([
       supabase.from("profiles").select("id, full_name, avatar_url, is_banned, role, created_at").order("created_at", { ascending: false }),
       supabase.from("feed_posts").select("*, profiles:user_id(full_name, avatar_url)").order("created_at", { ascending: false }).limit(100),
+      supabase.from("post_reports").select("*, post:post_id(*, profiles:user_id(full_name, avatar_url)), reporter:reporter_id(full_name, avatar_url)").order("created_at", { ascending: false }),
     ]);
     setUsers((userData ?? []) as UserRow[]);
     setPosts((postData ?? []) as PostRow[]);
+    setReports((reportData ?? []) as unknown as ReportRow[]);
     setLoading(false);
   }, []);
 
@@ -64,12 +89,17 @@ export function Moderation() {
 
   async function toggleBan(userId: string, currentlyBanned: boolean) {
     setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, is_banned: !currentlyBanned } : u));
-    await supabase.from("profiles").update({ is_banned: !currentlyBanned }).eq("id", userId);
+    await supabase.rpc("ban_user", { p_target: userId, p_ban: !currentlyBanned });
   }
 
   async function deletePost(postId: string) {
     setPosts((prev) => prev.filter((p) => p.id !== postId));
-    await supabase.from("feed_posts").delete().eq("id", postId);
+    await supabase.rpc("delete_post_as_owner", { p_post_id: postId });
+  }
+
+  async function resolveReport(reportId: string, action: "resolved" | "dismissed") {
+    setReports((prev) => prev.map((r) => r.id === reportId ? { ...r, status: action } : r));
+    await supabase.from("post_reports").update({ status: action, reviewed_at: new Date().toISOString() }).eq("id", reportId);
   }
 
   if (!isOwner) return null;
@@ -77,6 +107,8 @@ export function Moderation() {
   const filteredUsers = users.filter((u) =>
     !search.trim() || (u.full_name || "").toLowerCase().includes(search.toLowerCase())
   );
+
+  const pendingReports = reports.filter((r) => r.status === "pending");
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 px-4 py-6 sm:px-6">
@@ -92,6 +124,13 @@ export function Moderation() {
 
       {/* Tabs */}
       <div className="flex gap-2 border-b border-slate-200">
+        <button
+          onClick={() => setTab("reports")}
+          className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold transition-colors ${tab === "reports" ? "border-b-2 border-primary-600 text-primary-600" : "text-content-muted hover:text-content-strong"}`}
+        >
+          <Flag className="h-4 w-4" />
+          Denúncias ({pendingReports.length})
+        </button>
         <button
           onClick={() => setTab("users")}
           className={`px-4 py-2.5 text-sm font-semibold transition-colors ${tab === "users" ? "border-b-2 border-primary-600 text-primary-600" : "text-content-muted hover:text-content-strong"}`}
@@ -120,6 +159,75 @@ export function Moderation() {
       {loading ? (
         <div className="flex h-40 items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
+        </div>
+      ) : tab === "reports" ? (
+        <div className="flex flex-col gap-3">
+          {reports.length === 0 ? (
+            <Card><CardContent className="flex flex-col items-center py-12 text-center">
+              <Flag className="mb-3 h-10 w-10 text-slate-200" />
+              <p className="text-sm font-medium text-content-body">Nenhuma denúncia recebida</p>
+            </CardContent></Card>
+          ) : (
+            reports.map((r) => (
+              <Card key={r.id} className={r.status !== "pending" ? "opacity-60" : ""}>
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-2">
+                      <Avatar className="h-8 w-8">
+                        {r.reporter?.avatar_url ? <AvatarImage src={r.reporter.avatar_url} alt="" /> : <AvatarFallback className="bg-primary-50 text-[10px] font-bold text-primary-600">{initials(r.reporter?.full_name || "?")}</AvatarFallback>}
+                      </Avatar>
+                      <div>
+                        <p className="text-sm font-semibold text-content-strong">{r.reporter?.full_name || "?"}</p>
+                        <p className="text-xs text-content-muted">{timeAgo(r.created_at)}</p>
+                      </div>
+                    </div>
+                    <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${
+                      r.status === "pending" ? "bg-amber-50 text-amber-700" :
+                      r.status === "resolved" ? "bg-green-50 text-green-700" :
+                      "bg-slate-100 text-slate-500"
+                    }`}>
+                      {r.status === "pending" ? "Pendente" : r.status === "resolved" ? "Resolvido" : "Ignorado"}
+                    </span>
+                  </div>
+                  <div className="mt-2">
+                    <p className="text-xs font-semibold text-content-muted">Motivo: {reasonLabels[r.reason] || r.reason}</p>
+                    {r.description && <p className="mt-1 text-sm text-content-body">{r.description}</p>}
+                  </div>
+                  {r.post && (
+                    <div className="mt-3 rounded-xl bg-surface-subtle p-3">
+                      <div className="flex items-center gap-2">
+                        <Avatar className="h-7 w-7">
+                          {r.post.profiles?.avatar_url ? <AvatarImage src={r.post.profiles.avatar_url} alt="" /> : <AvatarFallback className="bg-primary-50 text-[10px] font-bold text-primary-600">{initials(r.post.profiles?.full_name || "?")}</AvatarFallback>}
+                        </Avatar>
+                        <p className="text-xs font-semibold text-content-strong">{r.post.profiles?.full_name || "?"}</p>
+                      </div>
+                      {r.post.content && <p className="mt-2 break-words text-sm text-content-body">{r.post.content}</p>}
+                      {r.post.image_url && <img src={r.post.image_url} alt="" className="mt-2 max-h-40 rounded-lg object-cover" />}
+                      {r.post.video_url && <video src={r.post.video_url} controls className="mt-2 max-h-40 rounded-lg" />}
+                    </div>
+                  )}
+                  {r.status === "pending" && (
+                    <div className="mt-3 flex items-center gap-2">
+                      <Button size="sm" variant="outline" onClick={() => resolveReport(r.id, "dismissed")} className="gap-1.5">
+                        <X className="h-3.5 w-3.5" /> Ignorar
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => { if (r.post) { deletePost(r.post.id); } resolveReport(r.id, "resolved"); }} className="gap-1.5 border-red-200 text-red-600 hover:bg-red-50">
+                        <Trash2 className="h-3.5 w-3.5" /> Excluir post
+                      </Button>
+                      {r.post && (
+                        <Button size="sm" variant="outline" onClick={() => { toggleBan(r.post.user_id, false); resolveReport(r.id, "resolved"); }} className="gap-1.5 border-red-200 text-red-600 hover:bg-red-50">
+                          <Ban className="h-3.5 w-3.5" /> Banir usuário
+                        </Button>
+                      )}
+                      <Button size="sm" onClick={() => resolveReport(r.id, "resolved")} className="gap-1.5">
+                        <Check className="h-3.5 w-3.5" /> Resolver
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))
+          )}
         </div>
       ) : tab === "users" ? (
         <div className="flex flex-col gap-2">
@@ -174,6 +282,7 @@ export function Moderation() {
                 </div>
                 {p.content && <p className="mt-2 break-words text-sm text-content-body">{p.content}</p>}
                 {p.image_url && <img src={p.image_url} alt="" className="mt-2 max-h-48 rounded-lg object-cover" />}
+                {p.video_url && <video src={p.video_url} controls className="mt-2 max-h-48 rounded-lg" />}
               </CardContent>
             </Card>
           ))}

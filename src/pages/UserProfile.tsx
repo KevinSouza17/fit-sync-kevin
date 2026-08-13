@@ -172,12 +172,8 @@ export function UserProfile() {
 
   async function handleFollow() {
     if (!user) return;
-    setFollowStatus("pending");
-    await supabase.from("follows").insert({
-      follower_id: user.id,
-      followee_id: profileId,
-      status: "pending",
-    });
+    const { data } = await supabase.rpc("follow_user", { p_followee_id: profileId });
+    setFollowStatus(data || "pending");
   }
 
   async function handleUnfollow() {
@@ -216,7 +212,7 @@ export function UserProfile() {
     if (!isOwner || !profileData) return;
     const newBanned = !profileData.is_banned;
     setProfileData({ ...profileData, is_banned: newBanned });
-    await supabase.from("profiles").update({ is_banned: newBanned }).eq("id", profileId);
+    await supabase.rpc("ban_user", { p_target: profileId, p_ban: newBanned });
   }
 
   if (loading) {
