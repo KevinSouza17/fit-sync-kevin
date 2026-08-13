@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import {
   Heart, Send, Trash2, ImagePlus, X, Loader2, Plus,
-  MessageCircle, Share2, Eye, Lock, Unlock, Ban, Shield, Video, Flag,
+  MessageCircle, Share2, Eye, Lock, Unlock, Ban, Shield, Video, Flag, ZoomIn,
 } from "lucide-react";
 import { AutoTextarea } from "../components/ui/textarea";
 import { Card, CardContent } from "../components/ui/card";
@@ -93,6 +93,7 @@ export function Feed() {
   const [reportReason, setReportReason] = useState("");
   const [reportDesc, setReportDesc] = useState("");
   const [reportSubmitting, setReportSubmitting] = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (profile) {
@@ -131,15 +132,26 @@ export function Feed() {
   }, [user]);
 
   const loadStories = useCallback(async () => {
+    if (!user) return;
     const now = new Date().toISOString();
+    // Get IDs of users we follow (accepted follows) plus our own ID
+    const { data: following } = await supabase
+      .from("follows")
+      .select("followee_id")
+      .eq("follower_id", user.id)
+      .eq("status", "accepted");
+    const followedIds = (following || []).map((f) => f.followee_id);
+    followedIds.push(user.id);
+    if (followedIds.length === 0) { setStories([]); return; }
     const { data } = await supabase
       .from("stories")
       .select("*, profiles:user_id(full_name, avatar_url)")
+      .in("user_id", followedIds)
       .gt("expires_at", now)
       .order("created_at", { ascending: false })
       .limit(30);
     setStories((data ?? []) as StoryWithProfile[]);
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     loadPosts();
@@ -327,10 +339,11 @@ export function Feed() {
   }
 
   async function submitReport(postId: string) {
-    if (!reportReason.trim()) return;
+    if (!reportReason.trim() || !user) return;
     setReportSubmitting(true);
-    await supabase.from("post_reports").insert({
+    const { error } = await supabase.from("post_reports").insert({
       post_id: postId,
+      reporter_id: user.id,
       reason: reportReason.trim(),
       description: reportDesc.trim() || null,
     });
@@ -338,7 +351,16 @@ export function Feed() {
     setReportReason("");
     setReportDesc("");
     setReportSubmitting(false);
-    alert("Denúncia enviada. O administrador irá analisar.");
+    if (error) {
+      alert("Erro ao enviar denúncia: " + error.message);
+    } else {
+      alert("Denúncia enviada. O administrador irá analisar.");
+    }
+  }
+
+  async function deleteStory(storyId: string) {
+    await supabase.from("stories").delete().eq("id", storyId);
+    loadStories();
   }
 
   const storiesByUser = stories.reduce((acc, s) => {
@@ -381,8 +403,8 @@ export function Feed() {
           const name = first.profiles?.full_name || "Usuario";
           const isOwn = uid === user?.id;
           return (
-            <button key={uid} onClick={() => { setActiveStoryGroup({ userId: uid, stories: userStories }); setActiveStoryIndex(0); }} className="flex flex-col items-center gap-1.5">
-              <div className="relative h-16 w-16 rounded-full bg-gradient-to-tr from-primary-400 to-primary-600 p-0.5">
+            <div key={uid} className="flex flex-col items-center gap-1.5">
+              <button onClick={() => { setActiveStoryGroup({ userId: uid, stories: userStories }); setActiveStoryIndex(0); }} className="relative h-16 w-16 rounded-full bg-gradient-to-tr from-primary-400 to-primary-600 p-0.5">
                 <div className="h-full w-full overflow-hidden rounded-full border-2 border-white">
                   {first.profiles?.avatar_url ? (
                     <img src={first.profiles.avatar_url} alt={name} className="h-full w-full object-cover" />
@@ -390,11 +412,16 @@ export function Feed() {
                     <div className="flex h-full w-full items-center justify-center bg-primary-100 text-sm font-bold text-primary-600">{initials(name)}</div>
                   )}
                 </div>
-              </div>
+                {isOwn && (
+                  <span onClick={(e) => { e.stopPropagation(); deleteStory(first.id); }} className="absolute -right-0.5 -top-0.5 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full bg-red-500 text-white shadow-sm transition-colors hover:bg-red-600">
+                    <X className="h-3 w-3" />
+                  </span>
+                )}
+              </button>
               <span className="max-w-[64px] truncate text-[10px] font-medium text-content-muted">
                 {isOwn ? "Voce" : name.split(" ")[0]}
               </span>
-            </button>
+            </div>
           );
         })}
       </div>
@@ -483,7 +510,7 @@ export function Feed() {
             const followStatus = followStatuses[post.user_id];
             const showComments = expandedComments.has(post.id);
             return (
-              <Card key={post.id} className="overflow-hidden">
+              <Card key={post.id}>
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between">
                     <button
@@ -538,9 +565,18 @@ export function Feed() {
                     </div>
                   </div>
                   {post.content && <p className="mt-3 break-words text-sm leading-relaxed text-content-body">{post.content}</p>}
-                  {post.image_url && <img src={post.image_url} alt="" className="mt-3 max-h-96 w-full rounded-xl object-cover" />}
+                  {post.image_url && (
+                    <button onClick={() => setLightboxUrl(post.image_url)} className="group relative mt-3 block w-full">
+                      <img src={post.image_url} alt="" className="w-full rounded-xl object-contain" style={{ maxHeight: "600px" }} />
+                      <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/0 opacity-0 transition-all group-hover:bg-black/10 group-hover:opacity-100">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/80 shadow-lg">
+                          <ZoomIn className="h-5 w-5 text-slate-700" />
+                        </div>
+                      </div>
+                    </button>
+                  )}
                   {post.video_url && (
-                    <video src={post.video_url} controls playsInline className="mt-3 max-h-96 w-full rounded-xl" />
+                    <video src={post.video_url} controls playsInline className="mt-3 w-full rounded-xl" />
                   )}
 
                   {/* Report modal */}
@@ -666,6 +702,16 @@ export function Feed() {
               </Card>
             );
           })}
+        </div>
+      )}
+
+      {/* Photo lightbox */}
+      {lightboxUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => setLightboxUrl(null)}>
+          <button className="absolute right-4 top-4 z-10 rounded-full bg-white/10 p-2 text-white transition-colors hover:bg-white/20">
+            <X className="h-6 w-6" />
+          </button>
+          <img src={lightboxUrl} alt="" className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain" onClick={(e) => e.stopPropagation()} />
         </div>
       )}
     </div>

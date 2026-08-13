@@ -202,8 +202,8 @@ export function Moderation() {
                         <p className="text-xs font-semibold text-content-strong">{r.post.profiles?.full_name || "?"}</p>
                       </div>
                       {r.post.content && <p className="mt-2 break-words text-sm text-content-body">{r.post.content}</p>}
-                      {r.post.image_url && <img src={r.post.image_url} alt="" className="mt-2 max-h-40 rounded-lg object-cover" />}
-                      {r.post.video_url && <video src={r.post.video_url} controls className="mt-2 max-h-40 rounded-lg" />}
+                      {r.post.image_url && <img src={r.post.image_url} alt="" className="mt-2 max-h-60 w-full rounded-lg object-contain" />}
+                      {r.post.video_url && <video src={r.post.video_url} controls className="mt-2 max-h-60 w-full rounded-lg" />}
                     </div>
                   )}
                   {r.status === "pending" && (
@@ -281,8 +281,8 @@ export function Moderation() {
                   </button>
                 </div>
                 {p.content && <p className="mt-2 break-words text-sm text-content-body">{p.content}</p>}
-                {p.image_url && <img src={p.image_url} alt="" className="mt-2 max-h-48 rounded-lg object-cover" />}
-                {p.video_url && <video src={p.video_url} controls className="mt-2 max-h-48 rounded-lg" />}
+                {p.image_url && <img src={p.image_url} alt="" className="mt-2 max-h-60 w-full rounded-lg object-contain" />}
+                {p.video_url && <video src={p.video_url} controls className="mt-2 max-h-60 w-full rounded-lg" />}
               </CardContent>
             </Card>
           ))}

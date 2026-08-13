@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Send, Search, ArrowLeft, MessageCircle, UserCircle, UserPlus, ImagePlus, Mic, Loader2, X } from "lucide-react";
+import { Send, Search, ArrowLeft, MessageCircle, UserCircle, UserPlus, ImagePlus, Mic, Loader2, X, Trash2 } from "lucide-react";
 import { AudioPlayer } from "../components/AudioPlayer";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
@@ -279,6 +279,13 @@ export function Messages() {
     });
   }
 
+  async function deleteMessage(msgId: string) {
+    if (!user) return;
+    await supabase.from("messages").delete().eq("id", msgId).eq("sender_id", user.id);
+    setMessages((prev) => prev.filter((m) => m.id !== msgId));
+    loadConversations();
+  }
+
   function openConversation(c: ConversationRow) {
     setActiveId(c.id);
     setActiveName(c.otherName);
@@ -361,8 +368,8 @@ export function Messages() {
                 messages.map((m) => {
                   const isMine = m.sender_id === user?.id;
                   return (
-                    <div key={m.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
-                      <div className={`max-w-[75%] break-words rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm ${isMine ? "rounded-br-md bg-primary-600 text-white" : "rounded-bl-md bg-white text-slate-700"}`}>
+                    <div key={m.id} className={`group flex ${isMine ? "justify-end" : "justify-start"}`}>
+                      <div className={`relative max-w-[75%] break-words rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm ${isMine ? "rounded-br-md bg-primary-600 text-white" : "rounded-bl-md bg-white text-slate-700"}`}>
                         {m.media_type === "image" && m.media_url && (
                           <img src={m.media_url} alt="" className="mb-1 max-h-60 rounded-lg object-cover" />
                         )}
@@ -372,7 +379,14 @@ export function Messages() {
                           </div>
                         )}
                         {m.content && <p className="whitespace-pre-wrap break-words">{m.content}</p>}
-                        <p className={`mt-1 text-[10px] ${isMine ? "text-primary-100" : "text-slate-400"}`}>{formatTime(m.created_at)}</p>
+                        <div className="flex items-center justify-end gap-2">
+                          <p className={`mt-1 text-[10px] ${isMine ? "text-primary-100" : "text-slate-400"}`}>{formatTime(m.created_at)}</p>
+                          {isMine && (
+                            <button onClick={() => deleteMessage(m.id)} className="opacity-0 transition-opacity group-hover:opacity-60 hover:!opacity-100">
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   );
