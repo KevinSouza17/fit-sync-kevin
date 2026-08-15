@@ -2,6 +2,7 @@ import { Outlet } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { useAuth } from "../../context/AuthContext";
 import { NotificationsProvider } from "../../context/NotificationsContext";
+import { InstallPrompt } from "../InstallPrompt";
 
 export function DashboardLayout() {
   const { profile } = useAuth();
@@ -15,6 +16,7 @@ export function DashboardLayout() {
           <Outlet />
         </main>
       </div>
+      <InstallPrompt />
     </NotificationsProvider>
   );
 }

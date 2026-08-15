@@ -1,0 +1,17 @@
+{
+  "name": "FitSync",
+  "short_name": "FitSync",
+  "description": "Sua jornada para uma vida mais saudável",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
