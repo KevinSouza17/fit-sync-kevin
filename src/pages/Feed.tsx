@@ -94,6 +94,12 @@ export function Feed() {
   const [reportDesc, setReportDesc] = useState("");
   const [reportSubmitting, setReportSubmitting] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [composerOpen, setComposerOpen] = useState(false);
+  const [reportingComment, setReportingComment] = useState<{ commentId: string; postId: string } | null>(null);
+  const [commentReportReason, setCommentReportReason] = useState("");
+  const [commentReportDesc, setCommentReportDesc] = useState("");
+  const [commentReportSubmitting, setCommentReportSubmitting] = useState(false);
+  const [deletingStoryId, setDeletingStoryId] = useState<string | null>(null);
 
   useEffect(() => {
     if (profile) {
@@ -378,8 +384,34 @@ export function Feed() {
   }
 
   async function deleteStory(storyId: string) {
-    await supabase.from("stories").delete().eq("id", storyId);
+    await supabase.from("stories").delete().eq("id", storyId).eq("user_id", user?.id ?? "");
     loadStories();
+  }
+
+  async function confirmDeleteStory() {
+    if (!deletingStoryId) return;
+    await deleteStory(deletingStoryId);
+    setDeletingStoryId(null);
+  }
+
+  async function reportComment(commentId: string, postId: string) {
+    if (!commentReportReason.trim() || !user) return;
+    setCommentReportSubmitting(true);
+    const { error } = await supabase.from("comment_reports").insert({
+      comment_id: commentId,
+      reporter_id: user.id,
+      reason: commentReportReason.trim(),
+      description: commentReportDesc.trim() || null,
+    });
+    setCommentReportSubmitting(false);
+    setReportingComment(null);
+    setCommentReportReason("");
+    setCommentReportDesc("");
+    if (error) {
+      alert("Erro ao enviar denúncia. Talvez você já tenha denunciado este comentário.");
+    } else {
+      alert("Denúncia enviada. O administrador irá analisar.");
+    }
   }
 
   const storiesByUser = stories.reduce((acc, s) => {
@@ -432,7 +464,7 @@ export function Feed() {
                   )}
                 </div>
                 {isOwn && (
-                  <span onClick={(e) => { e.stopPropagation(); deleteStory(first.id); }} className="absolute -right-0.5 -top-0.5 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full bg-red-500 text-white shadow-sm transition-colors hover:bg-red-600">
+                  <span onClick={(e) => { e.stopPropagation(); setDeletingStoryId(first.id); }} className="absolute -right-0.5 -top-0.5 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full bg-red-500 text-white shadow-sm transition-colors hover:bg-red-600">
                     <X className="h-3 w-3" />
                   </span>
                 )}
@@ -457,52 +489,6 @@ export function Feed() {
         />
       )}
 
-      {/* Composer */}
-      {!isBanned && (
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex flex-col gap-3">
-              <AutoTextarea
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder={t("feed.placeholder")}
-                minRows={3}
-                className={taCls}
-              />
-              {imageUrl && (
-                <div className="relative">
-                  <img src={imageUrl} alt="" className="max-h-64 rounded-xl object-cover" />
-                  <button onClick={() => { setImageUrl(null); setMediaType("image"); }} className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 text-white">
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              )}
-              {videoUrl && (
-                <div className="relative">
-                  <video src={videoUrl} controls className="max-h-64 rounded-xl" />
-                  <button onClick={() => { setVideoUrl(null); setMediaType("image"); }} className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 text-white">
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              )}
-              {error && <p className="text-sm text-red-500">{error}</p>}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <input ref={(el) => setFileInput(el)} type="file" accept="image/*,video/*" onChange={handleMediaUpload} className="hidden" />
-                  <Button variant="outline" size="sm" onClick={() => fileInput?.click()} disabled={uploading} className="gap-2">
-                    {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
-                    Foto/Vídeo
-                  </Button>
-                </div>
-                <Button onClick={createPost} disabled={posting} className="gap-2">
-                  {posting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                  {t("feed.post")}
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
       {isBanned && (
         <Card><CardContent className="flex items-center gap-3 py-4 text-sm text-red-600">
           <Ban className="h-5 w-5 shrink-0" />
@@ -683,11 +669,18 @@ export function Feed() {
                                 <div className="rounded-xl bg-slate-50 px-3 py-2">
                                   <div className="flex items-center justify-between">
                                     <button onClick={() => navigate(`/profile/${c.user_id}`)} className="text-xs font-semibold text-content-strong hover:underline">{cName}</button>
-                                    {(cIsOwn || isOwner) && (
-                                      <button onClick={() => deleteComment(c.id, post.id)} className="text-content-muted transition-colors hover:text-red-500">
-                                        <Trash2 className="h-3 w-3" />
-                                      </button>
-                                    )}
+                                    <div className="flex items-center gap-2">
+                                      {!cIsOwn && (
+                                        <button onClick={() => setReportingComment({ commentId: c.id, postId: post.id })} className="text-content-muted transition-colors hover:text-amber-500" title="Denunciar comentário">
+                                          <Flag className="h-3 w-3" />
+                                        </button>
+                                      )}
+                                      {(cIsOwn || isOwner) && (
+                                        <button onClick={() => deleteComment(c.id, post.id)} className="text-content-muted transition-colors hover:text-red-500">
+                                          <Trash2 className="h-3 w-3" />
+                                        </button>
+                                      )}
+                                    </div>
                                   </div>
                                   <p className="mt-0.5 break-words text-sm text-content-body">{c.content}</p>
                                 </div>
@@ -731,6 +724,128 @@ export function Feed() {
             <X className="h-6 w-6" />
           </button>
           <img src={lightboxUrl} alt="" className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain" onClick={(e) => e.stopPropagation()} />
+        </div>
+      )}
+
+      {/* Floating post button */}
+      {!isBanned && (
+        <button
+          onClick={() => setComposerOpen(true)}
+          className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-primary-600 text-white shadow-lg shadow-primary-600/30 transition-all hover:scale-105 hover:bg-primary-700 active:scale-95"
+          title={t("feed.post")}
+        >
+          <Plus className="h-6 w-6" />
+        </button>
+      )}
+
+      {/* Post composer modal */}
+      {composerOpen && !isBanned && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm sm:items-center" onClick={() => setComposerOpen(false)}>
+          <div className="w-full max-w-lg rounded-t-2xl bg-surface-card p-5 shadow-2xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-content-strong">{t("feed.post")}</h2>
+              <button onClick={() => setComposerOpen(false)} className="rounded-full p-1.5 text-content-muted transition-colors hover:bg-surface-subtle">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="flex flex-col gap-3">
+              <AutoTextarea
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                placeholder={t("feed.placeholder")}
+                minRows={3}
+                className={taCls}
+              />
+              {imageUrl && (
+                <div className="relative">
+                  <img src={imageUrl} alt="" className="max-h-64 rounded-xl object-cover" />
+                  <button onClick={() => { setImageUrl(null); setMediaType("image"); }} className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 text-white">
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
+              {videoUrl && (
+                <div className="relative">
+                  <video src={videoUrl} controls className="max-h-64 rounded-xl" />
+                  <button onClick={() => { setVideoUrl(null); setMediaType("image"); }} className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 text-white">
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
+              {error && <p className="text-sm text-red-500">{error}</p>}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <input ref={(el) => setFileInput(el)} type="file" accept="image/*,video/*" onChange={handleMediaUpload} className="hidden" />
+                  <Button variant="outline" size="sm" onClick={() => fileInput?.click()} disabled={uploading} className="gap-2">
+                    {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
+                    Foto/Vídeo
+                  </Button>
+                </div>
+                <Button onClick={() => { createPost(); setComposerOpen(false); }} disabled={posting} className="gap-2">
+                  {posting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                  {t("feed.post")}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Story delete confirmation */}
+      {deletingStoryId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setDeletingStoryId(null)}>
+          <div className="w-full max-w-sm rounded-2xl bg-surface-card p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-base font-bold text-content-strong">Excluir story?</h3>
+            <p className="mt-1 text-sm text-content-muted">Esta ação não pode ser desfeita.</p>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setDeletingStoryId(null)}>Cancelar</Button>
+              <Button size="sm" onClick={confirmDeleteStory} className="gap-2 bg-red-600 hover:bg-red-700">
+                <Trash2 className="h-4 w-4" />
+                Excluir
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Comment report modal */}
+      {reportingComment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setReportingComment(null)}>
+          <div className="w-full max-w-sm rounded-2xl bg-surface-card p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-bold text-content-strong">Denunciar comentário</h3>
+              <button onClick={() => setReportingComment(null)} className="text-content-muted hover:text-content-strong">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <select
+              value={commentReportReason}
+              onChange={(e) => setCommentReportReason(e.target.value)}
+              className="mt-3 w-full rounded-lg border border-edge-base bg-surface-base px-3 py-2 text-sm text-content-strong focus:outline-none"
+            >
+              <option value="">Selecione o motivo</option>
+              <option value="spam">Spam ou conteúdo repetitivo</option>
+              <option value="harassment">Assédio ou bullying</option>
+              <option value="inappropriate">Conteúdo inadequado</option>
+              <option value="misinformation">Desinformação</option>
+              <option value="violence">Ameaça ou violência</option>
+              <option value="other">Outro</option>
+            </select>
+            <textarea
+              value={commentReportDesc}
+              onChange={(e) => setCommentReportDesc(e.target.value)}
+              placeholder="Descreva o problema (opcional)..."
+              rows={2}
+              className="mt-2 w-full rounded-lg border border-edge-base bg-surface-base px-3 py-2 text-sm text-content-strong placeholder:text-content-muted focus:outline-none"
+            />
+            <div className="mt-3 flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setReportingComment(null)}>Cancelar</Button>
+              <Button size="sm" onClick={() => reportComment(reportingComment.commentId, reportingComment.postId)} disabled={!commentReportReason || commentReportSubmitting} className="gap-2">
+                {commentReportSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Flag className="h-4 w-4" />}
+                Enviar denúncia
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </div>

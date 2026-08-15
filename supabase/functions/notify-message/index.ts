@@ -112,14 +112,14 @@ Deno.serve(async (req: Request) => {
     const recipientId = conv.user_a_id === senderId ? conv.user_b_id : conv.user_a_id;
     if (recipientId === senderId) return json({ ok: true }); // shouldn't happen
 
-    // Sender name + recipient email.
-    const [{ data: senderProfile }, { data: recipientUser }] = await Promise.all([
+    // Sender name + recipient email (via RPC since auth.users is not exposed via PostgREST).
+    const [{ data: senderProfile }, { data: recipientEmailRaw }] = await Promise.all([
       serviceClient.from("profiles").select("full_name").eq("id", senderId).maybeSingle(),
-      serviceClient.from("auth.users").select("email").eq("id", recipientId).maybeSingle(),
+      serviceClient.rpc("get_email_by_user_id", { p_user_id: recipientId }),
     ]);
 
     const senderName = senderProfile?.full_name || "Alguém";
-    const recipientEmail = recipientUser?.email;
+    const recipientEmail = recipientEmailRaw as string | null;
     if (recipientEmail) {
       await sendMessageEmail(recipientEmail, senderName, content);
     }
