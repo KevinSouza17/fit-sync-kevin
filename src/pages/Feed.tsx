@@ -193,6 +193,25 @@ export function Feed() {
   async function handleStoryUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file || !user) return;
+
+    if (file.type.startsWith("video")) {
+      const video = document.createElement("video");
+      video.preload = "metadata";
+      video.src = URL.createObjectURL(file);
+      await new Promise<void>((resolve) => {
+        video.onloadedmetadata = () => {
+          URL.revokeObjectURL(video.src);
+          resolve();
+        };
+        video.onerror = () => resolve();
+      });
+      if (video.duration > 61) {
+        alert("O vídeo do story deve ter no máximo 60 segundos.");
+        setStoryUploading(false);
+        return;
+      }
+    }
+
     setStoryUploading(true);
     const ext = file.name.split(".").pop();
     const fileName = `${user.id}/story-${Date.now()}.${ext}`;

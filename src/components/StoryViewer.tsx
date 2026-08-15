@@ -26,7 +26,8 @@ interface StoryViewerProps {
   onGroupChange: (g: StoryGroup) => void;
 }
 
-const STORY_DURATION = 5000;
+const IMAGE_STORY_DURATION = 5000;
+const VIDEO_STORY_DURATION = 60000;
 
 export function StoryViewer({ group, index, onIndexChange, onClose, allGroups, onGroupChange }: StoryViewerProps) {
   const [progress, setProgress] = useState(0);
@@ -67,6 +68,16 @@ export function StoryViewer({ group, index, onIndexChange, onClose, allGroups, o
     }
   }
 
+  function handlePauseDown() {
+    pausedRef.current = true;
+    if (videoRef.current) videoRef.current.pause();
+  }
+
+  function handlePauseUp() {
+    pausedRef.current = false;
+    if (videoRef.current) videoRef.current.play().catch(() => {});
+  }
+
   // Progress timer
   useEffect(() => {
     setProgress(0);
@@ -75,11 +86,12 @@ export function StoryViewer({ group, index, onIndexChange, onClose, allGroups, o
       videoRef.current.currentTime = 0;
       videoRef.current.play().catch(() => {});
     }
+    const duration = story?.media_type === "video" ? VIDEO_STORY_DURATION : IMAGE_STORY_DURATION;
     const start = Date.now();
     timerRef.current = window.setInterval(() => {
       if (pausedRef.current) return;
       const elapsed = Date.now() - start;
-      const p = Math.min(elapsed / STORY_DURATION, 1);
+      const p = Math.min(elapsed / duration, 1);
       setProgress(p);
       if (p >= 1) {
         if (timerRef.current) clearInterval(timerRef.current);
@@ -132,7 +144,7 @@ export function StoryViewer({ group, index, onIndexChange, onClose, allGroups, o
       </button>
 
       {/* Story container */}
-      <div className="relative h-full w-full max-w-md" onClick={handleClick}>
+      <div className="relative h-full w-full max-w-md" onClick={handleClick} onPointerDown={handlePauseDown} onPointerUp={handlePauseUp} onPointerLeave={handlePauseUp}>
         {/* Progress bars */}
         <div className="absolute left-0 right-0 top-0 z-10 flex gap-1 p-3">
           {group.stories.map((_, i) => (
@@ -181,7 +193,7 @@ export function StoryViewer({ group, index, onIndexChange, onClose, allGroups, o
 
         {/* Tap hint */}
         <div className="absolute bottom-6 left-1/2 z-10 -translate-x-1/2 text-[11px] text-white/50">
-          Toque na esquerda/direita para navegar
+          Toque na esquerda/direita para navegar · Segure para pausar
         </div>
       </div>
     </div>

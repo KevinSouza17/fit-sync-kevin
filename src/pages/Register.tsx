@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Activity, Mail, Lock, Eye, EyeOff, User, Briefcase, GraduationCap, Award, MapPin, Loader2, Building2, CheckCircle2 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -61,33 +61,9 @@ export function Register() {
   const [docError, setDocError] = useState("");
 
   const { signUp, signInWithGoogle } = useAuth();
-  const navigate = useNavigate();
   const { t } = useI18n();
-  const [emailChecking] = useState(false);
-  const [emailChecked] = useState(false);
-  const [emailExists] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [registrationDone, setRegistrationDone] = useState(false);
-
-  async function checkEmail(value: string): Promise<boolean> {
-    if (!value.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value)) {
-      setEmailChecked(false);
-      setEmailExists(false);
-      return false;
-    }
-    setEmailChecking(true);
-    const { data, error } = await supabase.rpc("email_exists", { check_email: value.trim() });
-    setEmailChecking(false);
-    if (error) {
-      setEmailChecked(false);
-      setEmailExists(false);
-      return false;
-    }
-    const exists = !!data;
-    setEmailChecked(true);
-    setEmailExists(exists);
-    return exists;
-  }
 
   async function handleGoogle() {
     setError("");
