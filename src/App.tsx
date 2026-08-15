@@ -25,7 +25,7 @@ import { Moderation } from "./pages/Moderation";
 import { DashboardLayout } from "./components/layout/DashboardLayout";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, profile, loading } = useAuth();
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center bg-surface-base">
@@ -37,6 +37,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     );
   }
   if (!user) return <Navigate to="/login" replace />;
+  if (profile?.is_banned) return <Navigate to="/login" replace />;
   return <>{children}</>;
 }
 
@@ -50,7 +51,23 @@ function ProfessionalRoute({ children }: { children: React.ReactNode }) {
     );
   }
   if (!user) return <Navigate to="/login" replace />;
+  if (profile?.is_banned) return <Navigate to="/login" replace />;
   if (!profile?.is_professional) return <Navigate to="/dashboard" replace />;
+  return <>{children}</>;
+}
+
+function OwnerRoute({ children }: { children: React.ReactNode }) {
+  const { user, profile, loading } = useAuth();
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-surface-base">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-600 border-t-transparent" />
+      </div>
+    );
+  }
+  if (!user) return <Navigate to="/login" replace />;
+  if (profile?.is_banned) return <Navigate to="/login" replace />;
+  if (profile?.role !== "owner") return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 }
 
@@ -88,7 +105,7 @@ export default function App() {
           <Route path="/feed" element={<Feed />} />
           <Route path="/profile/:id" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
           <Route path="/my-profile" element={<MyProfile />} />
-          <Route path="/moderation" element={<ProtectedRoute><Moderation /></ProtectedRoute>} />
+          <Route path="/moderation" element={<OwnerRoute><Moderation /></OwnerRoute>} />
           <Route path="/reviews" element={<Reviews />} />
           <Route path="/messages" element={<Messages />} />
           <Route path="/notifications" element={<Notifications />} />
@@ -97,7 +114,7 @@ export default function App() {
           <Route path="/appointments" element={<Appointments />} />
           <Route path="/my-clients" element={<ProfessionalRoute><MyClients /></ProfessionalRoute>} />
         </Route>
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </BrowserRouter>
   );

@@ -10,7 +10,7 @@ interface AuthContextValue {
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signInWithGoogle: () => Promise<{ error: string | null }>;
-  signUp: (email: string, password: string, fullName: string, professional?: { role: string; specialty: string; credentials: string; registrationType?: string; documentNumber?: string }) => Promise<{ error: string | null }>;
+  signUp: (email: string, password: string, fullName: string, professional?: { role: string; specialty: string; credentials: string; registrationType?: string; documentNumber?: string; city?: string }) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -24,11 +24,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   async function fetchProfile(userId: string) {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("profiles")
       .select("*")
       .eq("id", userId)
       .maybeSingle();
+    if (error) {
+      console.error("Failed to fetch profile:", error.message);
+      setProfile(null);
+      return;
+    }
     setProfile(data);
   }
 
@@ -73,36 +78,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error: null };
   }
 
-  async function signUp(email: string, password: string, fullName: string, professional?: { role: string; specialty: string; credentials: string }) {
+  async function signUp(email: string, password: string, fullName: string, professional?: { role: string; specialty: string; credentials: string; registrationType?: string; documentNumber?: string; city?: string }) {
     const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) return { error: error.message };
     if (data.user) {
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .upsert({
-          id: data.user.id,
-          full_name: fullName,
-          daily_calorie_goal: 2400,
-          daily_water_goal_liters: 2.5,
-          is_professional: !!professional,
-          professional_role: professional?.role ?? null,
-          specialty: professional?.specialty ?? null,
-          credentials: professional?.credentials ?? null,
-          registration_type: professional?.registrationType ?? 'autonomo',
-          document_number: professional?.documentNumber ?? null,
-          available_for_booking: !!professional,
-        }, { onConflict: "id" });
-      if (profileError) return { error: profileError.message };
+      const { error: rpcError } = await supabase.rpc("create_profile", {
+        p_full_name: fullName,
+        p_is_professional: !!professional,
+        p_professional_role: professional?.role ?? null,
+        p_specialty: professional?.specialty ?? null,
+        p_credentials: professional?.credentials ?? null,
+        p_registration_type: professional?.registrationType ?? "autonomo",
+        p_document_number: professional?.documentNumber ?? null,
+        p_location_city: professional?.city ?? null,
+      });
+      if (rpcError) return { error: rpcError.message };
+
+      if (professional) {
+        await supabase.from("professional_verification").insert({ user_id: data.user.id });
+      }
     }
     return { error: null };
   }
 
   async function signOut() {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.error("Sign out failed:", err);
+    }
   }
 
   async function refreshProfile() {
-    if (user) await fetchProfile(user.id);
+    if (user) {
+      try {
+        await fetchProfile(user.id);
+      } catch (err) {
+        console.error("Failed to refresh profile:", err);
+      }
+    }
   }
 
   return (

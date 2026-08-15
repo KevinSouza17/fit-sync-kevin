@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Activity, Mail, Lock, Eye, EyeOff, User, Briefcase, GraduationCap, Award, MapPin, Loader2, CheckCircle2, AlertCircle, Building2 } from "lucide-react";
+import { Activity, Mail, Lock, Eye, EyeOff, User, Briefcase, GraduationCap, Award, MapPin, Loader2, Building2, CheckCircle2 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { useAuth } from "../context/AuthContext";
@@ -63,10 +63,11 @@ export function Register() {
   const { signUp, signInWithGoogle } = useAuth();
   const navigate = useNavigate();
   const { t } = useI18n();
-  const [emailChecking, setEmailChecking] = useState(false);
-  const [emailExists, setEmailExists] = useState(false);
-  const [emailChecked, setEmailChecked] = useState(false);
+  const [emailChecking] = useState(false);
+  const [emailChecked] = useState(false);
+  const [emailExists] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [registrationDone, setRegistrationDone] = useState(false);
 
   async function checkEmail(value: string): Promise<boolean> {
     if (!value.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value)) {
@@ -122,24 +123,19 @@ export function Register() {
         return;
       }
     }
-    const exists = emailChecked ? emailExists : await checkEmail(email);
-    if (exists) {
-      setError(t("register.emailExists"));
-      return;
-    }
     setLoading(true);
     const proData = accountType === "professional"
-      ? { role: proRole, specialty: proSpecialty, credentials: proCredentials, registrationType: regType, documentNumber: docNumber.trim() }
+      ? { role: proRole, specialty: proSpecialty, credentials: proCredentials, registrationType: regType, documentNumber: docNumber.trim(), city: proCity.trim() }
       : undefined;
     const { error } = await signUp(email, password, fullName, proData);
     if (error) {
-      if (error.includes("already registered")) {
+      if (error.includes("already registered") || error.includes("already been registered")) {
         setError(t("register.emailExists"));
       } else {
-        setError(error);
+        setError("Erro ao criar conta. Tente novamente.");
       }
     } else {
-      navigate("/dashboard");
+      setRegistrationDone(true);
     }
     setLoading(false);
   }
@@ -260,28 +256,11 @@ export function Register() {
                   type="email"
                   placeholder="seu@email.com"
                   value={email}
-                  onChange={(e) => {
-                    setEmail(e.target.value);
-                    setEmailChecked(false);
-                    setEmailExists(false);
-                  }}
-                  onBlur={(e) => checkEmail(e.target.value)}
-                  className="pl-9 pr-10"
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="pl-9"
                   required
                 />
-                {emailChecking && (
-                  <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-content-muted" />
-                )}
-                {emailChecked && !emailChecking && !emailExists && (
-                  <CheckCircle2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-green-500" />
-                )}
-                {emailChecked && !emailChecking && emailExists && (
-                  <AlertCircle className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-red-500" />
-                )}
               </div>
-              {emailChecked && emailExists && (
-                <p className="text-xs text-red-500">{t("register.emailExists")}</p>
-              )}
             </div>
 
             <div className="space-y-1.5">
