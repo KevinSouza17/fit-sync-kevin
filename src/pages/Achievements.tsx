@@ -37,6 +37,9 @@ export function Achievements() {
 
   useEffect(() => {
     (async () => {
+      if (user) {
+        await supabase.rpc("check_and_grant_achievements", { p_user_id: user.id });
+      }
       const [{ data: achievements }, { data: userAch }] = await Promise.all([
         supabase.from("achievements").select("*").order("tier").order("title"),
         supabase.from("user_achievements").select("achievement_id, earned_at").eq("user_id", user?.id ?? ""),

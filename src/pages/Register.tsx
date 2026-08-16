@@ -98,6 +98,41 @@ export function Register() {
 
   return (
     <div className="flex min-h-screen">
+      {/* Left brand panel */}
+      <div className={`hidden w-1/2 flex-col justify-between p-12 lg:flex ${
+        accountType === "professional" ? "bg-emerald-600" : "bg-primary-600"
+      }`}>
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/20">
+            <Activity className="h-5 w-5 text-white" />
+          </div>
+          <span className="text-xl font-bold text-white">FitSync</span>
+        </div>
+        <div className="space-y-4">
+          {accountType === "professional" ? (
+            <>
+              <h2 className="text-4xl font-bold leading-tight text-white">
+                Conecte-se com<br />seus clientes.
+              </h2>
+              <p className="text-base leading-relaxed text-emerald-100">
+                Gerencie seus pacientes, crie planos alimentares e de treino, e amplie seu alcance como profissional de saúde e fitness.
+              </p>
+            </>
+          ) : (
+            <>
+              <h2 className="text-4xl font-bold leading-tight text-white">
+                Comece sua jornada<br />hoje mesmo.
+              </h2>
+              <p className="text-base leading-relaxed text-primary-100">
+                Defina suas metas, acompanhe seu progresso e transforme seus hábitos com o suporte de nossa comunidade.
+              </p>
+            </>
+          )}
+        </div>
+        <p className="text-sm text-primary-200">© 2026 FitSync. Todos os direitos reservados.</p>
+      </div>
+
+      {/* Right form panel */}
       <div className="flex w-full flex-col justify-center bg-surface-card px-8 py-12 lg:w-1/2 lg:px-16">
         <div className="mx-auto w-full max-w-md">
           <div className="mb-8 flex items-center gap-2">
@@ -378,37 +413,6 @@ export function Register() {
         </div>
       </div>
 
-      <div className={`hidden w-1/2 flex-col justify-between p-12 lg:flex ${
-        accountType === "professional" ? "bg-emerald-600" : "bg-primary-600"
-      }`}>
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/20">
-            <Activity className="h-5 w-5 text-white" />
-          </div>
-          <span className="text-xl font-bold text-white">FitSync</span>
-        </div>
-        <div className="space-y-4">
-          {accountType === "professional" ? (
-            <>
-              <h2 className="text-4xl font-bold leading-tight text-white">
-                Conecte-se com<br />seus clientes.
-              </h2>
-              <p className="text-base leading-relaxed text-emerald-100">
-                Gerencie seus pacientes, crie planos alimentares e de treino, e amplie seu alcance como profissional de saúde e fitness.
-              </p>
-            </>
-          ) : (
-            <>
-              <h2 className="text-4xl font-bold leading-tight text-white">
-                Comece sua jornada<br />hoje mesmo.
-              </h2>
-              <p className="text-base leading-relaxed text-primary-100">
-                Defina suas metas, acompanhe seu progresso e transforme seus hábitos com o suporte de nossa comunidade.
-              </p>
-            </>
-          )}
-        </div>
-      </div>
     </div>
   );
 }

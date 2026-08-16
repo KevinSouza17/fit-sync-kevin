@@ -60,7 +60,6 @@ const navSections: NavSection[] = [
       { to: "/workout", key: "nav.workout", icon: Dumbbell },
       { to: "/progress", key: "nav.progress", icon: TrendingUp },
       { to: "/recipes", key: "nav.recipes", icon: UtensilsCrossed },
-      { to: "/achievements", key: "nav.achievements", icon: Trophy },
     ],
   },
   {
@@ -77,6 +76,7 @@ const navSections: NavSection[] = [
     labelKey: "nav.sectionAccount",
     items: [
       { to: "/my-profile", key: "nav.myProfile", icon: UserCircle },
+      { to: "/achievements", key: "nav.achievements", icon: Trophy },
       { to: "/notifications", key: "nav.notifications", icon: Bell },
       { to: "/settings", key: "nav.settings", icon: Settings },
     ],
