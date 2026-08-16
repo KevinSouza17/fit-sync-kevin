@@ -31,44 +31,6 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
   }
 }
 
-// Best-effort email notification for a new message. The in-app notification is
-// already created by the database trigger; this just adds the email channel.
-async function sendMessageEmail(toEmail: string, senderName: string, preview: string) {
-  const apiKey = Deno.env.get("RESEND_API_KEY");
-  if (!apiKey) return;
-  const fromEmail = Deno.env.get("RESEND_FROM_EMAIL") || "FitSync <no-reply@fitsync.app>";
-  const snippet = preview.length > 80 ? preview.slice(0, 80) + "…" : preview;
-  const html = `
-  <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
-    <div style="text-align: center; margin-bottom: 24px;">
-      <div style="display: inline-block; width: 40px; height: 40px; border-radius: 10px; background: #059669; color: white; font-weight: 800; font-size: 22px; line-height: 40px;">F</div>
-    </div>
-    <h2 style="font-size: 17px; color: #0f172a; margin: 0 0 8px;">Nova mensagem de ${senderName}</h2>
-    <div style="background: #f8fafc; border-radius: 12px; padding: 16px; margin: 16px 0;">
-      <p style="font-size: 15px; color: #334155; line-height: 1.5; margin: 0;">${snippet}</p>
-    </div>
-    <p style="font-size: 13px; color: #94a3b8; margin: 0;">Abra o FitSync para ver a mensagem completa e responder.</p>
-  </div>`;
-
-  try {
-    await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from: fromEmail,
-        to: [toEmail],
-        subject: `${senderName} te enviou uma mensagem no FitSync`,
-        html,
-      }),
-    });
-  } catch (_e) {
-    // ignored — in-app notification is the source of truth
-  }
-}
-
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -111,18 +73,6 @@ Deno.serve(async (req: Request) => {
 
     const recipientId = conv.user_a_id === senderId ? conv.user_b_id : conv.user_a_id;
     if (recipientId === senderId) return json({ ok: true }); // shouldn't happen
-
-    // Sender name + recipient email (via RPC since auth.users is not exposed via PostgREST).
-    const [{ data: senderProfile }, { data: recipientEmailRaw }] = await Promise.all([
-      serviceClient.from("profiles").select("full_name").eq("id", senderId).maybeSingle(),
-      serviceClient.rpc("get_email_by_user_id", { p_user_id: recipientId }),
-    ]);
-
-    const senderName = senderProfile?.full_name || "Alguém";
-    const recipientEmail = recipientEmailRaw as string | null;
-    if (recipientEmail) {
-      await sendMessageEmail(recipientEmail, senderName, content);
-    }
 
     return json({ ok: true });
   } catch (err) {
