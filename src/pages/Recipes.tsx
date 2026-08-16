@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from "react";
-import { Search, UtensilsCrossed, Plus, X, Flame, Barcode, History, BookUser, Clock, Trash2, Check, Calendar } from "lucide-react";
+import { Search, UtensilsCrossed, Plus, X, Flame, Barcode, History, BookUser, Clock, Trash2, Check, Calendar, ChefHat, Star, Clock3, Users } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { supabase } from "../lib/supabase";
@@ -34,6 +34,26 @@ interface CustomFood {
   barcode: string | null;
   is_recipe: boolean;
   ingredients: string | null;
+}
+
+interface CommunityRecipe {
+  id: string;
+  user_id: string;
+  title: string;
+  description: string | null;
+  ingredients: string;
+  instructions: string;
+  prep_time_min: number;
+  servings: number;
+  calories: number;
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
+  image_url: string | null;
+  created_at: string;
+  profiles: { full_name: string } | null;
+  ratings_count: number;
+  ratings_sum: number;
 }
 
 interface MealLog {
@@ -78,7 +98,7 @@ function getMealLabel(mealType: string, t: (k: string) => string) {
 
 const mealOrder = ["breakfast", "pre_workout", "lunch", "snack", "post_workout", "dinner"];
 
-type Tab = "catalog" | "mine" | "history";
+type Tab = "catalog" | "mine" | "community" | "history";
 
 export function Recipes() {
   const { user } = useAuth();
@@ -112,6 +132,13 @@ export function Recipes() {
   const [meals, setMeals] = useState<MealLog[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [reAddedId, setReAddedId] = useState<string | null>(null);
+
+  const [communityRecipes, setCommunityRecipes] = useState<CommunityRecipe[]>([]);
+  const [communityLoading, setCommunityLoading] = useState(true);
+  const [showRecipeModal, setShowRecipeModal] = useState(false);
+  const [recipeForm, setRecipeForm] = useState({ title: "", description: "", ingredients: "", instructions: "", prep_time_min: "", servings: "1", calories: "", protein_g: "", carbs_g: "", fat_g: "" });
+  const [userRatings, setUserRatings] = useState<Record<string, number>>({});
+  const [ratingSubmitting, setRatingSubmitting] = useState<string | null>(null);
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -150,11 +177,28 @@ export function Recipes() {
     setHistoryLoading(false);
   }, []);
 
+  const loadCommunityRecipes = useCallback(async () => {
+    setCommunityLoading(true);
+    const { data } = await supabase
+      .from("community_recipes_with_ratings")
+      .select("*, profiles:user_id(full_name)")
+      .order("created_at", { ascending: false });
+    if (data) setCommunityRecipes(data as unknown as CommunityRecipe[]);
+    const { data: ratings } = await supabase.from("recipe_ratings").select("recipe_id, rating").eq("user_id", user?.id ?? "");
+    if (ratings) {
+      const m: Record<string, number> = {};
+      ratings.forEach((r) => { m[r.recipe_id] = r.rating; });
+      setUserRatings(m);
+    }
+    setCommunityLoading(false);
+  }, [user]);
+
   useEffect(() => {
     loadFoods();
     loadCustomFoods();
     loadHistory();
-  }, [loadFoods, loadCustomFoods, loadHistory]);
+    loadCommunityRecipes();
+  }, [loadFoods, loadCustomFoods, loadHistory, loadCommunityRecipes]);
 
   function handleSearch(value: string) {
     setSearch(value);
@@ -266,6 +310,48 @@ export function Recipes() {
     setCustomFiltered((prev) => prev.filter((f) => f.id !== id));
   }
 
+  async function saveCommunityRecipe() {
+    if (!user || !recipeForm.title.trim() || !recipeForm.ingredients.trim() || !recipeForm.instructions.trim()) return;
+    setSaving(true);
+    const { data } = await supabase
+      .from("community_recipes")
+      .insert({
+        user_id: user.id,
+        title: recipeForm.title,
+        description: recipeForm.description || null,
+        ingredients: recipeForm.ingredients,
+        instructions: recipeForm.instructions,
+        prep_time_min: parseInt(recipeForm.prep_time_min) || 0,
+        servings: parseInt(recipeForm.servings) || 1,
+        calories: parseInt(recipeForm.calories) || 0,
+        protein_g: parseFloat(recipeForm.protein_g) || 0,
+        carbs_g: parseFloat(recipeForm.carbs_g) || 0,
+        fat_g: parseFloat(recipeForm.fat_g) || 0,
+      })
+      .select("*")
+      .single();
+    setSaving(false);
+    if (data) {
+      const newRecipe = { ...data, profiles: { full_name: "" }, ratings_count: 0, ratings_sum: 0 } as CommunityRecipe;
+      setCommunityRecipes((prev) => [newRecipe, ...prev]);
+      setShowRecipeModal(false);
+      setRecipeForm({ title: "", description: "", ingredients: "", instructions: "", prep_time_min: "", servings: "1", calories: "", protein_g: "", carbs_g: "", fat_g: "" });
+    }
+  }
+
+  async function submitRating(recipeId: string, rating: number) {
+    if (!user) return;
+    setRatingSubmitting(recipeId);
+    const { error } = await supabase
+      .from("recipe_ratings")
+      .upsert({ recipe_id: recipeId, user_id: user.id, rating }, { onConflict: "recipe_id,user_id" });
+    if (!error) {
+      setUserRatings((prev) => ({ ...prev, [recipeId]: rating }));
+      loadCommunityRecipes();
+    }
+    setRatingSubmitting(null);
+  }
+
   async function searchByBarcode() {
     if (!customForm.barcode.trim()) return;
     const { data } = await supabase.from("foods").select("*").eq("barcode", customForm.barcode.trim()).maybeSingle();
@@ -334,6 +420,7 @@ export function Recipes() {
   const tabConfig: { key: Tab; label: string; icon: typeof UtensilsCrossed }[] = [
     { key: "catalog", label: t("foods.tabCatalog"), icon: UtensilsCrossed },
     { key: "mine", label: t("foods.tabMine"), icon: BookUser },
+    { key: "community", label: "Receitas", icon: ChefHat },
     { key: "history", label: t("foods.tabHistory"), icon: History },
   ];
 
@@ -516,6 +603,92 @@ export function Recipes() {
         </div>
       )}
 
+      {/* ── Community Recipes tab ── */}
+      {tab === "community" && (
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-content-muted">Receitas compartilhadas pela comunidade</p>
+            <Button className="gap-2" onClick={() => setShowRecipeModal(true)}>
+              <Plus className="h-4 w-4" />
+              Compartilhar Receita
+            </Button>
+          </div>
+          {communityLoading ? (
+            <div className="flex h-40 items-center justify-center">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-600 border-t-transparent" />
+            </div>
+          ) : communityRecipes.length === 0 ? (
+            <Card><CardContent className="flex flex-col items-center py-16 text-center">
+              <ChefHat className="mb-3 h-12 w-12 text-slate-200" />
+              <h3 className="text-base font-semibold text-content-body">Nenhuma receita ainda</h3>
+              <p className="mt-1 text-sm text-content-muted">Seja o primeiro a compartilhar uma receita!</p>
+              <Button className="mt-4 gap-2" onClick={() => setShowRecipeModal(true)}>
+                <Plus className="h-4 w-4" />
+                Compartilhar Receita
+              </Button>
+            </CardContent></Card>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {communityRecipes.map((r) => {
+                const avgRating = r.ratings_count > 0 ? (r.ratings_sum / r.ratings_count).toFixed(1) : "-";
+                const myRating = userRatings[r.id] || 0;
+                return (
+                  <Card key={r.id} className="overflow-hidden">
+                    <CardContent className="p-4">
+                      <div className="mb-2 flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <h3 className="text-sm font-bold text-content-strong leading-tight">{r.title}</h3>
+                          <p className="text-[11px] text-content-muted">por {r.profiles?.full_name || "Anônimo"}</p>
+                        </div>
+                        <div className="flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5">
+                          <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                          <span className="text-xs font-bold text-amber-600">{avgRating}</span>
+                          <span className="text-[10px] text-content-muted">({r.ratings_count})</span>
+                        </div>
+                      </div>
+                      {r.description && <p className="mb-2 text-xs text-content-muted line-clamp-2">{r.description}</p>}
+                      <div className="mb-2 flex items-center gap-3 text-[11px] text-content-muted">
+                        {r.prep_time_min > 0 && <span className="flex items-center gap-1"><Clock3 className="h-3 w-3" />{r.prep_time_min} min</span>}
+                        <span className="flex items-center gap-1"><Users className="h-3 w-3" />{r.servings} porções</span>
+                        {r.calories > 0 && <span className="flex items-center gap-1"><Flame className="h-3 w-3 text-orange-500" />{r.calories} kcal</span>}
+                      </div>
+                      {r.calories > 0 && (
+                        <div className="mb-3 grid grid-cols-3 gap-1 text-center">
+                          <div className="rounded-lg bg-primary-50 px-1 py-1"><p className="text-xs font-bold text-primary-600">{r.protein_g}g</p><p className="text-[9px] text-content-muted">Prot</p></div>
+                          <div className="rounded-lg bg-orange-50 px-1 py-1"><p className="text-xs font-bold text-orange-600">{r.carbs_g}g</p><p className="text-[9px] text-content-muted">Carb</p></div>
+                          <div className="rounded-lg bg-amber-50 px-1 py-1"><p className="text-xs font-bold text-amber-600">{r.fat_g}g</p><p className="text-[9px] text-content-muted">Gord</p></div>
+                        </div>
+                      )}
+                      <div className="border-t border-edge-base pt-2">
+                        <p className="mb-1 text-[10px] font-medium text-content-muted">Ingredientes</p>
+                        <p className="text-xs text-content-body line-clamp-3 whitespace-pre-wrap">{r.ingredients}</p>
+                      </div>
+                      <div className="mt-2 border-t border-edge-base pt-2">
+                        <p className="mb-1 text-[10px] font-medium text-content-muted">Modo de preparo</p>
+                        <p className="text-xs text-content-body line-clamp-3 whitespace-pre-wrap">{r.instructions}</p>
+                      </div>
+                      <div className="mt-3 flex items-center gap-1 border-t border-edge-base pt-2">
+                        <span className="mr-1 text-[10px] text-content-muted">Sua nota:</span>
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <button
+                            key={star}
+                            onClick={() => submitRating(r.id, star)}
+                            disabled={ratingSubmitting === r.id}
+                            className="transition-transform hover:scale-110 active:scale-95"
+                          >
+                            <Star className={`h-4 w-4 ${star <= myRating ? "fill-amber-400 text-amber-400" : "text-slate-300"}`} />
+                          </button>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── History tab ── */}
       {tab === "history" && (
         <div className="flex flex-col gap-4">
@@ -661,6 +834,68 @@ export function Recipes() {
               </div>
             </div>
             <div className="mt-4 flex justify-end"><Button variant="outline" onClick={() => setSelectedFood(null)}>{t("close")}</Button></div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Recipe share modal ── */}
+      {showRecipeModal && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onClick={() => setShowRecipeModal(false)}>
+          <div className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-y-auto rounded-t-2xl bg-surface-card p-6 shadow-xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-5 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-content-strong">Compartilhar Receita</h2>
+              <button onClick={() => setShowRecipeModal(false)} className="text-content-muted hover:text-content-body"><X className="h-5 w-5" /></button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium text-content-body">Título *</label>
+                <input type="text" placeholder="Nome da receita" value={recipeForm.title} onChange={(e) => setRecipeForm({ ...recipeForm, title: e.target.value })} className="mt-1 flex h-10 w-full rounded-lg border border-edge-base bg-surface-card px-3 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100" />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-content-body">Descrição</label>
+                <input type="text" placeholder="Breve descrição" value={recipeForm.description} onChange={(e) => setRecipeForm({ ...recipeForm, description: e.target.value })} className="mt-1 flex h-10 w-full rounded-lg border border-edge-base bg-surface-card px-3 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100" />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-content-body">Ingredientes *</label>
+                <AutoTextarea minRows={3} placeholder="Liste os ingredientes..." value={recipeForm.ingredients} onChange={(e) => setRecipeForm({ ...recipeForm, ingredients: e.target.value })} className="mt-1 flex w-full rounded-lg border border-edge-base bg-surface-card px-3 py-2 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100" />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-content-body">Modo de preparo *</label>
+                <AutoTextarea minRows={3} placeholder="Passo a passo..." value={recipeForm.instructions} onChange={(e) => setRecipeForm({ ...recipeForm, instructions: e.target.value })} className="mt-1 flex w-full rounded-lg border border-edge-base bg-surface-card px-3 py-2 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100" />
+              </div>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div>
+                  <label className="text-sm font-medium text-content-body">Tempo (min)</label>
+                  <input type="number" placeholder="0" value={recipeForm.prep_time_min} onChange={(e) => setRecipeForm({ ...recipeForm, prep_time_min: e.target.value })} className="mt-1 flex h-10 w-full rounded-lg border border-edge-base bg-surface-card px-3 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100" />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-content-body">Porções</label>
+                  <input type="number" placeholder="1" value={recipeForm.servings} onChange={(e) => setRecipeForm({ ...recipeForm, servings: e.target.value })} className="mt-1 flex h-10 w-full rounded-lg border border-edge-base bg-surface-card px-3 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100" />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-content-body">Calorias</label>
+                  <input type="number" placeholder="0" value={recipeForm.calories} onChange={(e) => setRecipeForm({ ...recipeForm, calories: e.target.value })} className="mt-1 flex h-10 w-full rounded-lg border border-edge-base bg-surface-card px-3 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100" />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-content-body">Proteína (g)</label>
+                  <input type="number" placeholder="0" value={recipeForm.protein_g} onChange={(e) => setRecipeForm({ ...recipeForm, protein_g: e.target.value })} className="mt-1 flex h-10 w-full rounded-lg border border-edge-base bg-surface-card px-3 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100" />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-content-body">Carboidrato (g)</label>
+                  <input type="number" placeholder="0" value={recipeForm.carbs_g} onChange={(e) => setRecipeForm({ ...recipeForm, carbs_g: e.target.value })} className="mt-1 flex h-10 w-full rounded-lg border border-edge-base bg-surface-card px-3 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100" />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-content-body">Gordura (g)</label>
+                  <input type="number" placeholder="0" value={recipeForm.fat_g} onChange={(e) => setRecipeForm({ ...recipeForm, fat_g: e.target.value })} className="mt-1 flex h-10 w-full rounded-lg border border-edge-base bg-surface-card px-3 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100" />
+                </div>
+              </div>
+            </div>
+            <div className="mt-5 flex gap-3">
+              <Button variant="outline" className="flex-1" onClick={() => setShowRecipeModal(false)}>{t("cancel")}</Button>
+              <Button className="flex-1" onClick={saveCommunityRecipe} disabled={saving || !recipeForm.title.trim() || !recipeForm.ingredients.trim() || !recipeForm.instructions.trim()}>
+                {saving ? t("saving") : "Publicar"}
+              </Button>
+            </div>
           </div>
         </div>
       )}

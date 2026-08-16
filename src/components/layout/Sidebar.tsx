@@ -21,6 +21,7 @@ import {
   Newspaper,
   Shield,
   Star,
+  Trophy,
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { Avatar, AvatarImage, AvatarFallback } from "../ui/avatar";
@@ -59,6 +60,7 @@ const navSections: NavSection[] = [
       { to: "/workout", key: "nav.workout", icon: Dumbbell },
       { to: "/progress", key: "nav.progress", icon: TrendingUp },
       { to: "/recipes", key: "nav.recipes", icon: UtensilsCrossed },
+      { to: "/achievements", key: "nav.achievements", icon: Trophy },
     ],
   },
   {

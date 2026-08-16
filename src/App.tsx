@@ -18,6 +18,7 @@ import { WorkoutProgression } from "./pages/WorkoutProgression";
 import { Appointments } from "./pages/Appointments";
 import { MyClients } from "./pages/MyClients";
 import { Feed } from "./pages/Feed";
+import { Achievements } from "./pages/Achievements";
 import { Reviews } from "./pages/Reviews";
 import { UserProfile } from "./pages/UserProfile";
 import { MyProfile } from "./pages/MyProfile";
@@ -103,6 +104,7 @@ export default function App() {
           <Route path="/professional-profile" element={<ProfessionalRoute><ProfessionalProfile /></ProfessionalRoute>} />
           <Route path="/professional/:id" element={<ProtectedRoute><ProfessionalProfile /></ProtectedRoute>} />
           <Route path="/feed" element={<Feed />} />
+          <Route path="/achievements" element={<Achievements />} />
           <Route path="/profile/:id" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
           <Route path="/my-profile" element={<MyProfile />} />
           <Route path="/moderation" element={<OwnerRoute><Moderation /></OwnerRoute>} />
