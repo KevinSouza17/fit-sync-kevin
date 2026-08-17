@@ -6,7 +6,6 @@ import {
   TrendingUp,
   UtensilsCrossed,
   Settings,
-  Activity,
   Users,
   Target,
   LogOut,
@@ -25,6 +24,7 @@ import {
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { Avatar, AvatarImage, AvatarFallback } from "../ui/avatar";
+import { FitSyncLogo } from "../FitSyncLogo";
 import { useAuth } from "../../context/AuthContext";
 import { useNotifications } from "../../context/NotificationsContext";
 import { useI18n } from "../../context/I18nContext";
@@ -114,10 +114,7 @@ export function Sidebar() {
   const sidebarContent = (
     <aside className="flex h-full w-64 shrink-0 flex-col border-r border-edge-base bg-surface-card px-4 py-4">
       <header className="flex items-center gap-2.5 px-2 pb-6 pt-1">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-600">
-          <Activity className="h-5 w-5 text-white" />
-        </div>
-        <span className="text-xl font-bold text-content-strong">FitSync</span>
+        <FitSyncLogo size="sm" />
         <button onClick={() => setMobileOpen(false)} className="ml-auto rounded-lg p-1.5 text-content-muted hover:bg-surface-subtle lg:hidden">
           <X className="h-5 w-5" />
         </button>
@@ -196,12 +193,7 @@ export function Sidebar() {
     <>
       {/* Mobile top bar */}
       <div className="flex items-center justify-between border-b border-edge-base bg-surface-card px-4 py-3 lg:hidden">
-        <div className="flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary-600">
-            <Activity className="h-4 w-4 text-white" />
-          </div>
-          <span className="text-lg font-bold text-content-strong">FitSync</span>
-        </div>
+        <FitSyncLogo size="sm" />
         <button onClick={() => setMobileOpen(true)} className="rounded-lg p-2 text-content-body hover:bg-surface-subtle">
           <Menu className="h-5 w-5" />
         </button>

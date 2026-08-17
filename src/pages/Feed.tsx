@@ -7,6 +7,7 @@ import { AutoTextarea } from "../components/ui/textarea";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "../components/ui/avatar";
+import { AvatarPreview } from "../components/ui/AvatarPreview";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
 import { supabase } from "../lib/supabase";
@@ -423,7 +424,7 @@ export function Feed() {
   const taCls = "w-full rounded-xl border border-edge-base bg-surface-base px-4 py-3 text-sm text-content-strong placeholder:text-content-muted focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100";
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-5 px-4 py-6 sm:px-6">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 sm:p-6 lg:p-8">
       <header>
         <h1 className="text-2xl font-bold text-content-strong">{t("feed.title")}</h1>
         <p className="mt-0.5 text-sm text-content-muted">{t("feed.subtitle")}</p>
@@ -518,22 +519,20 @@ export function Feed() {
               <Card key={post.id}>
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between">
-                    <button
-                      onClick={() => navigate(`/profile/${post.user_id}`)}
-                      className="flex items-center gap-3 text-left"
-                    >
-                      <Avatar className="h-10 w-10">
-                        {post.profiles?.avatar_url ? (
-                          <AvatarImage src={post.profiles.avatar_url} alt={name} />
-                        ) : (
-                          <AvatarFallback className="bg-primary-50 text-sm font-bold text-primary-600">{initials(name)}</AvatarFallback>
-                        )}
-                      </Avatar>
+                    <div className="flex items-center gap-3">
+                      <AvatarPreview
+                        src={post.profiles?.avatar_url}
+                        name={name}
+                        userId={post.user_id}
+                        size="sm"
+                      />
                       <div>
-                        <p className="text-sm font-semibold text-content-strong hover:underline">{name}</p>
+                        <button onClick={() => navigate(`/profile/${post.user_id}`)} className="text-left">
+                          <p className="text-sm font-semibold text-content-strong hover:underline">{name}</p>
+                        </button>
                         <p className="text-xs text-content-muted">{timeAgo(post.created_at)}</p>
                       </div>
-                    </button>
+                    </div>
                     <div className="flex items-center gap-2">
                       {!isOwn && (
                         followStatus === "pending" || followStatus === "accepted" ? (
@@ -658,13 +657,12 @@ export function Feed() {
                           const cIsOwn = c.user_id === user?.id;
                           return (
                             <div key={c.id} className="flex items-start gap-2">
-                              <Avatar className="h-7 w-7 shrink-0">
-                                {c.profiles?.avatar_url ? (
-                                  <AvatarImage src={c.profiles.avatar_url} alt={cName} />
-                                ) : (
-                                  <AvatarFallback className="bg-primary-50 text-[10px] font-bold text-primary-600">{initials(cName)}</AvatarFallback>
-                                )}
-                              </Avatar>
+                              <AvatarPreview
+                                src={c.profiles?.avatar_url}
+                                name={cName}
+                                userId={c.user_id}
+                                size="xs"
+                              />
                               <div className="flex-1">
                                 <div className="rounded-xl bg-slate-50 px-3 py-2">
                                   <div className="flex items-center justify-between">

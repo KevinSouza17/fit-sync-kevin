@@ -74,7 +74,7 @@ export function Settings() {
   }
 
   return (
-    <div className="flex flex-col gap-6 p-8">
+    <div className="flex flex-col gap-6 p-4 sm:p-6 lg:p-8">
       <header>
         <h1 className="text-2xl font-bold text-content-strong">{t("settings.title")}</h1>
         <p className="mt-0.5 text-sm text-content-muted">{t("settings.subtitle")}</p>

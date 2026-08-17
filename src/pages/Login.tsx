@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Activity, Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
+import { FitSyncLogo } from "../components/FitSyncLogo";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
 
@@ -30,17 +31,14 @@ export function Login() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-primary-50/30 p-4">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 via-white to-primary-50/40 p-4 dark:from-slate-950 dark:via-slate-900 dark:to-primary-900/10">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center text-center">
-          <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary-600 shadow-lg shadow-primary-600/20">
-            <Activity className="h-7 w-7 text-white" />
-          </div>
-          <span className="text-2xl font-bold text-content-strong">FitSync</span>
-          <p className="mt-1.5 text-sm text-content-muted">{t("login.subtitle")}</p>
+          <FitSyncLogo size="lg" animated />
+          <p className="mt-3 text-sm text-content-muted">{t("login.subtitle")}</p>
         </div>
 
-        <div className="rounded-2xl bg-surface-card p-6 shadow-sm sm:p-8">
+        <div className="rounded-2xl border border-edge-base/60 bg-surface-card/95 p-6 shadow-xl shadow-primary-900/5 backdrop-blur-sm sm:p-8">
           <h1 className="mb-6 text-xl font-bold text-content-strong">{t("login.title")}</h1>
 
           {error && (

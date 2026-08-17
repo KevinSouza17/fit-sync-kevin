@@ -243,7 +243,7 @@ export function MyClients() {
     "w-full rounded-lg border border-edge-base bg-surface-base px-3 py-2 text-sm text-content-strong placeholder:text-content-muted focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100 dark:bg-surface-subtle";
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-4 sm:p-6 lg:p-8">
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-bold text-content-strong sm:text-3xl">{t("plans.title")}</h1>
         <p className="text-sm text-content-muted">{t("plans.subtitle")}</p>

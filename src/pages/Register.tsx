@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Activity, Mail, Lock, Eye, EyeOff, User, Briefcase, GraduationCap, Award, MapPin, Loader2, Building2, CheckCircle2 } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, User, Briefcase, GraduationCap, Award, MapPin, Loader2, Building2, CheckCircle2 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
+import { FitSyncLogo } from "../components/FitSyncLogo";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
 import { useI18n } from "../context/I18nContext";
@@ -102,12 +103,7 @@ export function Register() {
       <div className={`hidden w-1/2 flex-col justify-between p-12 lg:flex ${
         accountType === "professional" ? "bg-emerald-600" : "bg-primary-600"
       }`}>
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/20">
-            <Activity className="h-5 w-5 text-white" />
-          </div>
-          <span className="text-xl font-bold text-white">FitSync</span>
-        </div>
+        <FitSyncLogo size="sm" textClassName="text-white" />
         <div className="space-y-4">
           {accountType === "professional" ? (
             <>
@@ -135,11 +131,8 @@ export function Register() {
       {/* Right form panel */}
       <div className="flex w-full flex-col justify-center bg-surface-card px-8 py-12 lg:w-1/2 lg:px-16">
         <div className="mx-auto w-full max-w-md">
-          <div className="mb-8 flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-600">
-              <Activity className="h-5 w-5 text-white" />
-            </div>
-            <span className="text-xl font-bold text-content-strong">FitSync</span>
+          <div className="mb-8">
+            <FitSyncLogo size="md" />
           </div>
 
           <div className="mb-6">

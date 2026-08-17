@@ -7,6 +7,7 @@ import {
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "../components/ui/avatar";
+import { AvatarPreview } from "../components/ui/AvatarPreview";
 import { StoryViewer } from "../components/StoryViewer";
 import type { StoryItem, StoryGroup } from "../components/StoryViewer";
 import { useAuth } from "../context/AuthContext";
@@ -226,7 +227,7 @@ export function UserProfile() {
   const name = profileData?.full_name || "Usuario";
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-5 px-4 py-6 sm:px-6">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 sm:p-6 lg:p-8">
       {/* Profile header */}
       <Card>
         <CardContent className="p-0">
@@ -244,13 +245,13 @@ export function UserProfile() {
                 title={profileStories.length > 0 ? "Ver stories" : undefined}
               >
                 <div className={`h-20 w-20 rounded-full ring-4 ring-white shadow-lg ${profileStories.length > 0 ? "bg-gradient-to-tr from-primary-400 to-primary-600 p-0.5" : ""}`}>
-                  <Avatar className="h-full w-full overflow-hidden rounded-full border-2 border-white">
-                    {profileData?.avatar_url ? (
-                      <AvatarImage src={profileData.avatar_url} alt={name} />
-                    ) : (
-                      <AvatarFallback className="bg-primary-50 text-2xl font-bold text-primary-600">{initials(name)}</AvatarFallback>
-                    )}
-                  </Avatar>
+                  <AvatarPreview
+                    src={profileData?.avatar_url}
+                    name={name}
+                    size="lg"
+                    className="border-2 border-white"
+                    fallbackClassName="text-2xl"
+                  />
                 </div>
               </button>
               <div className="flex items-center gap-2">
@@ -339,13 +340,12 @@ export function UserProfile() {
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
-                      <Avatar className="h-10 w-10">
-                        {post.profiles?.avatar_url ? (
-                          <AvatarImage src={post.profiles.avatar_url} alt={name} />
-                        ) : (
-                          <AvatarFallback className="bg-primary-50 text-sm font-bold text-primary-600">{initials(name)}</AvatarFallback>
-                        )}
-                      </Avatar>
+                      <AvatarPreview
+                        src={post.profiles?.avatar_url}
+                        name={name}
+                        userId={post.user_id}
+                        size="sm"
+                      />
                       <div>
                         <p className="text-sm font-semibold text-content-strong">{name}</p>
                         <p className="text-xs text-content-muted">{timeAgo(post.created_at)}</p>

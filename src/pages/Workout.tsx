@@ -260,7 +260,7 @@ export function Workout() {
   const logDay = days.find((d) => d.id === logForm.workout_day_id);
 
   return (
-    <div className="flex flex-col gap-6 p-4 sm:p-8">
+    <div className="flex flex-col gap-6 p-4 sm:p-6 lg:p-8">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold text-content-strong">

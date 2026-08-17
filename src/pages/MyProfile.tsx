@@ -7,6 +7,7 @@ import {
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "../components/ui/avatar";
+import { AvatarPreview } from "../components/ui/AvatarPreview";
 import { StoryViewer } from "../components/StoryViewer";
 import type { StoryItem, StoryGroup } from "../components/StoryViewer";
 import { useAuth } from "../context/AuthContext";
@@ -54,7 +55,7 @@ function timeAgo(dateStr: string) {
 type Tab = "posts" | "followers" | "following";
 
 export function MyProfile() {
-  const { user, profile } = useAuth();
+  const { user, profile, refreshProfile } = useAuth();
   const { t } = useI18n();
   const navigate = useNavigate();
   const [posts, setPosts] = useState<PostWithProfile[]>([]);
@@ -212,13 +213,14 @@ export function MyProfile() {
   ];
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-5 px-4 py-6 sm:px-6">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 sm:p-6 lg:p-8">
       {/* Profile header */}
-      <Card className="overflow-hidden">
+      <Card className="overflow-hidden border-edge-base/60 shadow-lg shadow-primary-900/5">
         <CardContent className="p-0">
           {/* Cover */}
           <div className="relative h-36 w-full bg-gradient-to-br from-primary-600 via-primary-500 to-primary-400 sm:h-40">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.15),transparent_50%)]" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_80%,rgba(255,255,255,0.08),transparent_40%)]" />
           </div>
 
           <div className="px-5 pb-5 sm:px-8">
@@ -235,21 +237,28 @@ export function MyProfile() {
                 title={profileStories.length > 0 ? "Ver stories" : undefined}
               >
                 <div className={`h-24 w-24 rounded-full ring-4 ring-white shadow-xl ${profileStories.length > 0 ? "bg-gradient-to-tr from-primary-400 to-primary-600 p-0.5" : ""}`}>
-                  <Avatar className="h-full w-full overflow-hidden rounded-full border-2 border-white">
-                    {profile?.avatar_url ? (
-                      <AvatarImage src={profile.avatar_url} alt={name} />
-                    ) : (
-                      <AvatarFallback className="bg-primary-50 text-2xl font-bold text-primary-600">{initials(name)}</AvatarFallback>
-                    )}
-                  </Avatar>
+                  <AvatarPreview
+                    src={profile?.avatar_url}
+                    name={name}
+                    size="lg"
+                    className="border-2 border-white"
+                    fallbackClassName="text-2xl"
+                  />
                 </div>
               </button>
 
               <div className="flex items-center gap-2 pb-1">
-                <Button variant="outline" size="sm" onClick={togglePrivacy} className="gap-1.5">
-                  {profile?.is_private ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
-                  <span className="hidden sm:inline">{profile?.is_private ? t("feed.profilePrivate") : t("feed.profilePublic")}</span>
-                </Button>
+                <button
+                  onClick={togglePrivacy}
+                  className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                    profile?.is_private
+                      ? "bg-amber-50 text-amber-700 hover:bg-amber-100"
+                      : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                  }`}
+                >
+                  {profile?.is_private ? <Lock className="h-3.5 w-3.5" /> : <Unlock className="h-3.5 w-3.5" />}
+                  <span>{profile?.is_private ? t("feed.profilePrivate") : t("feed.profilePublic")}</span>
+                </button>
                 <Button variant="outline" size="sm" onClick={() => navigate("/profile")} className="gap-1.5">
                   <Pencil className="h-4 w-4" />
                   <span className="hidden sm:inline">{t("editProfile.title")}</span>
@@ -329,13 +338,12 @@ export function MyProfile() {
                 <CardContent className="flex flex-1 flex-col p-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Avatar className="h-8 w-8">
-                        {profile?.avatar_url ? (
-                          <AvatarImage src={profile.avatar_url} alt={name} />
-                        ) : (
-                          <AvatarFallback className="bg-primary-50 text-xs font-bold text-primary-600">{initials(name)}</AvatarFallback>
-                        )}
-                      </Avatar>
+                      <AvatarPreview
+                        src={profile?.avatar_url}
+                        name={name}
+                        userId={profileId}
+                        size="xs"
+                      />
                       <div>
                         <p className="text-xs font-semibold text-content-strong">{name}</p>
                         <p className="text-[11px] text-content-muted">{timeAgo(post.created_at)}</p>
@@ -387,11 +395,7 @@ export function MyProfile() {
                 onClick={() => navigate(`/profile/${f.id}`)}
                 className="flex items-center gap-3 rounded-xl bg-surface-card p-3 text-left transition-colors hover:bg-surface-subtle"
               >
-                <Avatar className="h-10 w-10">
-                  {f.avatar_url ? <AvatarImage src={f.avatar_url} alt={f.full_name ?? ""} /> : (
-                    <AvatarFallback className="bg-primary-50 text-sm font-bold text-primary-600">{initials(f.full_name ?? "?")}</AvatarFallback>
-                  )}
-                </Avatar>
+                <AvatarPreview src={f.avatar_url} name={f.full_name ?? "Usuario"} userId={f.id} size="sm" />
                 <div className="flex-1">
                   <p className="text-sm font-semibold text-content-strong">{f.full_name ?? "Usuario"}</p>
                   {f.is_professional && <p className="text-xs text-primary-600">{f.professional_role}</p>}
@@ -420,11 +424,7 @@ export function MyProfile() {
                 onClick={() => navigate(`/profile/${f.id}`)}
                 className="flex items-center gap-3 rounded-xl bg-surface-card p-3 text-left transition-colors hover:bg-surface-subtle"
               >
-                <Avatar className="h-10 w-10">
-                  {f.avatar_url ? <AvatarImage src={f.avatar_url} alt={f.full_name ?? ""} /> : (
-                    <AvatarFallback className="bg-primary-50 text-sm font-bold text-primary-600">{initials(f.full_name ?? "?")}</AvatarFallback>
-                  )}
-                </Avatar>
+                <AvatarPreview src={f.avatar_url} name={f.full_name ?? "Usuario"} userId={f.id} size="sm" />
                 <div className="flex-1">
                   <p className="text-sm font-semibold text-content-strong">{f.full_name ?? "Usuario"}</p>
                   {f.is_professional && <p className="text-xs text-primary-600">{f.professional_role}</p>}

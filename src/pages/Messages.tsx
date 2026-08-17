@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Send, Search, ArrowLeft, MessageCircle, UserCircle, UserPlus, ImagePlus, Mic, Loader2, X, Trash2 } from "lucide-react";
+import { Send, Search, ArrowLeft, MessageCircle, UserCircle, UserPlus, ImagePlus, Mic, Loader2, X, Trash2, Square } from "lucide-react";
 import { AudioPlayer } from "../components/AudioPlayer";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
@@ -63,10 +63,12 @@ export function Messages() {
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
   const [recordedUrl, setRecordedUrl] = useState<string | null>(null);
   const [sendingAudio, setSendingAudio] = useState(false);
+  const [recordTime, setRecordTime] = useState(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const recordTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const activeConv = conversations.find((c) => c.id === activeId);
 
@@ -226,6 +228,10 @@ export function Messages() {
       recorder.start();
       mediaRecorderRef.current = recorder;
       setRecording(true);
+      setRecordTime(0);
+      recordTimerRef.current = setInterval(() => {
+        setRecordTime((prev) => prev + 1);
+      }, 1000);
     } catch {
       setRecording(false);
     }
@@ -234,6 +240,10 @@ export function Messages() {
   function stopRecording() {
     mediaRecorderRef.current?.stop();
     setRecording(false);
+    if (recordTimerRef.current) {
+      clearInterval(recordTimerRef.current);
+      recordTimerRef.current = null;
+    }
   }
 
   function cancelRecording() {
@@ -243,6 +253,11 @@ export function Messages() {
     setRecording(false);
     setRecordedBlob(null);
     setRecordedUrl(null);
+    setRecordTime(0);
+    if (recordTimerRef.current) {
+      clearInterval(recordTimerRef.current);
+      recordTimerRef.current = null;
+    }
   }
 
   async function sendAudio() {
@@ -264,6 +279,7 @@ export function Messages() {
     }
     setRecordedBlob(null);
     setRecordedUrl(null);
+    setRecordTime(0);
     setSendingAudio(false);
   }
 
@@ -398,9 +414,42 @@ export function Messages() {
           {/* Audio preview bar */}
           {recordedUrl && (
             <div className="flex items-center gap-3 border-t border-slate-200 bg-amber-50 px-4 py-3">
+              <div className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                <span className="text-xs font-medium text-amber-700">{Math.floor(recordTime / 60)}:{(recordTime % 60).toString().padStart(2, "0")}</span>
+              </div>
               <audio src={recordedUrl} controls className="h-8 flex-1" />
               <button onClick={sendAudio} disabled={sendingAudio} className="flex h-9 w-9 items-center justify-center rounded-full bg-primary-600 text-white disabled:opacity-40">
                 {sendingAudio ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              </button>
+              <button onClick={cancelRecording} className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-200 text-slate-600">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+
+          {/* Recording indicator bar */}
+          {recording && !recordedUrl && (
+            <div className="flex items-center gap-3 border-t border-red-200 bg-red-50 px-4 py-3">
+              <div className="flex items-center gap-2">
+                <span className="relative flex h-3 w-3">
+                  <span className="absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75 animate-ping" />
+                  <span className="relative inline-flex h-3 w-3 rounded-full bg-red-500" />
+                </span>
+                <span className="text-sm font-semibold text-red-600">Gravando áudio...</span>
+              </div>
+              <div className="flex flex-1 items-center justify-center gap-1">
+                {[0,1,2,3,4,5,6,7,8,9,10,11].map((i) => (
+                  <span
+                    key={i}
+                    className="w-1 rounded-full bg-red-400 wave-bar"
+                    style={{ animationDelay: `${i * 0.08}s`, height: "6px" }}
+                  />
+                ))}
+              </div>
+              <span className="text-sm font-mono text-red-600">{Math.floor(recordTime / 60)}:{(recordTime % 60).toString().padStart(2, "0")}</span>
+              <button onClick={stopRecording} className="flex h-9 w-9 items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600">
+                <Square className="h-4 w-4" />
               </button>
               <button onClick={cancelRecording} className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-200 text-slate-600">
                 <X className="h-4 w-4" />
@@ -418,7 +467,7 @@ export function Messages() {
               <button
                 onClick={recording ? stopRecording : startRecording}
                 disabled={!!recordedUrl}
-                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors disabled:opacity-40 ${recording ? "bg-red-500 text-white animate-pulse" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
+                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-all disabled:opacity-40 ${recording ? "bg-red-500 text-white record-pulse" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
               >
                 <Mic className="h-5 w-5" />
               </button>

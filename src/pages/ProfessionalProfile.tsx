@@ -212,7 +212,7 @@ export function ProfessionalProfile() {
   }
 
   return (
-    <div className="flex flex-col gap-0 pb-10">
+    <div className="flex flex-col gap-6 p-4 sm:p-6 lg:p-8">
       {/* Hero banner */}
       <div className="relative h-48 w-full overflow-hidden bg-gradient-to-br from-primary-700 via-primary-500 to-primary-400">
         <svg className="absolute bottom-0 left-0 h-full w-full opacity-20" viewBox="0 0 900 200" preserveAspectRatio="none">

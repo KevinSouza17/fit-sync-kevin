@@ -116,7 +116,7 @@ export function Reviews() {
   const taCls = "w-full rounded-xl border border-edge-base bg-surface-base px-4 py-3 text-sm text-content-strong placeholder:text-content-muted focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100";
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 px-4 py-6 sm:px-6">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 sm:p-6 lg:p-8">
       <header>
         <h1 className="text-2xl font-bold text-content-strong">{t("reviews.title")}</h1>
         <p className="mt-0.5 text-sm text-content-muted">{t("reviews.subtitle")}</p>

@@ -111,7 +111,7 @@ export function Moderation() {
   const pendingReports = reports.filter((r) => r.status === "pending");
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 px-4 py-6 sm:px-6">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 sm:p-6 lg:p-8">
       <header className="flex items-center gap-3">
         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-600 text-white">
           <Shield className="h-5 w-5" />

@@ -56,7 +56,7 @@ export function Achievements() {
   const totalXp = all.filter((a) => earned[a.id]).reduce((s, a) => s + a.xp_reward, 0);
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-6 sm:px-6">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 sm:p-6 lg:p-8">
       <header>
         <h1 className="flex items-center gap-2 text-2xl font-bold text-content-strong">
           <Trophy className="h-7 w-7 text-yellow-500" />

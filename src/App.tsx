@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 import { Login } from "./pages/Login";
@@ -24,19 +25,11 @@ import { UserProfile } from "./pages/UserProfile";
 import { MyProfile } from "./pages/MyProfile";
 import { Moderation } from "./pages/Moderation";
 import { DashboardLayout } from "./components/layout/DashboardLayout";
+import { PageLoader, SplashScreen } from "./components/PageLoader";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, profile, loading } = useAuth();
-  if (loading) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-surface-base">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-600 border-t-transparent" />
-          <p className="text-sm text-content-muted">Carregando...</p>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <PageLoader />;
   if (!user) return <Navigate to="/login" replace />;
   if (profile?.is_banned) return <Navigate to="/login" replace />;
   return <>{children}</>;
@@ -44,13 +37,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 function ProfessionalRoute({ children }: { children: React.ReactNode }) {
   const { user, profile, loading } = useAuth();
-  if (loading) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-surface-base">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-600 border-t-transparent" />
-      </div>
-    );
-  }
+  if (loading) return <PageLoader />;
   if (!user) return <Navigate to="/login" replace />;
   if (profile?.is_banned) return <Navigate to="/login" replace />;
   if (!profile?.is_professional) return <Navigate to="/dashboard" replace />;
@@ -59,13 +46,7 @@ function ProfessionalRoute({ children }: { children: React.ReactNode }) {
 
 function OwnerRoute({ children }: { children: React.ReactNode }) {
   const { user, profile, loading } = useAuth();
-  if (loading) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-surface-base">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-600 border-t-transparent" />
-      </div>
-    );
-  }
+  if (loading) return <PageLoader />;
   if (!user) return <Navigate to="/login" replace />;
   if (profile?.is_banned) return <Navigate to="/login" replace />;
   if (profile?.role !== "owner") return <Navigate to="/dashboard" replace />;
@@ -80,6 +61,15 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
+  const [showSplash, setShowSplash] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setShowSplash(false), 1800);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (showSplash) return <SplashScreen />;
+
   return (
     <BrowserRouter>
       <Routes>

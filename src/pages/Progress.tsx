@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { TrendingUp, ArrowUp, ArrowDown, Scale } from "lucide-react";
+import { Link } from "react-router-dom";
+import { ArrowUp, ArrowDown, Scale, Trophy, ChevronRight } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
@@ -48,16 +49,6 @@ export function Progress() {
   const maxWeight = weightLogs.length > 0 ? Math.max(...weightLogs.map((w) => Number(w.weight_kg))) : 80;
   const minWeight = weightLogs.length > 0 ? Math.min(...weightLogs.map((w) => Number(w.weight_kg))) : 60;
   const range = maxWeight - minWeight || 1;
-
-  const milestones = [
-    { text: "Primeiro peso registrado", done: weightLogs.length >= 1 },
-    { text: "5 registros de peso", done: weightLogs.length >= 5 },
-    { text: "10 registros de peso", done: weightLogs.length >= 10 },
-    { text: "30 registros de peso", done: weightLogs.length >= 30 },
-    ...(goalWeight && latest
-      ? [{ text: `Atingir peso meta de ${goalWeight} kg`, done: Number(latest.weight_kg) <= goalWeight }]
-      : []),
-  ];
 
   return (
     <div className="flex flex-col gap-6 p-4 sm:p-6 lg:p-8">
@@ -188,29 +179,20 @@ export function Progress() {
             </Card>
           </div>
 
-          {/* Milestones */}
-          <Card>
-            <CardContent className="p-5">
-              <h2 className="mb-4 text-base font-semibold text-content-strong">Conquistas</h2>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {milestones.map((m) => (
-                  <div
-                    key={m.text}
-                    className={`flex items-center gap-3 rounded-xl p-3 ${m.done ? "bg-primary-50" : "bg-surface-base"}`}
-                  >
-                    <div
-                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${m.done ? "bg-primary-600" : "bg-slate-200"}`}
-                    >
-                      <TrendingUp className={`h-3.5 w-3.5 ${m.done ? "text-white" : "text-content-muted"}`} />
-                    </div>
-                    <p className={`text-sm ${m.done ? "font-medium text-content-strong" : "text-content-muted"}`}>
-                      {m.text}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          <Link to="/achievements">
+            <Card className="cursor-pointer transition-shadow hover:shadow-md">
+              <CardContent className="flex items-center gap-4 p-5">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-50">
+                  <Trophy className="h-6 w-6 text-amber-500" />
+                </div>
+                <div className="flex-1">
+                  <h2 className="text-base font-semibold text-content-strong">Conquistas</h2>
+                  <p className="mt-0.5 text-sm text-content-muted">Veja suas medalhas e marcos desbloqueados</p>
+                </div>
+                <ChevronRight className="h-5 w-5 text-content-muted" />
+              </CardContent>
+            </Card>
+          </Link>
         </>
       )}
     </div>

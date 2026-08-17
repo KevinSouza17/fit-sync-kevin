@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Camera, Save, Check, Briefcase, GraduationCap, Award, MapPin, Loader2, Building2, ShieldCheck, ShieldAlert, User } from "lucide-react";
+import { Camera, Save, Check, Briefcase, GraduationCap, Award, MapPin, Loader2, Building2, ShieldCheck, ShieldAlert, User, Lock, Unlock } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -44,6 +44,7 @@ interface FormState {
   available_for_booking: boolean;
   registration_type: "autonomo" | "empresa";
   document_number: string;
+  is_private: boolean;
 }
 
 const professionalRoles = [
@@ -94,6 +95,7 @@ export function EditProfile() {
     available_for_booking: false,
     registration_type: "autonomo",
     document_number: "",
+    is_private: false,
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -137,6 +139,7 @@ export function EditProfile() {
         available_for_booking: profile.available_for_booking ?? false,
         registration_type: (profile.registration_type as "autonomo" | "empresa") ?? "autonomo",
         document_number: profile.document_number ?? "",
+        is_private: profile.is_private ?? false,
       });
       setAvatarUrl(profile.avatar_url ?? null);
     }
@@ -205,6 +208,7 @@ export function EditProfile() {
       available_for_booking: form.is_professional ? form.available_for_booking : false,
       registration_type: form.is_professional ? form.registration_type : "autonomo",
       document_number: form.is_professional ? form.document_number : null,
+      is_private: form.is_private,
       updated_at: new Date().toISOString(),
     };
     const { error: err } = await supabase
@@ -361,6 +365,38 @@ export function EditProfile() {
                     className="bg-surface-subtle text-content-muted"
                   />
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="flex items-center gap-2 text-base font-semibold text-content-strong">
+                    {form.is_private ? <Lock className="h-5 w-5 text-amber-500" /> : <Unlock className="h-5 w-5 text-emerald-500" />}
+                    Perfil Privado
+                  </h2>
+                  <p className="mt-1 text-sm text-content-muted">
+                    {form.is_private
+                      ? "Apenas seus seguidores podem ver suas postagens."
+                      : "Qualquer pessoa pode ver suas postagens e informações."}
+                  </p>
+                </div>
+                <button
+                  role="switch"
+                  aria-checked={form.is_private}
+                  onClick={() => setField("is_private", !form.is_private)}
+                  className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+                    form.is_private ? "bg-amber-500" : "bg-slate-200"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      form.is_private ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                </button>
               </div>
             </CardContent>
           </Card>
