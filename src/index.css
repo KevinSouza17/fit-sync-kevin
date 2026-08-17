@@ -82,15 +82,51 @@
     font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
   }
 
   body {
     background-color: rgb(var(--bg-base));
     color: rgb(var(--text-body));
+    overscroll-behavior: none;
+    -webkit-overflow-scrolling: touch;
   }
 
   * {
     border-color: rgb(var(--border-base));
+  }
+
+  /* iOS safe area insets */
+  .pt-safe { padding-top: env(safe-area-inset-top); }
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+  .pl-safe { padding-left: env(safe-area-inset-left); }
+  .pr-safe { padding-right: env(safe-area-inset-right); }
+
+  /* iOS: prevent input zoom on focus */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="tel"],
+  input[type="date"],
+  input[type="time"],
+  input[type="search"],
+  textarea,
+  select {
+    font-size: 16px;
+  }
+
+  /* iOS: smooth scrolling for chat/message containers */
+  .ios-scroll {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  /* iOS: fix 100vh issues */
+  .h-screen-ios {
+    height: 100vh;
+    height: 100dvh;
   }
 }
 

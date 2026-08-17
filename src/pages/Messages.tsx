@@ -300,9 +300,9 @@ export function Messages() {
   );
 
   return (
-    <div className="flex h-full overflow-hidden">
+    <div className="flex h-screen-ios overflow-hidden">
       <aside className={`flex w-full flex-col border-r border-slate-200 bg-white md:w-80 xl:w-96 ${activeId ? "hidden md:flex" : "flex"}`}>
-        <div className="border-b border-slate-100 px-5 py-4">
+        <div className="border-b border-slate-100 px-5 pt-safe pb-4">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-lg font-bold text-slate-900">{t("messages.title")}</h1>
@@ -350,14 +350,14 @@ export function Messages() {
 
       {activeId && activeConv ? (
         <section className="flex flex-1 flex-col bg-slate-50">
-          <header className="flex items-center gap-3 border-b border-slate-200 bg-white px-5 py-3.5">
+          <header className="flex items-center gap-3 border-b border-slate-200 bg-white px-5 pt-safe pb-3.5">
             <button onClick={() => { setActiveId(null); setActiveName(""); setSearchParams({}); }} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 md:hidden"><ArrowLeft className="h-5 w-5" /></button>
             <Avatar className="h-10 w-10"><AvatarFallback className="bg-primary-100 text-sm font-bold text-primary-700">{initials(activeName)}</AvatarFallback></Avatar>
             <div className="flex-1"><p className="text-sm font-semibold text-slate-900">{activeName}</p><p className="text-xs text-primary-600">{activeConv.otherRole}</p></div>
             <button className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"><UserCircle className="h-5 w-5" /></button>
           </header>
 
-          <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-6">
+          <div ref={scrollRef} className="ios-scroll flex-1 overflow-y-auto px-4 py-6">
             <div className="mx-auto flex max-w-2xl flex-col gap-3">
               {messages.length === 0 ? (
                 <div className="flex flex-1 flex-col items-center justify-center py-20 text-center">
@@ -409,7 +409,7 @@ export function Messages() {
           )}
 
           {/* Composer */}
-          <div className="border-t border-slate-200 bg-white px-4 py-3">
+          <div className="border-t border-slate-200 bg-white px-4 pt-3 pb-safe">
             <div className="mx-auto flex max-w-2xl items-center gap-2">
               <input ref={(el) => { fileInputRef.current = el; }} type="file" accept="image/*" onChange={handlePhotoUpload} className="hidden" />
               <button onClick={() => fileInputRef.current?.click()} disabled={uploading || !!recordedUrl} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition-colors hover:bg-slate-200 disabled:opacity-40">
@@ -423,7 +423,7 @@ export function Messages() {
                 <Mic className="h-5 w-5" />
               </button>
               <input
-                className="flex-1 rounded-full border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-primary-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-100"
+                className="flex-1 rounded-full border border-slate-200 bg-slate-50 px-4 py-2.5 text-base text-slate-900 placeholder:text-slate-400 focus:border-primary-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-100"
                 placeholder={recording ? t("messages.recording") : t("messages.typeMessage")}
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
