@@ -197,11 +197,17 @@ export function MyProfile() {
     setPosts((prev) => prev.filter((p) => p.id !== id));
   }
 
+  const [privacyLoading, setPrivacyLoading] = useState(false);
+
   async function togglePrivacy() {
-    if (!profile || !user) return;
+    if (!profile || !user || privacyLoading) return;
     const newPrivate = !profile.is_private;
-    await supabase.from("profiles").update({ is_private: newPrivate }).eq("id", user.id);
-    await refreshProfile();
+    setPrivacyLoading(true);
+    const { error } = await supabase.from("profiles").update({ is_private: newPrivate }).eq("id", user.id);
+    if (!error) {
+      await refreshProfile();
+    }
+    setPrivacyLoading(false);
   }
 
   const name = profile?.full_name || user?.email?.split("@")[0] || "Usuario";
@@ -250,13 +256,14 @@ export function MyProfile() {
               <div className="flex items-center gap-2 pb-1">
                 <button
                   onClick={togglePrivacy}
-                  className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  disabled={privacyLoading}
+                  className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-60 ${
                     profile?.is_private
                       ? "bg-amber-50 text-amber-700 hover:bg-amber-100"
                       : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
                   }`}
                 >
-                  {profile?.is_private ? <Lock className="h-3.5 w-3.5" /> : <Unlock className="h-3.5 w-3.5" />}
+                  {privacyLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : profile?.is_private ? <Lock className="h-3.5 w-3.5" /> : <Unlock className="h-3.5 w-3.5" />}
                   <span>{profile?.is_private ? t("feed.profilePrivate") : t("feed.profilePublic")}</span>
                 </button>
                 <Button variant="outline" size="sm" onClick={() => navigate("/profile")} className="gap-1.5">

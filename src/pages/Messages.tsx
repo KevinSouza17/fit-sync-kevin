@@ -64,11 +64,14 @@ export function Messages() {
   const [recordedUrl, setRecordedUrl] = useState<string | null>(null);
   const [sendingAudio, setSendingAudio] = useState(false);
   const [recordTime, setRecordTime] = useState(0);
+  const [otherTyping, setOtherTyping] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const recordTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const typingChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   const activeConv = conversations.find((c) => c.id === activeId);
 
@@ -158,14 +161,42 @@ export function Messages() {
           (payload) => {
             const row = payload.new as MessageRow;
             setMessages((prev) => prev.some((m) => m.id === row.id) ? prev : [...prev, row]);
+            setOtherTyping(false);
             if (user && row.sender_id !== user.id) {
               supabase.from("messages").update({ read: true }).eq("id", row.id).eq("read", false)
                 .then(() => loadConversations());
             }
           })
         .subscribe();
+
+      typingChannelRef.current = supabase
+        .channel(`typing-${activeId}`)
+        .on("broadcast", { event: "typing" }, (payload) => {
+          if (payload.payload?.userId && payload.payload.userId !== user?.id) {
+            setOtherTyping(true);
+            if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+            typingTimerRef.current = setTimeout(() => setOtherTyping(false), 3000);
+          }
+        })
+        .on("broadcast", { event: "stop-typing" }, (payload) => {
+          if (payload.payload?.userId && payload.payload.userId !== user?.id) {
+            setOtherTyping(false);
+          }
+        })
+        .subscribe();
     })();
-    return () => { if (channel) supabase.removeChannel(channel); };
+    return () => {
+      if (channel) supabase.removeChannel(channel);
+      if (typingChannelRef.current) {
+        supabase.removeChannel(typingChannelRef.current);
+        typingChannelRef.current = null;
+      }
+      if (typingTimerRef.current) {
+        clearTimeout(typingTimerRef.current);
+        typingTimerRef.current = null;
+      }
+      setOtherTyping(false);
+    };
   }, [activeId, user, loadConversations]);
 
   useEffect(() => {
@@ -173,10 +204,31 @@ export function Messages() {
   }, [messages]);
 
   // ── Send text message ──
+  function sendTypingEvent(isTyping: boolean) {
+    if (!typingChannelRef.current || !user) return;
+    typingChannelRef.current.send({
+      type: "broadcast",
+      event: isTyping ? "typing" : "stop-typing",
+      payload: { userId: user.id },
+    });
+  }
+
+  function handleDraftChange(value: string) {
+    setDraft(value);
+    if (value.trim()) {
+      sendTypingEvent(true);
+      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+      typingTimerRef.current = setTimeout(() => sendTypingEvent(false), 2000);
+    } else {
+      sendTypingEvent(false);
+    }
+  }
+
   async function handleSend() {
     if (!draft.trim() || !activeId || !user) return;
     const text = draft.trim();
     setDraft("");
+    sendTypingEvent(false);
     const { data } = await supabase
       .from("messages")
       .insert({ conversation_id: activeId, sender_id: user.id, content: text })
@@ -408,6 +460,15 @@ export function Messages() {
                   );
                 })
               )}
+              {otherTyping && (
+                <div className="flex justify-start">
+                  <div className="flex items-center gap-1.5 rounded-2xl rounded-bl-md bg-white px-4 py-3 shadow-sm">
+                    <span className="typing-dot h-2 w-2 rounded-full bg-slate-400 [animation-delay:-0.3s]" />
+                    <span className="typing-dot h-2 w-2 rounded-full bg-slate-400 [animation-delay:-0.15s]" />
+                    <span className="typing-dot h-2 w-2 rounded-full bg-slate-400" />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -475,7 +536,7 @@ export function Messages() {
                 className="flex-1 rounded-full border border-slate-200 bg-slate-50 px-4 py-2.5 text-base text-slate-900 placeholder:text-slate-400 focus:border-primary-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-100"
                 placeholder={recording ? t("messages.recording") : t("messages.typeMessage")}
                 value={draft}
-                onChange={(e) => setDraft(e.target.value)}
+                onChange={(e) => handleDraftChange(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
                 disabled={recording || !!recordedUrl}
               />
