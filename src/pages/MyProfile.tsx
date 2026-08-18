@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Heart, Trash2, Loader2, MessageCircle, Share2, Lock, Unlock,
-  Settings, Image as ImageIcon, Users, UserPlus, Pencil,
+  Settings, Image as ImageIcon, Users, UserPlus, Pencil, Grid3x3, LayoutGrid, Eye,
 } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -52,6 +52,7 @@ function timeAgo(dateStr: string) {
 }
 
 type Tab = "posts" | "followers" | "following";
+type Layout = "grid" | "list";
 
 export function MyProfile() {
   const { user, profile, refreshProfile } = useAuth();
@@ -68,6 +69,8 @@ export function MyProfile() {
   const [followers, setFollowers] = useState<FollowUser[]>([]);
   const [following, setFollowing] = useState<FollowUser[]>([]);
   const [listLoading, setListLoading] = useState(false);
+  const [layout, setLayout] = useState<Layout>("grid");
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   const profileId = user?.id ?? "";
 
@@ -209,7 +212,20 @@ export function MyProfile() {
     setPrivacyLoading(false);
   }
 
+  async function handleShare(post: PostWithProfile) {
+    const url = `${window.location.origin}/profile/${post.user_id}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "FitSync", text: post.content, url });
+      } else {
+        await navigator.clipboard.writeText(url);
+        alert("Link copiado!");
+      }
+    } catch { /* user cancelled */ }
+  }
+
   const name = profile?.full_name || user?.email?.split("@")[0] || "Usuario";
+  const mediaPosts = posts.filter((p) => p.image_url || p.video_url);
 
   const tabs: { key: Tab; label: string; count: number }[] = [
     { key: "posts", label: t("feed.posts"), count: posts.length },
@@ -310,77 +326,149 @@ export function MyProfile() {
 
       {/* Tab content */}
       {tab === "posts" && (
-        loading ? (
-          <div className="flex h-40 items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
-          </div>
-        ) : posts.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-center py-16 text-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-surface-subtle">
-                <ImageIcon className="h-8 w-8 text-content-muted" />
-              </div>
-              <p className="mt-4 text-sm font-medium text-content-body">{t("feed.noPosts")}</p>
-              <p className="mt-1 text-xs text-content-muted">{t("feed.noPostsSub")}</p>
-              <Button className="mt-4" size="sm" onClick={() => navigate("/feed")}>
-                {t("feed.createPost")}
-              </Button>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="flex flex-col gap-4">
-            {posts.map((post) => (
-              <Card key={post.id} className="overflow-hidden transition-shadow hover:shadow-md">
-                {post.image_url && (
-                  <button onClick={() => {}} className="block w-full">
-                    <img src={post.image_url} alt="" className="w-full object-contain" style={{ maxHeight: "600px" }} />
-                  </button>
-                )}
-                {post.video_url && (
-                  <div className="w-full overflow-hidden bg-black">
-                    <video src={post.video_url} controls playsInline className="w-full" />
-                  </div>
-                )}
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <AvatarPreview
-                        src={profile?.avatar_url}
-                        name={name}
-                        userId={profileId}
-                        size="sm"
-                      />
-                      <div>
-                        <p className="text-sm font-semibold text-content-strong">{name}</p>
-                        <p className="text-xs text-content-muted">{timeAgo(post.created_at)}</p>
+        <>
+          {/* Layout toggle */}
+          {posts.length > 0 && (
+            <div className="flex items-center justify-end gap-1 rounded-lg bg-surface-subtle p-1">
+              <button
+                onClick={() => setLayout("grid")}
+                className={`flex items-center justify-center rounded-md p-1.5 transition-colors ${layout === "grid" ? "bg-surface-card text-primary-600 shadow-sm" : "text-content-muted hover:text-content-body"}`}
+                title="Grade"
+              >
+                <Grid3x3 className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setLayout("list")}
+                className={`flex items-center justify-center rounded-md p-1.5 transition-colors ${layout === "list" ? "bg-surface-card text-primary-600 shadow-sm" : "text-content-muted hover:text-content-body"}`}
+                title="Lista"
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+
+          {loading ? (
+            <div className="flex h-40 items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
+            </div>
+          ) : posts.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center py-16 text-center">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-surface-subtle">
+                  <ImageIcon className="h-8 w-8 text-content-muted" />
+                </div>
+                <p className="mt-4 text-sm font-medium text-content-body">{t("feed.noPosts")}</p>
+                <p className="mt-1 text-xs text-content-muted">{t("feed.noPostsSub")}</p>
+                <Button className="mt-4" size="sm" onClick={() => navigate("/feed")}>
+                  {t("feed.createPost")}
+                </Button>
+              </CardContent>
+            </Card>
+          ) : layout === "grid" ? (
+            <div className="grid grid-cols-3 gap-1 sm:gap-1.5">
+              {posts.map((post) => {
+                const hasMedia = post.image_url || post.video_url;
+                return (
+                  <button
+                    key={post.id}
+                    onClick={() => hasMedia ? setLightboxUrl(post.image_url) : undefined}
+                    className="group relative aspect-square overflow-hidden rounded-lg bg-surface-subtle"
+                  >
+                    {post.image_url ? (
+                      <img src={post.image_url} alt="" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                    ) : post.video_url ? (
+                      <div className="relative h-full w-full bg-slate-900">
+                        <video src={post.video_url} className="h-full w-full object-cover" muted />
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/80 shadow-lg">
+                            <MessageCircle className="h-5 w-5 text-slate-700" />
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-primary-50 to-primary-100 p-3">
+                        <p className="line-clamp-4 text-center text-[11px] font-medium leading-snug text-content-body">{post.content}</p>
+                      </div>
+                    )}
+                    {/* Hover overlay with stats */}
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition-all duration-200 group-hover:bg-black/40 group-hover:opacity-100">
+                      <div className="flex items-center gap-4 text-white">
+                        <span className="flex items-center gap-1 text-sm font-semibold">
+                          <Heart className="h-4 w-4 fill-white" />
+                          {post.like_count}
+                        </span>
+                        <span className="flex items-center gap-1 text-sm font-semibold">
+                          <MessageCircle className="h-4 w-4" />
+                          {post.comment_count}
+                        </span>
                       </div>
                     </div>
-                    <button onClick={() => deletePost(post.id)} className="text-content-muted transition-colors hover:text-red-500">
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                  {post.content && <p className="mt-3 break-words text-sm leading-relaxed text-content-body">{post.content}</p>}
-                  <div className="mt-3 flex items-center gap-4 border-t border-slate-100 pt-3">
-                    <button
-                      onClick={() => toggleLike(post.id, post.liked_by_me)}
-                      className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${post.liked_by_me ? "text-rose-600" : "text-content-muted hover:text-rose-500"}`}
+                    {/* Delete button */}
+                    <span
+                      onClick={(e) => { e.stopPropagation(); deletePost(post.id); }}
+                      className="absolute right-1.5 top-1.5 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-black/50 text-white opacity-0 transition-opacity hover:bg-red-500 group-hover:opacity-100"
                     >
-                      <Heart className={`h-4 w-4 ${post.liked_by_me ? "fill-rose-500" : ""}`} />
-                      {post.like_count > 0 && <span>{post.like_count}</span>}
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex flex-col gap-4">
+              {posts.map((post) => (
+                <Card key={post.id} className="overflow-hidden transition-shadow hover:shadow-md">
+                  {post.image_url && (
+                    <button onClick={() => setLightboxUrl(post.image_url)} className="block w-full">
+                      <img src={post.image_url} alt="" className="w-full object-contain" style={{ maxHeight: "600px" }} />
                     </button>
-                    <button className="flex items-center gap-1.5 text-sm font-medium text-content-muted hover:text-primary-500">
-                      <MessageCircle className="h-4 w-4" />
-                      {post.comment_count > 0 && <span>{post.comment_count}</span>}
-                    </button>
-                    <button className="flex items-center gap-1.5 text-sm font-medium text-content-muted hover:text-primary-500">
-                      <Share2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )
+                  )}
+                  {post.video_url && (
+                    <div className="w-full overflow-hidden bg-black">
+                      <video src={post.video_url} controls playsInline className="w-full" />
+                    </div>
+                  )}
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <AvatarPreview
+                          src={profile?.avatar_url}
+                          name={name}
+                          userId={profileId}
+                          size="sm"
+                        />
+                        <div>
+                          <p className="text-sm font-semibold text-content-strong">{name}</p>
+                          <p className="text-xs text-content-muted">{timeAgo(post.created_at)}</p>
+                        </div>
+                      </div>
+                      <button onClick={() => deletePost(post.id)} className="text-content-muted transition-colors hover:text-red-500">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                    {post.content && <p className="mt-3 break-words text-sm leading-relaxed text-content-body">{post.content}</p>}
+                    <div className="mt-3 flex items-center gap-4 border-t border-slate-100 pt-3">
+                      <button
+                        onClick={() => toggleLike(post.id, post.liked_by_me)}
+                        className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${post.liked_by_me ? "text-rose-600" : "text-content-muted hover:text-rose-500"}`}
+                      >
+                        <Heart className={`h-4 w-4 ${post.liked_by_me ? "fill-rose-500" : ""}`} />
+                        {post.like_count > 0 && <span>{post.like_count}</span>}
+                      </button>
+                      <button className="flex items-center gap-1.5 text-sm font-medium text-content-muted hover:text-primary-500">
+                        <MessageCircle className="h-4 w-4" />
+                        {post.comment_count > 0 && <span>{post.comment_count}</span>}
+                      </button>
+                      <button onClick={() => handleShare(post)} className="flex items-center gap-1.5 text-sm font-medium text-content-muted hover:text-primary-500">
+                        <Share2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {tab === "followers" && (
@@ -451,6 +539,19 @@ export function MyProfile() {
           allGroups={[activeStoryGroup]}
           onGroupChange={() => {}}
         />
+      )}
+
+      {/* Lightbox */}
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setLightboxUrl(null)}
+        >
+          <img src={lightboxUrl} alt="" className="max-h-full max-w-full rounded-xl object-contain" />
+          <button className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20">
+            <Eye className="h-5 w-5" />
+          </button>
+        </div>
       )}
     </div>
   );

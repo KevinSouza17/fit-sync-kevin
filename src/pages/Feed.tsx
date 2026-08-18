@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import {
   Heart, Send, Trash2, ImagePlus, X, Loader2, Plus,
-  MessageCircle, Share2, Eye, Lock, Unlock, Ban, Shield, Video, Flag, ZoomIn, Sparkles,
+  MessageCircle, Share2, Eye, Lock, Unlock, Ban, Shield, Video, Flag, ZoomIn, Sparkles, TrendingUp, Hash,
 } from "lucide-react";
 import { AutoTextarea } from "../components/ui/textarea";
 import { Card, CardContent } from "../components/ui/card";
@@ -104,6 +104,10 @@ export function Feed() {
   const [feedTab, setFeedTab] = useState<"feed" | "foryou">("feed");
   const [recommendedPosts, setRecommendedPosts] = useState<PostWithProfile[]>([]);
   const [recommendedLoading, setRecommendedLoading] = useState(false);
+  const [trendingTags, setTrendingTags] = useState<{ tag: string; post_count: number }[]>([]);
+  const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [tagPosts, setTagPosts] = useState<PostWithProfile[]>([]);
+  const [tagLoading, setTagLoading] = useState(false);
 
   useEffect(() => {
     if (profile) {
@@ -230,9 +234,18 @@ export function Feed() {
     setRecommendedLoading(false);
   }, [user]);
 
+  const loadTrending = useCallback(async () => {
+    const { data } = await supabase
+      .from("trending_hashtags")
+      .select("tag, post_count")
+      .limit(10);
+    setTrendingTags((data ?? []) as { tag: string; post_count: number }[]);
+  }, []);
+
   useEffect(() => {
     loadPosts();
     loadStories();
+    loadTrending();
     if (feedTab === "foryou") loadRecommended();
     const channel = supabase
       .channel("feed-realtime")
@@ -243,7 +256,7 @@ export function Feed() {
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "feed_comments" }, () => loadPosts())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [loadPosts, loadStories]);
+  }, [loadPosts, loadStories, loadTrending]);
 
   async function handleMediaUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -305,6 +318,12 @@ export function Feed() {
     loadStories();
   }
 
+  function parseHashtags(text: string): string[] {
+    const matches = text.match(/#[\w\u00C0-\u024F]+/g);
+    if (!matches) return [];
+    return [...new Set(matches.map((m) => m.slice(1).toLowerCase()))];
+  }
+
   async function createPost() {
     if (!content.trim() && !imageUrl && !videoUrl) { setError(t("feed.emptyError")); return; }
     if (isBanned) { setError(t("feed.userBanned")); return; }
@@ -326,6 +345,18 @@ export function Feed() {
         liked_by_me: false,
         comment_count: 0,
       } as PostWithProfile, ...prev]);
+      const tags = parseHashtags(content);
+      if (tags.length > 0) {
+        for (const tag of tags) {
+          await supabase.from("hashtags").upsert({ tag }, { onConflict: "tag" }).select("id").maybeSingle()
+            .then(async ({ data: hd }) => {
+              if (hd && data) {
+                await supabase.from("post_hashtags").insert({ post_id: data.id, hashtag_id: hd.id });
+              }
+            });
+        }
+        loadTrending();
+      }
       setContent("");
       setImageUrl(null);
       setVideoUrl(null);
@@ -340,9 +371,50 @@ export function Feed() {
     } else {
       await supabase.from("feed_likes").insert({ post_id: postId });
     }
-    setPosts((prev) => prev.map((p) => p.id === postId ? {
+    const updateFn = (prev: PostWithProfile[]) => prev.map((p) => p.id === postId ? {
       ...p, liked_by_me: !liked, like_count: p.like_count + (liked ? -1 : 1),
-    } : p));
+    } : p);
+    setPosts(updateFn);
+    setRecommendedPosts(updateFn);
+    setTagPosts(updateFn);
+  }
+
+  async function loadPostsByTag(tag: string) {
+    setActiveTag(tag);
+    setTagLoading(true);
+    const { data: tagRow } = await supabase.from("hashtags").select("id").eq("tag", tag).maybeSingle();
+    if (!tagRow) { setTagPosts([]); setTagLoading(false); return; }
+    const { data: phData } = await supabase
+      .from("post_hashtags")
+      .select("post_id")
+      .eq("hashtag_id", tagRow.id);
+    const postIds = (phData || []).map((p) => p.post_id);
+    if (postIds.length === 0) { setTagPosts([]); setTagLoading(false); return; }
+    const { data: postData } = await supabase
+      .from("feed_posts")
+      .select("*, profiles:user_id(full_name, avatar_url)")
+      .in("id", postIds)
+      .order("created_at", { ascending: false })
+      .limit(30);
+    if (!postData || postData.length === 0) { setTagPosts([]); setTagLoading(false); return; }
+    const [{ data: likes }, { data: myLikes }, { data: commentCounts }] = await Promise.all([
+      supabase.from("feed_likes").select("post_id").in("post_id", postIds),
+      supabase.from("feed_likes").select("post_id").eq("user_id", user?.id ?? "").in("post_id", postIds),
+      supabase.from("feed_comments").select("post_id").in("post_id", postIds),
+    ]);
+    const likeMap: Record<string, number> = {};
+    (likes || []).forEach((l) => { likeMap[l.post_id] = (likeMap[l.post_id] || 0) + 1; });
+    const myLikeSet = new Set((myLikes || []).map((l) => l.post_id));
+    const commentMap: Record<string, number> = {};
+    (commentCounts || []).forEach((c) => { commentMap[c.post_id] = (commentMap[c.post_id] || 0) + 1; });
+    setTagPosts(postData.map((p) => ({
+      ...p,
+      profiles: p.profiles as PostWithProfile["profiles"],
+      like_count: likeMap[p.id] || 0,
+      liked_by_me: myLikeSet.has(p.id),
+      comment_count: commentMap[p.id] || 0,
+    })) as PostWithProfile[]);
+    setTagLoading(false);
   }
 
   async function deletePost(id: string) {
@@ -517,6 +589,99 @@ export function Feed() {
           {t("recommend.tabForYou")}
         </button>
       </div>
+
+      {/* Trending topics */}
+      {trendingTags.length > 0 && (
+        <div className="rounded-xl border border-edge-base bg-surface-card p-4">
+          <div className="mb-2 flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-primary-600" />
+            <h3 className="text-sm font-semibold text-content-strong">Em alta</h3>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {trendingTags.map((tag) => (
+              <button
+                key={tag.tag}
+                onClick={() => activeTag === tag.tag ? setActiveTag(null) : loadPostsByTag(tag.tag)}
+                className={`flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-medium transition-all ${activeTag === tag.tag ? "bg-primary-600 text-white shadow-sm" : "bg-primary-50 text-primary-600 hover:bg-primary-100"}`}
+              >
+                <Hash className="h-3 w-3" />
+                {tag.tag}
+                <span className={`ml-1 rounded-full px-1.5 py-0.5 text-[10px] ${activeTag === tag.tag ? "bg-white/20 text-white" : "bg-primary-100 text-primary-700"}`}>
+                  {tag.post_count}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Hashtag-filtered posts */}
+      {activeTag && (
+        <div>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="flex items-center gap-1.5 text-base font-semibold text-content-strong">
+              <Hash className="h-4 w-4 text-primary-600" />
+              {activeTag}
+            </h2>
+            <button onClick={() => setActiveTag(null)} className="text-sm text-content-muted hover:text-content-body">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          {tagLoading ? (
+            <div className="flex h-40 items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
+            </div>
+          ) : tagPosts.length === 0 ? (
+            <Card><CardContent className="py-12 text-center text-sm text-content-muted">
+              Nenhuma postagem com esta hashtag ainda.
+            </CardContent></Card>
+          ) : (
+            <div className="flex flex-col gap-4">
+              {tagPosts.map((post) => {
+                const name = post.profiles?.full_name || "Usuario";
+                return (
+                  <Card key={post.id}>
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <AvatarPreview src={post.profiles?.avatar_url} name={name} userId={post.user_id} size="sm" />
+                        <div>
+                          <button onClick={() => navigate(`/profile/${post.user_id}`)} className="text-left">
+                            <p className="text-sm font-semibold text-content-strong hover:underline">{name}</p>
+                          </button>
+                          <p className="text-xs text-content-muted">{timeAgo(post.created_at)}</p>
+                        </div>
+                      </div>
+                      {post.content && <p className="mt-3 break-words text-sm leading-relaxed text-content-body">{post.content}</p>}
+                      {post.image_url && (
+                        <img src={post.image_url} alt="" className="mt-3 w-full rounded-xl object-contain" style={{ maxHeight: "600px" }} />
+                      )}
+                      {post.video_url && (
+                        <video src={post.video_url} controls playsInline className="mt-3 w-full rounded-xl" />
+                      )}
+                      <div className="mt-3 flex items-center gap-4 border-t border-slate-100 pt-3">
+                        <button
+                          onClick={() => toggleLike(post.id, post.liked_by_me)}
+                          className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${post.liked_by_me ? "text-rose-600" : "text-content-muted hover:text-rose-500"}`}
+                        >
+                          <Heart className={`h-4 w-4 ${post.liked_by_me ? "fill-rose-500" : ""}`} />
+                          {post.like_count > 0 && <span>{post.like_count}</span>}
+                        </button>
+                        <button className="flex items-center gap-1.5 text-sm font-medium text-content-muted">
+                          <MessageCircle className="h-4 w-4" />
+                          {post.comment_count > 0 && <span>{post.comment_count}</span>}
+                        </button>
+                        <button onClick={() => handleShare(post)} className="flex items-center gap-1.5 text-sm font-medium text-content-muted hover:text-primary-500">
+                          <Share2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Stories bar */}
       <div className="flex gap-3 overflow-x-auto pb-2">
