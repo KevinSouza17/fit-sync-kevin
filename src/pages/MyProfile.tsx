@@ -6,7 +6,6 @@ import {
 } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
-import { Avatar, AvatarImage, AvatarFallback } from "../components/ui/avatar";
 import { AvatarPreview } from "../components/ui/AvatarPreview";
 import { StoryViewer } from "../components/StoryViewer";
 import type { StoryItem, StoryGroup } from "../components/StoryViewer";
@@ -329,51 +328,51 @@ export function MyProfile() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="flex flex-col gap-4">
             {posts.map((post) => (
-              <Card key={post.id} className="flex flex-col overflow-hidden transition-shadow hover:shadow-md">
+              <Card key={post.id} className="overflow-hidden transition-shadow hover:shadow-md">
                 {post.image_url && (
-                  <div className="aspect-square w-full overflow-hidden bg-surface-subtle">
-                    <img src={post.image_url} alt="" className="h-full w-full object-cover" />
-                  </div>
+                  <button onClick={() => {}} className="block w-full">
+                    <img src={post.image_url} alt="" className="w-full object-contain" style={{ maxHeight: "600px" }} />
+                  </button>
                 )}
                 {post.video_url && (
-                  <div className="aspect-video w-full overflow-hidden bg-black">
-                    <video src={post.video_url} controls playsInline className="h-full w-full object-cover" />
+                  <div className="w-full overflow-hidden bg-black">
+                    <video src={post.video_url} controls playsInline className="w-full" />
                   </div>
                 )}
-                <CardContent className="flex flex-1 flex-col p-4">
+                <CardContent className="p-4">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-3">
                       <AvatarPreview
                         src={profile?.avatar_url}
                         name={name}
                         userId={profileId}
-                        size="xs"
+                        size="sm"
                       />
                       <div>
-                        <p className="text-xs font-semibold text-content-strong">{name}</p>
-                        <p className="text-[11px] text-content-muted">{timeAgo(post.created_at)}</p>
+                        <p className="text-sm font-semibold text-content-strong">{name}</p>
+                        <p className="text-xs text-content-muted">{timeAgo(post.created_at)}</p>
                       </div>
                     </div>
                     <button onClick={() => deletePost(post.id)} className="text-content-muted transition-colors hover:text-red-500">
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
-                  {post.content && <p className="mt-3 line-clamp-3 break-words text-sm leading-relaxed text-content-body">{post.content}</p>}
-                  <div className="mt-auto flex items-center gap-4 border-t border-slate-100 pt-3">
+                  {post.content && <p className="mt-3 break-words text-sm leading-relaxed text-content-body">{post.content}</p>}
+                  <div className="mt-3 flex items-center gap-4 border-t border-slate-100 pt-3">
                     <button
                       onClick={() => toggleLike(post.id, post.liked_by_me)}
-                      className={`flex items-center gap-1.5 text-xs font-medium transition-colors ${post.liked_by_me ? "text-rose-600" : "text-content-muted hover:text-rose-500"}`}
+                      className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${post.liked_by_me ? "text-rose-600" : "text-content-muted hover:text-rose-500"}`}
                     >
                       <Heart className={`h-4 w-4 ${post.liked_by_me ? "fill-rose-500" : ""}`} />
                       {post.like_count > 0 && <span>{post.like_count}</span>}
                     </button>
-                    <button className="flex items-center gap-1.5 text-xs font-medium text-content-muted hover:text-primary-500">
+                    <button className="flex items-center gap-1.5 text-sm font-medium text-content-muted hover:text-primary-500">
                       <MessageCircle className="h-4 w-4" />
                       {post.comment_count > 0 && <span>{post.comment_count}</span>}
                     </button>
-                    <button className="flex items-center gap-1.5 text-xs font-medium text-content-muted hover:text-primary-500">
+                    <button className="flex items-center gap-1.5 text-sm font-medium text-content-muted hover:text-primary-500">
                       <Share2 className="h-4 w-4" />
                     </button>
                   </div>

@@ -213,7 +213,8 @@ export function EditProfile() {
     };
     const { error: err } = await supabase
       .from("profiles")
-      .upsert({ id: user.id, ...payload });
+      .update(payload)
+      .eq("id", user.id);
     if (err) {
       setError("Erro ao salvar. Tente novamente.");
     } else {

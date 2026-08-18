@@ -24,6 +24,7 @@ import { Reviews } from "./pages/Reviews";
 import { UserProfile } from "./pages/UserProfile";
 import { MyProfile } from "./pages/MyProfile";
 import { Moderation } from "./pages/Moderation";
+import { Onboarding } from "./pages/Onboarding";
 import { DashboardLayout } from "./components/layout/DashboardLayout";
 import { PageLoader, SplashScreen } from "./components/PageLoader";
 
@@ -32,6 +33,10 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (loading) return <PageLoader />;
   if (!user) return <Navigate to="/login" replace />;
   if (profile?.is_banned) return <Navigate to="/login" replace />;
+  const isOnboarding = window.location.pathname === "/onboarding";
+  if (!isOnboarding && profile && !profile.onboarding_completed) {
+    return <Navigate to="/onboarding" replace />;
+  }
   return <>{children}</>;
 }
 
@@ -97,6 +102,7 @@ export default function App() {
           <Route path="/achievements" element={<Achievements />} />
           <Route path="/profile/:id" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
           <Route path="/my-profile" element={<MyProfile />} />
+          <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
           <Route path="/moderation" element={<OwnerRoute><Moderation /></OwnerRoute>} />
           <Route path="/reviews" element={<Reviews />} />
           <Route path="/messages" element={<Messages />} />

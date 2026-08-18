@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import {
   Heart, Send, Trash2, ImagePlus, X, Loader2, Plus,
-  MessageCircle, Share2, Eye, Lock, Unlock, Ban, Shield, Video, Flag, ZoomIn,
+  MessageCircle, Share2, Eye, Lock, Unlock, Ban, Shield, Video, Flag, ZoomIn, Sparkles,
 } from "lucide-react";
 import { AutoTextarea } from "../components/ui/textarea";
 import { Card, CardContent } from "../components/ui/card";
@@ -101,6 +101,9 @@ export function Feed() {
   const [commentReportDesc, setCommentReportDesc] = useState("");
   const [commentReportSubmitting, setCommentReportSubmitting] = useState(false);
   const [deletingStoryId, setDeletingStoryId] = useState<string | null>(null);
+  const [feedTab, setFeedTab] = useState<"feed" | "foryou">("feed");
+  const [recommendedPosts, setRecommendedPosts] = useState<PostWithProfile[]>([]);
+  const [recommendedLoading, setRecommendedLoading] = useState(false);
 
   useEffect(() => {
     if (profile) {
@@ -141,7 +144,6 @@ export function Feed() {
   const loadStories = useCallback(async () => {
     if (!user) return;
     const now = new Date().toISOString();
-    // Get IDs of users we follow (accepted follows) plus our own ID
     const { data: following } = await supabase
       .from("follows")
       .select("followee_id")
@@ -160,9 +162,78 @@ export function Feed() {
     setStories((data ?? []) as StoryWithProfile[]);
   }, [user]);
 
+  const loadRecommended = useCallback(async () => {
+    if (!user) return;
+    setRecommendedLoading(true);
+    // 1. Get authors the user has liked posts from
+    const { data: myLikes } = await supabase
+      .from("feed_likes")
+      .select("post_id")
+      .eq("user_id", user.id)
+      .limit(100);
+    const likedPostIds = (myLikes || []).map((l) => l.post_id);
+    const likedAuthorIds = new Set<string>();
+    if (likedPostIds.length > 0) {
+      const { data: likedPosts } = await supabase
+        .from("feed_posts")
+        .select("user_id")
+        .in("id", likedPostIds);
+      (likedPosts || []).forEach((p) => likedAuthorIds.add(p.user_id));
+    }
+    // 2. Get followed authors
+    const { data: following } = await supabase
+      .from("follows")
+      .select("followee_id")
+      .eq("follower_id", user.id)
+      .eq("status", "accepted");
+    const followedSet = new Set((following || []).map((f) => f.followee_id));
+    // 3. Load all recent posts (excluding own)
+    const { data: postData } = await supabase
+      .from("feed_posts")
+      .select("*, profiles:user_id(full_name, avatar_url)")
+      .neq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(80);
+    if (!postData || postData.length === 0) { setRecommendedPosts([]); setRecommendedLoading(false); return; }
+    // 4. Score each post
+    const scored = postData.map((p) => {
+      let score = 0;
+      if (followedSet.has(p.user_id)) score += 100;
+      if (likedAuthorIds.has(p.user_id)) score += 50;
+      // Recency boost: newer posts get higher scores
+      const ageHours = (Date.now() - new Date(p.created_at).getTime()) / 3600000;
+      score += Math.max(0, 24 - ageHours);
+      return { post: p, score };
+    });
+    // Sort by score descending, take top 20
+    scored.sort((a, b) => b.score - a.score);
+    const top = scored.slice(0, 20).map((s) => s.post);
+    // 5. Fetch likes and comments for recommended posts
+    const topIds = top.map((p) => p.id);
+    const [{ data: likes }, { data: myLikes2 }, { data: commentCounts }] = await Promise.all([
+      supabase.from("feed_likes").select("post_id").in("post_id", topIds),
+      supabase.from("feed_likes").select("post_id").eq("user_id", user.id).in("post_id", topIds),
+      supabase.from("feed_comments").select("post_id").in("post_id", topIds),
+    ]);
+    const likeMap: Record<string, number> = {};
+    (likes || []).forEach((l) => { likeMap[l.post_id] = (likeMap[l.post_id] || 0) + 1; });
+    const myLikeSet = new Set((myLikes2 || []).map((l) => l.post_id));
+    const commentMap: Record<string, number> = {};
+    (commentCounts || []).forEach((c) => { commentMap[c.post_id] = (commentMap[c.post_id] || 0) + 1; });
+    setRecommendedPosts(top.map((p) => ({
+      ...p,
+      profiles: p.profiles as PostWithProfile["profiles"],
+      like_count: likeMap[p.id] || 0,
+      liked_by_me: myLikeSet.has(p.id),
+      comment_count: commentMap[p.id] || 0,
+    })) as PostWithProfile[]);
+    setRecommendedLoading(false);
+  }, [user]);
+
   useEffect(() => {
     loadPosts();
     loadStories();
+    if (feedTab === "foryou") loadRecommended();
     const channel = supabase
       .channel("feed-realtime")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "feed_posts" }, () => loadPosts())
@@ -430,6 +501,23 @@ export function Feed() {
         <p className="mt-0.5 text-sm text-content-muted">{t("feed.subtitle")}</p>
       </header>
 
+      {/* Feed / For You tabs */}
+      <div className="flex gap-2 rounded-xl bg-surface-subtle p-1">
+        <button
+          onClick={() => setFeedTab("feed")}
+          className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-semibold transition-all ${feedTab === "feed" ? "bg-surface-card shadow-sm text-primary-600" : "text-content-muted hover:text-content-body"}`}
+        >
+          {t("recommend.tabFeed")}
+        </button>
+        <button
+          onClick={() => { setFeedTab("foryou"); loadRecommended(); }}
+          className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-semibold transition-all ${feedTab === "foryou" ? "bg-surface-card shadow-sm text-primary-600" : "text-content-muted hover:text-content-body"}`}
+        >
+          <Sparkles className="h-4 w-4" />
+          {t("recommend.tabForYou")}
+        </button>
+      </div>
+
       {/* Stories bar */}
       <div className="flex gap-3 overflow-x-auto pb-2">
         <button
@@ -497,8 +585,76 @@ export function Feed() {
         </CardContent></Card>
       )}
 
-      {/* Posts */}
-      {loading ? (
+      {/* For You - recommended posts */}
+      {feedTab === "foryou" && (
+        recommendedLoading ? (
+          <div className="flex h-40 items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
+          </div>
+        ) : recommendedPosts.length === 0 ? (
+          <Card><CardContent className="flex flex-col items-center py-16 text-center">
+            <Sparkles className="mb-3 h-12 w-12 text-slate-200" />
+            <h3 className="text-base font-semibold text-content-body">{t("recommend.title")}</h3>
+            <p className="mt-1 text-sm text-content-muted">{t("recommend.empty")}</p>
+          </CardContent></Card>
+        ) : (
+          <div className="flex flex-col gap-4">
+            {recommendedPosts.map((post) => {
+              const name = post.profiles?.full_name || "Usuario";
+              return (
+                <Card key={post.id}>
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <AvatarPreview
+                          src={post.profiles?.avatar_url}
+                          name={name}
+                          userId={post.user_id}
+                          size="sm"
+                        />
+                        <div>
+                          <button onClick={() => navigate(`/profile/${post.user_id}`)} className="text-left">
+                            <p className="text-sm font-semibold text-content-strong hover:underline">{name}</p>
+                          </button>
+                          <p className="text-xs text-content-muted">{timeAgo(post.created_at)}</p>
+                        </div>
+                      </div>
+                    </div>
+                    {post.content && <p className="mt-3 break-words text-sm leading-relaxed text-content-body">{post.content}</p>}
+                    {post.image_url && (
+                      <button onClick={() => setLightboxUrl(post.image_url)} className="group relative mt-3 block w-full">
+                        <img src={post.image_url} alt="" className="w-full rounded-xl object-contain" style={{ maxHeight: "600px" }} />
+                      </button>
+                    )}
+                    {post.video_url && (
+                      <video src={post.video_url} controls playsInline className="mt-3 w-full rounded-xl" />
+                    )}
+                    <div className="mt-3 flex items-center gap-4 border-t border-slate-100 pt-3">
+                      <button
+                        onClick={() => toggleLike(post.id, post.liked_by_me)}
+                        className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${post.liked_by_me ? "text-rose-600" : "text-content-muted hover:text-rose-500"}`}
+                      >
+                        <Heart className={`h-4 w-4 ${post.liked_by_me ? "fill-rose-500" : ""}`} />
+                        {post.like_count > 0 && <span>{post.like_count}</span>}
+                      </button>
+                      <button className="flex items-center gap-1.5 text-sm font-medium text-content-muted hover:text-primary-500">
+                        <MessageCircle className="h-4 w-4" />
+                        {post.comment_count > 0 && <span>{post.comment_count}</span>}
+                      </button>
+                      <button onClick={() => handleShare(post)} className="flex items-center gap-1.5 text-sm font-medium text-content-muted transition-colors hover:text-primary-500">
+                        <Share2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )
+      )}
+
+      {/* Posts - regular feed (only on feed tab) */}
+      {feedTab === "feed" && (loading ? (
         <div className="flex h-40 items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
         </div>
@@ -713,7 +869,7 @@ export function Feed() {
             );
           })}
         </div>
-      )}
+      ))}
 
       {/* Photo lightbox */}
       {lightboxUrl && (

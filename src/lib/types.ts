@@ -29,6 +29,7 @@ export interface Database {
           is_private: boolean;
           role: string;
           is_banned: boolean;
+          onboarding_completed: boolean;
           created_at: string;
           updated_at: string;
         };
