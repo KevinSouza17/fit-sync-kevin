@@ -166,6 +166,7 @@ export function Onboarding() {
         health_goal: goalLabel(answers.goal),
         daily_calorie_goal: calTarget,
         onboarding_completed: true,
+        onboarding_due_at: null,
       })
       .eq("id", user?.id);
 

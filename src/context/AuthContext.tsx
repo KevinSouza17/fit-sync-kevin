@@ -41,7 +41,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        fetchProfile(session.user.id).finally(() => setLoading(false));
+        (async () => {
+          await supabase.rpc("touch_last_active", { p_user: session.user.id });
+          await fetchProfile(session.user.id);
+          setLoading(false);
+        })();
       } else {
         setLoading(false);
       }
@@ -52,6 +56,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(session?.user ?? null);
       if (session?.user) {
         (async () => {
+          await supabase.rpc("touch_last_active", { p_user: session.user.id });
           await fetchProfile(session.user.id);
         })();
       } else {

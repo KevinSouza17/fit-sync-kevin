@@ -30,6 +30,8 @@ export interface Database {
           role: string;
           is_banned: boolean;
           onboarding_completed: boolean;
+          last_active_at: string | null;
+          onboarding_due_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -388,6 +390,103 @@ export interface Database {
         };
         Update: Partial<Database["public"]["Tables"]["feed_likes"]["Row"]>;
       };
+      diet_streaks: {
+        Row: {
+          id: string;
+          user_id: string;
+          current_streak: number;
+          longest_streak: number;
+          last_log_date: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["diet_streaks"]["Row"], "id" | "user_id" | "created_at"> & {
+          id?: string;
+          user_id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["diet_streaks"]["Row"]>;
+      };
+      onboarding_answers: {
+        Row: {
+          id: string;
+          user_id: string;
+          goal: string;
+          experience_level: string;
+          workout_days: number;
+          diet_preference: string;
+          allergies: string[] | null;
+          equipment: string[] | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["onboarding_answers"]["Row"], "id" | "user_id" | "created_at"> & {
+          id?: string;
+          user_id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["onboarding_answers"]["Row"]>;
+      };
+      professional_plans: {
+        Row: {
+          id: string;
+          professional_id: string;
+          name: string;
+          title: string;
+          description: string | null;
+          plan_type: string;
+          content: unknown;
+          price: number;
+          tagline: string | null;
+          features: string[] | null;
+          popular: boolean;
+          active: boolean;
+          created_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["professional_plans"]["Row"], "id" | "created_at"> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["professional_plans"]["Row"]>;
+      };
+      appointments: {
+        Row: {
+          id: string;
+          professional_id: string;
+          client_id: string;
+          scheduled_at: string;
+          status: string;
+          notes: string | null;
+          created_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["appointments"]["Row"], "id" | "created_at"> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["appointments"]["Row"]>;
+      };
+      client_plans: {
+        Row: {
+          id: string;
+          professional_id: string;
+          client_id: string;
+          plan_type: string;
+          title: string;
+          description: string | null;
+          content: unknown;
+          target_calories: number | null;
+          target_protein_g: number | null;
+          target_carbs_g: number | null;
+          target_fat_g: number | null;
+          active: boolean;
+          created_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["client_plans"]["Row"], "id" | "created_at"> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["client_plans"]["Row"]>;
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
@@ -419,3 +518,5 @@ export type SiteReview = Database["public"]["Tables"]["site_reviews"]["Row"];
 export type Story = Database["public"]["Tables"]["stories"]["Row"];
 export type Follow = Database["public"]["Tables"]["follows"]["Row"];
 export type FeedComment = Database["public"]["Tables"]["feed_comments"]["Row"];
+export type DietStreak = Database["public"]["Tables"]["diet_streaks"]["Row"];
+export type OnboardingAnswers = Database["public"]["Tables"]["onboarding_answers"]["Row"];

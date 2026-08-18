@@ -85,6 +85,8 @@ export function Dashboard() {
   ];
 
   const [dietPlan, setDietPlan] = useState<ClientPlan | null>(null);
+  const [streak, setStreak] = useState<{ current_streak: number; longest_streak: number } | null>(null);
+  const [recommendedMeals, setRecommendedMeals] = useState<{ meal: string; items: string; calories: number; protein: number }[] | null>(null);
 
   const calGoal = dietPlan?.target_calories ?? profile?.daily_calorie_goal ?? 2400;
   const waterGoal = profile?.daily_water_goal_liters ?? 2.5;
@@ -125,11 +127,13 @@ export function Dashboard() {
 
   async function loadData() {
     setLoading(true);
-    const [mealsRes, waterRes, weightRes, planRes] = await Promise.all([
+    const [mealsRes, waterRes, weightRes, planRes, streakRes, onboardingRes] = await Promise.all([
       supabase.from("meals").select("*").eq("logged_date", today).order("created_at"),
       supabase.from("water_logs").select("amount_liters").eq("logged_date", today),
       supabase.from("weight_logs").select("weight_kg, logged_date").order("logged_date", { ascending: false }).limit(1),
       supabase.from("client_plans").select("*").eq("client_id", user?.id ?? "").eq("plan_type", "diet").eq("active", true).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+      supabase.from("diet_streaks").select("current_streak, longest_streak").eq("user_id", user?.id ?? "").maybeSingle(),
+      supabase.from("onboarding_answers").select("*").eq("user_id", user?.id ?? "").maybeSingle(),
     ]);
     if (mealsRes.data) setMeals(mealsRes.data);
     if (waterRes.data) {
@@ -137,6 +141,26 @@ export function Dashboard() {
     }
     if (weightRes.data?.[0]) setLatestWeight(Number(weightRes.data[0].weight_kg));
     if (planRes.data) setDietPlan(planRes.data as ClientPlan);
+    if (streakRes.data) setStreak(streakRes.data as { current_streak: number; longest_streak: number });
+    // Generate personalized diet recommendation from onboarding answers if no pro plan
+    if (!planRes.data && onboardingRes.data) {
+      const oa = onboardingRes.data as {
+        goal: string; experience_level: string; workout_days: number;
+        diet_preference: string; allergies: string[] | null; equipment: string[] | null;
+      };
+      const { generateDietPlan } = await import("../lib/recommendations");
+      const meals = generateDietPlan({
+        goal: oa.goal as never,
+        experience: oa.experience_level as never,
+        workout_days: oa.workout_days,
+        diet: oa.diet_preference as never,
+        allergies: oa.allergies,
+        equipment: oa.equipment ?? [],
+      }, latestWeight ?? profile?.weight_kg ?? 75);
+      setRecommendedMeals(meals);
+    } else {
+      setRecommendedMeals(null);
+    }
     setLoading(false);
   }
 
@@ -251,6 +275,16 @@ export function Dashboard() {
       .select()
       .single();
     if (data) setMeals((prev) => [...prev, data]);
+    // Update streak
+    if (user) {
+      const { data: streakData } = await supabase.rpc("upsert_diet_streak", { p_user: user.id, p_log_date: today });
+      if (streakData !== null) {
+        setStreak((prev) => ({
+          current_streak: streakData as number,
+          longest_streak: Math.max(prev?.longest_streak ?? 0, streakData as number),
+        }));
+      }
+    }
     setForm(emptyForm);
     setShowMealModal(false);
     setSaving(false);
@@ -340,6 +374,19 @@ export function Dashboard() {
         </div>
       ) : (
         <>
+          {/* Streak banner */}
+          {streak && streak.current_streak > 0 && (
+            <div className="flex items-center gap-3 rounded-xl border border-orange-200 bg-gradient-to-r from-orange-50 to-amber-50 p-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-100">
+                <Flame className="h-5 w-5 text-orange-500" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-orange-700">Sequência de {streak.current_streak} {streak.current_streak === 1 ? "dia" : "dias"}!</p>
+                <p className="text-xs text-orange-600">Continue registrando suas refeições para manter o pego. Recorde: {streak.longest_streak} dias</p>
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             {summaryCards.map((card) => (
               <Card
@@ -474,6 +521,28 @@ export function Dashboard() {
                       <div key={i} className="rounded-xl border border-edge-base bg-surface-subtle p-3">
                         <p className="text-sm font-semibold text-content-strong">{m.name}</p>
                         {m.items && <p className="mt-1 text-xs text-content-body whitespace-pre-line">{m.items}</p>}
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            ) : recommendedMeals && recommendedMeals.length > 0 ? (
+              <Card>
+                <CardContent className="p-5">
+                  <div className="mb-3 flex items-center gap-2">
+                    <UtensilsCrossed className="h-4 w-4 text-primary-600" />
+                    <h3 className="text-base font-semibold text-content-strong">Plano alimentar recomendado</h3>
+                  </div>
+                  <p className="mb-3 text-xs text-content-muted">Personalizado para voce com base no seu questionario inicial</p>
+                  <div className="flex flex-col gap-2">
+                    {recommendedMeals.map((m, i) => (
+                      <div key={i} className="rounded-xl border border-edge-base bg-surface-subtle p-3">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-semibold text-content-strong">{m.meal}</p>
+                          <span className="text-xs font-medium text-primary-600">{m.calories} kcal</span>
+                        </div>
+                        <p className="mt-1 text-xs text-content-body">{m.items}</p>
+                        <p className="mt-1 text-[11px] text-content-muted">~{m.protein}g proteina</p>
                       </div>
                     ))}
                   </div>

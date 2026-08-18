@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { supabase } from "./lib/supabase";
 import { useAuth } from "./context/AuthContext";
 import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
@@ -30,13 +31,23 @@ import { PageLoader, SplashScreen } from "./components/PageLoader";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, profile, loading } = useAuth();
+  const [onboardingDue, setOnboardingDue] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    supabase.rpc("check_onboarding_due", { p_user: user.id }).then(({ data }) => {
+      setOnboardingDue(!!data);
+    });
+  }, [user, profile?.onboarding_completed, profile?.onboarding_due_at]);
+
   if (loading) return <PageLoader />;
   if (!user) return <Navigate to="/login" replace />;
   if (profile?.is_banned) return <Navigate to="/login" replace />;
   const isOnboarding = window.location.pathname === "/onboarding";
-  if (!isOnboarding && profile && !profile.onboarding_completed) {
+  if (!isOnboarding && onboardingDue === true) {
     return <Navigate to="/onboarding" replace />;
   }
+  if (onboardingDue === null) return <PageLoader />;
   return <>{children}</>;
 }
 

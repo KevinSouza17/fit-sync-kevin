@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Dumbbell, Plus, X, Pencil, Trash2, Calendar, TrendingUp,
-  Activity, ChevronRight, Check, Flame, UtensilsCrossed, ClipboardList,
+  Activity, ChevronRight, Check, Flame, ClipboardList, Sparkles,
 } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -11,6 +11,8 @@ import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
 import type { ClientPlan } from "../lib/types";
+import { generateWorkoutPlan } from "../lib/recommendations";
+import type { WorkoutRecommendationDay } from "../lib/recommendations";
 
 interface WorkoutPlanContent {
   days?: { name: string; exercises: string }[];
@@ -68,6 +70,7 @@ export function Workout() {
   const [logForm, setLogForm] = useState(emptyLogForm);
   const [assignedPlan, setAssignedPlan] = useState<ClientPlan | null>(null);
   const [stats, setStats] = useState({ total: 0, maxWeight: 0, lastSession: "" });
+  const [recommendedWorkout, setRecommendedWorkout] = useState<WorkoutRecommendationDay[] | null>(null);
 
   const daysByDow = useMemo(() => {
     const map = new Map<number, WorkoutDay>();
@@ -116,6 +119,24 @@ export function Workout() {
           .eq("client_id", user.id).eq("plan_type", "workout").eq("active", true)
           .order("created_at", { ascending: false }).limit(1).maybeSingle();
         if (data) setAssignedPlan(data as ClientPlan);
+        // If no programs and no assigned plan, generate a live recommendation from onboarding answers
+        const progs = await supabase.from("workout_programs").select("id").eq("user_id", user.id);
+        if (!data && (progs.data ?? []).length === 0) {
+          const { data: oa } = await supabase
+            .from("onboarding_answers").select("*")
+            .eq("user_id", user.id).maybeSingle();
+          if (oa) {
+            const a = oa as {
+              goal: string; experience_level: string; workout_days: number;
+              diet_preference: string; allergies: string[] | null; equipment: string[] | null;
+            };
+            setRecommendedWorkout(generateWorkoutPlan({
+              goal: a.goal as never, experience: a.experience_level as never,
+              workout_days: a.workout_days, diet: a.diet_preference as never,
+              allergies: a.allergies, equipment: a.equipment ?? [],
+            }));
+          }
+        }
       }
       setLoading(false);
     })();
@@ -305,7 +326,38 @@ export function Workout() {
         </Card>
       ) : null}
 
-      {programs.length === 0 ? (
+      {programs.length === 0 && !assignedPlan && recommendedWorkout ? (
+        <Card className="border-primary-300 bg-gradient-to-br from-primary-50/50 to-surface-card">
+          <CardContent className="p-5">
+            <div className="mb-4 flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary-600" />
+              <h2 className="text-base font-bold text-content-strong">Treino recomendado para voce</h2>
+            </div>
+            <p className="mb-4 text-xs text-content-muted">Personalizado com base no seu questionario inicial. Crie um programa para comecar a registrar seu progresso.</p>
+            <div className="flex flex-col gap-3">
+              {recommendedWorkout.map((day, i) => (
+                <div key={i} className="rounded-xl border border-edge-base p-3">
+                  <p className="mb-2 text-sm font-semibold text-content-strong">{day.dayName}</p>
+                  <div className="flex flex-col gap-1.5">
+                    {day.exercises.map((ex, j) => (
+                      <div key={j} className="flex items-center justify-between text-xs text-content-body">
+                        <span>{ex.name}</span>
+                        <span className="font-medium text-content-muted">{ex.sets}x {ex.reps}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <Button className="mt-4 w-full gap-2" onClick={() => setShowProgramModal(true)}>
+              <Plus className="h-4 w-4" />
+              Criar programa a partir da recomendacao
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {programs.length === 0 && !assignedPlan && !recommendedWorkout ? (
         <Card>
           <CardContent className="flex flex-col items-center py-16 text-center">
             <Dumbbell className="mb-3 h-12 w-12 text-slate-300" />

@@ -1,33 +1,26 @@
-import { useEffect, useState, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Heart, Trash2, Loader2, MessageCircle, Share2, Lock, Unlock,
-  Settings, Image as ImageIcon, Users, UserPlus, Pencil, Grid3x3, LayoutGrid, Eye,
+  ArrowLeft, Search, Settings, Pencil, Heart, MessageCircle, MoreHorizontal,
+  UserRound, UserPlus, MessageSquare, ShieldCheck, X, Grid3X3,
 } from "lucide-react";
-import { Card, CardContent } from "../components/ui/card";
-import { Button } from "../components/ui/button";
 import { AvatarPreview } from "../components/ui/AvatarPreview";
-import { StoryViewer } from "../components/StoryViewer";
-import type { StoryItem, StoryGroup } from "../components/StoryViewer";
+import { Button } from "../components/ui/button";
 import { useAuth } from "../context/AuthContext";
-import { useI18n } from "../context/I18nContext";
 import { supabase } from "../lib/supabase";
 
-interface PostWithProfile {
+interface ProfilePost {
   id: string;
   user_id: string;
   content: string;
   image_url: string | null;
   video_url: string | null;
-  media_type: string | null;
   created_at: string;
-  profiles: { full_name: string | null; avatar_url: string | null } | null;
   like_count: number;
-  liked_by_me: boolean;
   comment_count: number;
 }
 
-interface FollowUser {
+interface SuggestedProfile {
   id: string;
   full_name: string | null;
   avatar_url: string | null;
@@ -35,524 +28,198 @@ interface FollowUser {
   professional_role: string | null;
 }
 
-function initials(name: string) {
-  return name.split(" ").slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("");
-}
+type ProfileTab = "posts" | "replies" | "reposts" | "media";
 
-function timeAgo(dateStr: string) {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "agora";
-  if (mins < 60) return `${mins}min`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h`;
-  const days = Math.floor(hrs / 24);
-  if (days < 7) return `${days}d`;
-  return new Date(dateStr).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+function joinedDate(value: string | undefined) {
+  if (!value) return "agosto de 2026";
+  return new Date(value).toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 }
-
-type Tab = "posts" | "followers" | "following";
-type Layout = "grid" | "list";
 
 export function MyProfile() {
-  const { user, profile, refreshProfile } = useAuth();
-  const { t } = useI18n();
+  const { user, profile } = useAuth();
   const navigate = useNavigate();
-  const [posts, setPosts] = useState<PostWithProfile[]>([]);
+  const [posts, setPosts] = useState<ProfilePost[]>([]);
+  const [followers, setFollowers] = useState(0);
+  const [following, setFollowing] = useState(0);
+  const [suggested, setSuggested] = useState<SuggestedProfile[]>([]);
+  const [activeTab, setActiveTab] = useState<ProfileTab>("posts");
   const [loading, setLoading] = useState(true);
-  const [followerCount, setFollowerCount] = useState(0);
-  const [followingCount, setFollowingCount] = useState(0);
-  const [profileStories, setProfileStories] = useState<StoryItem[]>([]);
-  const [activeStoryGroup, setActiveStoryGroup] = useState<StoryGroup | null>(null);
-  const [activeStoryIndex, setActiveStoryIndex] = useState(0);
-  const [tab, setTab] = useState<Tab>("posts");
-  const [followers, setFollowers] = useState<FollowUser[]>([]);
-  const [following, setFollowing] = useState<FollowUser[]>([]);
-  const [listLoading, setListLoading] = useState(false);
-  const [layout, setLayout] = useState<Layout>("grid");
-  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [lightbox, setLightbox] = useState<string | null>(null);
 
-  const profileId = user?.id ?? "";
-
-  const loadPosts = useCallback(async () => {
+  const loadProfileData = useCallback(async () => {
     if (!user) return;
     setLoading(true);
-    const { data: postData } = await supabase
-      .from("feed_posts")
-      .select("*, profiles:user_id(full_name, avatar_url)")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(50);
-    if (postData && postData.length > 0) {
-      const postIds = postData.map((p) => p.id);
-      const [{ data: likes }, { data: myLikes }, { data: commentCounts }] = await Promise.all([
-        supabase.from("feed_likes").select("post_id").in("post_id", postIds),
-        supabase.from("feed_likes").select("post_id").eq("user_id", user.id).in("post_id", postIds),
-        supabase.from("feed_comments").select("post_id").in("post_id", postIds),
-      ]);
-      const likeMap: Record<string, number> = {};
-      (likes || []).forEach((l) => { likeMap[l.post_id] = (likeMap[l.post_id] || 0) + 1; });
-      const myLikeSet = new Set((myLikes || []).map((l) => l.post_id));
-      const commentMap: Record<string, number> = {};
-      (commentCounts || []).forEach((c) => { commentMap[c.post_id] = (commentMap[c.post_id] || 0) + 1; });
-      setPosts(postData.map((p) => ({
-        ...p,
-        profiles: p.profiles as PostWithProfile["profiles"],
-        like_count: likeMap[p.id] || 0,
-        liked_by_me: myLikeSet.has(p.id),
-        comment_count: commentMap[p.id] || 0,
-      })) as PostWithProfile[]);
-    } else {
-      setPosts([]);
-    }
-    setLoading(false);
-  }, [user]);
-
-  const loadCounts = useCallback(async () => {
-    if (!user) return;
-    const [{ count: fCount }, { count: fgCount }] = await Promise.all([
+    const [{ data: rawPosts }, { count: followersCount }, { count: followingCount }] = await Promise.all([
+      supabase.from("feed_posts").select("id, user_id, content, image_url, video_url, created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(50),
       supabase.from("follows").select("id", { count: "exact", head: true }).eq("followee_id", user.id).eq("status", "accepted"),
       supabase.from("follows").select("id", { count: "exact", head: true }).eq("follower_id", user.id).eq("status", "accepted"),
     ]);
-    setFollowerCount(fCount ?? 0);
-    setFollowingCount(fgCount ?? 0);
+
+    const postRows = rawPosts ?? [];
+    const postIds = postRows.map((post) => post.id);
+    let likeCounts: Record<string, number> = {};
+    let commentCounts: Record<string, number> = {};
+    if (postIds.length > 0) {
+      const [{ data: likes }, { data: comments }] = await Promise.all([
+        supabase.from("feed_likes").select("post_id").in("post_id", postIds),
+        supabase.from("feed_comments").select("post_id").in("post_id", postIds),
+      ]);
+      likeCounts = (likes ?? []).reduce<Record<string, number>>((map, like) => ({ ...map, [like.post_id]: (map[like.post_id] ?? 0) + 1 }), {});
+      commentCounts = (comments ?? []).reduce<Record<string, number>>((map, comment) => ({ ...map, [comment.post_id]: (map[comment.post_id] ?? 0) + 1 }), {});
+    }
+
+    setPosts(postRows.map((post) => ({
+      ...post,
+      like_count: likeCounts[post.id] ?? 0,
+      comment_count: commentCounts[post.id] ?? 0,
+    })) as ProfilePost[]);
+    setFollowers(followersCount ?? 0);
+    setFollowing(followingCount ?? 0);
+
+    const { data: suggestions } = await supabase
+      .from("profiles")
+      .select("id, full_name, avatar_url, is_professional, professional_role")
+      .neq("id", user.id)
+      .limit(3);
+    setSuggested((suggestions ?? []) as SuggestedProfile[]);
+    setLoading(false);
   }, [user]);
 
-  const loadStories = useCallback(async () => {
-    if (!user) return;
-    const now = new Date().toISOString();
-    const { data: sData } = await supabase
-      .from("stories")
-      .select("*, profiles:user_id(full_name, avatar_url)")
-      .eq("user_id", user.id)
-      .gt("expires_at", now)
-      .order("created_at", { ascending: false });
-    setProfileStories((sData ?? []) as StoryItem[]);
-  }, [user]);
-
-  useEffect(() => {
-    loadPosts();
-    loadCounts();
-    loadStories();
-  }, [loadPosts, loadCounts, loadStories]);
-
-  async function loadFollowers() {
-    if (!user) return;
-    setListLoading(true);
-    const { data } = await supabase
-      .from("follows")
-      .select("follower_id")
-      .eq("followee_id", user.id)
-      .eq("status", "accepted");
-    const ids = (data || []).map((f) => f.follower_id);
-    if (ids.length > 0) {
-      const { data: profilesData } = await supabase
-        .from("profiles")
-        .select("id, full_name, avatar_url, is_professional, professional_role")
-        .in("id", ids);
-      setFollowers((profilesData ?? []) as FollowUser[]);
-    } else {
-      setFollowers([]);
-    }
-    setListLoading(false);
-  }
-
-  async function loadFollowing() {
-    if (!user) return;
-    setListLoading(true);
-    const { data } = await supabase
-      .from("follows")
-      .select("followee_id")
-      .eq("follower_id", user.id)
-      .eq("status", "accepted");
-    const ids = (data || []).map((f) => f.followee_id);
-    if (ids.length > 0) {
-      const { data: profilesData } = await supabase
-        .from("profiles")
-        .select("id, full_name, avatar_url, is_professional, professional_role")
-        .in("id", ids);
-      setFollowing((profilesData ?? []) as FollowUser[]);
-    } else {
-      setFollowing([]);
-    }
-    setListLoading(false);
-  }
-
-  useEffect(() => {
-    if (tab === "followers") loadFollowers();
-    if (tab === "following") loadFollowing();
-  }, [tab]);
-
-  async function toggleLike(postId: string, liked: boolean) {
-    if (liked) {
-      await supabase.from("feed_likes").delete().eq("post_id", postId).eq("user_id", user?.id ?? "");
-    } else {
-      await supabase.from("feed_likes").insert({ post_id: postId });
-    }
-    setPosts((prev) => prev.map((p) => p.id === postId ? {
-      ...p, liked_by_me: !liked, like_count: p.like_count + (liked ? -1 : 1),
-    } : p));
-  }
-
-  async function deletePost(id: string) {
-    await supabase.from("feed_posts").delete().eq("id", id);
-    setPosts((prev) => prev.filter((p) => p.id !== id));
-  }
-
-  const [privacyLoading, setPrivacyLoading] = useState(false);
-
-  async function togglePrivacy() {
-    if (!profile || !user || privacyLoading) return;
-    const newPrivate = !profile.is_private;
-    setPrivacyLoading(true);
-    const { error } = await supabase.from("profiles").update({ is_private: newPrivate }).eq("id", user.id);
-    if (!error) {
-      await refreshProfile();
-    }
-    setPrivacyLoading(false);
-  }
-
-  async function handleShare(post: PostWithProfile) {
-    const url = `${window.location.origin}/profile/${post.user_id}`;
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: "FitSync", text: post.content, url });
-      } else {
-        await navigator.clipboard.writeText(url);
-        alert("Link copiado!");
-      }
-    } catch { /* user cancelled */ }
-  }
+  useEffect(() => { loadProfileData(); }, [loadProfileData]);
 
   const name = profile?.full_name || user?.email?.split("@")[0] || "Usuario";
-  const mediaPosts = posts.filter((p) => p.image_url || p.video_url);
-
-  const tabs: { key: Tab; label: string; count: number }[] = [
-    { key: "posts", label: t("feed.posts"), count: posts.length },
-    { key: "followers", label: t("feed.followers"), count: followerCount },
-    { key: "following", label: t("feed.followingCount"), count: followingCount },
-  ];
+  const handle = `@${name.toLowerCase().replace(/[^a-z0-9]+/g, "").slice(0, 24) || "fitsync"}`;
+  const visiblePosts = activeTab === "media" ? posts.filter((post) => post.image_url || post.video_url) : posts;
+  const filteredSuggestions = suggested.filter((person) => (person.full_name ?? "").toLowerCase().includes(search.toLowerCase()));
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 sm:p-6 lg:p-8">
-      {/* Profile header */}
-      <Card className="overflow-hidden border-edge-base/60 shadow-lg shadow-primary-900/5">
-        <CardContent className="p-0">
-          {/* Cover */}
-          <div className="relative h-36 w-full bg-gradient-to-br from-primary-600 via-primary-500 to-primary-400 sm:h-40">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.15),transparent_50%)]" />
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_80%,rgba(255,255,255,0.08),transparent_40%)]" />
-          </div>
+    <div className="min-h-full bg-white text-slate-950 dark:bg-surface-base dark:text-content-strong">
+      <div className="mx-auto grid min-h-screen w-full max-w-[1180px] grid-cols-1 lg:grid-cols-[minmax(0,620px)_360px] lg:gap-7">
+        <main className="min-w-0 border-x border-slate-200 dark:border-edge-base">
+          <header className="sticky top-0 z-10 flex h-14 items-center gap-5 border-b border-slate-200 bg-white/95 px-4 backdrop-blur dark:border-edge-base dark:bg-surface-card/95">
+            <button onClick={() => navigate(-1)} aria-label="Voltar" className="rounded-full p-1.5 transition-colors hover:bg-slate-100 dark:hover:bg-surface-subtle">
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+            <div className="min-w-0">
+              <h1 className="truncate text-lg font-bold">{name}</h1>
+              <p className="text-xs text-slate-500 dark:text-content-muted">{posts.length} posts</p>
+            </div>
+            <button onClick={() => navigate("/settings")} className="ml-auto rounded-full p-2 transition-colors hover:bg-slate-100 dark:hover:bg-surface-subtle">
+              <Settings className="h-5 w-5" />
+            </button>
+          </header>
 
-          <div className="px-5 pb-5 sm:px-8">
-            {/* Avatar + actions */}
+          <div className="h-48 bg-slate-200 dark:bg-slate-700 sm:h-52" />
+          <section className="relative border-b border-slate-200 px-4 pb-4 dark:border-edge-base sm:px-5">
             <div className="flex items-end justify-between">
-              <button
-                onClick={() => {
-                  if (profileStories.length > 0) {
-                    setActiveStoryGroup({ userId: profileId, stories: profileStories });
-                    setActiveStoryIndex(0);
-                  }
-                }}
-                className={`-mt-12 shrink-0 ${profileStories.length > 0 ? "cursor-pointer" : "cursor-default"}`}
-                title={profileStories.length > 0 ? "Ver stories" : undefined}
-              >
-                <div className={`h-24 w-24 rounded-full ring-4 ring-white shadow-xl ${profileStories.length > 0 ? "bg-gradient-to-tr from-primary-400 to-primary-600 p-0.5" : ""}`}>
-                  <AvatarPreview
-                    src={profile?.avatar_url}
-                    name={name}
-                    size="lg"
-                    className="border-2 border-white"
-                    fallbackClassName="text-2xl"
-                  />
-                </div>
-              </button>
-
-              <div className="flex items-center gap-2 pb-1">
-                <button
-                  onClick={togglePrivacy}
-                  disabled={privacyLoading}
-                  className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-60 ${
-                    profile?.is_private
-                      ? "bg-amber-50 text-amber-700 hover:bg-amber-100"
-                      : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                  }`}
-                >
-                  {privacyLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : profile?.is_private ? <Lock className="h-3.5 w-3.5" /> : <Unlock className="h-3.5 w-3.5" />}
-                  <span>{profile?.is_private ? t("feed.profilePrivate") : t("feed.profilePublic")}</span>
+              <div className="-mt-14 rounded-full border-4 border-white bg-slate-300 shadow-sm dark:border-surface-base dark:bg-slate-600">
+                <AvatarPreview src={profile?.avatar_url} name={name} size="lg" className="h-28 w-28 border-0" fallbackClassName="text-3xl" />
+              </div>
+              <div className="flex items-center gap-2 pb-2">
+                <button onClick={() => navigate("/settings")} className="rounded-full border border-slate-300 p-2 transition-colors hover:bg-slate-50 dark:border-edge-base dark:hover:bg-surface-subtle">
+                  <MoreHorizontal className="h-5 w-5" />
                 </button>
-                <Button variant="outline" size="sm" onClick={() => navigate("/profile")} className="gap-1.5">
-                  <Pencil className="h-4 w-4" />
-                  <span className="hidden sm:inline">{t("editProfile.title")}</span>
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => navigate("/settings")} className="gap-1.5">
-                  <Settings className="h-4 w-4" />
+                <Button variant="outline" size="sm" onClick={() => navigate("/profile")} className="rounded-full gap-1.5 font-bold">
+                  <Pencil className="h-4 w-4" /> Editar perfil
                 </Button>
               </div>
             </div>
 
-            {/* Name + bio */}
-            <div className="mt-4">
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold text-content-strong">{name}</h1>
-                {profile?.is_professional && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
-                    PRO
-                  </span>
-                )}
+            <div className="mt-3">
+              <div className="flex items-center gap-1.5">
+                <h2 className="text-xl font-extrabold">{name}</h2>
+                {profile?.is_professional && <ShieldCheck className="h-5 w-5 fill-sky-500 text-white" />}
               </div>
-              {profile?.is_professional && profile?.professional_role && (
-                <p className="mt-0.5 text-sm font-medium text-primary-600">{profile.professional_role}</p>
-              )}
-              {profile?.bio && <p className="mt-2 text-sm leading-relaxed text-content-body">{profile.bio}</p>}
+              <p className="text-sm text-slate-500 dark:text-content-muted">{handle}</p>
+              {profile?.bio && <p className="mt-3 text-sm leading-relaxed">{profile.bio}</p>}
+              <p className="mt-3 text-sm text-slate-500 dark:text-content-muted">Entrou em {joinedDate(profile?.created_at)}</p>
+              <div className="mt-3 flex gap-5 text-sm">
+                <button onClick={() => setActiveTab("posts")} className="hover:underline"><strong>{following}</strong> <span className="text-slate-500 dark:text-content-muted">Seguindo</span></button>
+                <button onClick={() => setActiveTab("posts")} className="hover:underline"><strong>{followers}</strong> <span className="text-slate-500 dark:text-content-muted">Seguidores</span></button>
+              </div>
             </div>
+          </section>
 
-            {/* Stats as tabs */}
-            <div className="mt-5 grid grid-cols-3 gap-2 rounded-xl bg-surface-subtle p-1">
-              {tabs.map((tb) => (
-                <button
-                  key={tb.key}
-                  onClick={() => setTab(tb.key)}
-                  className={`flex flex-col items-center rounded-lg py-2.5 transition-all ${tab === tb.key ? "bg-surface-card shadow-sm" : "hover:bg-surface-card/50"}`}
-                >
-                  <span className={`text-lg font-bold ${tab === tb.key ? "text-primary-600" : "text-content-strong"}`}>{tb.count}</span>
-                  <span className="text-xs text-content-muted">{tb.label}</span>
-                </button>
-              ))}
+          <div className="m-4 rounded-2xl bg-emerald-100 p-4 dark:bg-emerald-950/40">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-extrabold">Seu perfil ainda não está verificado</h3>
+                <p className="mt-1 text-sm leading-relaxed text-emerald-800 dark:text-emerald-200">Complete seu perfil para destacar sua jornada, acompanhar seu progresso e conectar-se com a comunidade.</p>
+                <button onClick={() => navigate("/profile")} className="mt-3 rounded-full bg-slate-950 px-4 py-2 text-sm font-bold text-white transition-transform hover:scale-[1.02]">Completar perfil</button>
+              </div>
+              <button className="rounded-full p-1 text-emerald-800 hover:bg-emerald-200 dark:text-emerald-200" aria-label="Fechar aviso"><X className="h-4 w-4" /></button>
             </div>
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Tab content */}
-      {tab === "posts" && (
-        <>
-          {/* Layout toggle */}
-          {posts.length > 0 && (
-            <div className="flex items-center justify-end gap-1 rounded-lg bg-surface-subtle p-1">
-              <button
-                onClick={() => setLayout("grid")}
-                className={`flex items-center justify-center rounded-md p-1.5 transition-colors ${layout === "grid" ? "bg-surface-card text-primary-600 shadow-sm" : "text-content-muted hover:text-content-body"}`}
-                title="Grade"
-              >
-                <Grid3x3 className="h-4 w-4" />
+          <nav className="grid grid-cols-4 border-b border-slate-200 dark:border-edge-base">
+            {(["posts", "replies", "reposts", "media"] as ProfileTab[]).map((tab) => (
+              <button key={tab} onClick={() => setActiveTab(tab)} className={`relative px-2 py-4 text-sm font-semibold transition-colors hover:bg-slate-50 dark:hover:bg-surface-subtle ${activeTab === tab ? "text-slate-950 dark:text-content-strong" : "text-slate-500 dark:text-content-muted"}`}>
+                {tab === "posts" ? "Posts" : tab === "replies" ? "Respostas" : tab === "reposts" ? "Reposts" : "Mídia"}
+                {activeTab === tab && <span className="absolute inset-x-5 bottom-0 h-1 rounded-full bg-primary-500" />}
               </button>
-              <button
-                onClick={() => setLayout("list")}
-                className={`flex items-center justify-center rounded-md p-1.5 transition-colors ${layout === "list" ? "bg-surface-card text-primary-600 shadow-sm" : "text-content-muted hover:text-content-body"}`}
-                title="Lista"
-              >
-                <LayoutGrid className="h-4 w-4" />
-              </button>
+            ))}
+          </nav>
+
+          <section className="p-4 sm:p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-xl font-extrabold">Vamos preparar seu perfil</h3>
+              <Grid3X3 className="h-5 w-5 text-slate-400" />
             </div>
-          )}
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <SetupCard icon={UserRound} color="from-sky-500 to-cyan-400" title="Complete seu perfil" onClick={() => navigate("/profile")} />
+              <SetupCard icon={UserPlus} color="from-fuchsia-500 to-blue-500" title="Siga pessoas" onClick={() => navigate("/feed")} />
+              <SetupCard icon={MessageSquare} color="from-amber-400 to-orange-500" title="Conheça a comunidade" onClick={() => navigate("/feed")} />
+              <SetupCard icon={Heart} color="from-pink-500 to-rose-500" title="Compartilhe sua jornada" onClick={() => navigate("/feed")} />
+            </div>
+          </section>
 
           {loading ? (
-            <div className="flex h-40 items-center justify-center">
-              <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
-            </div>
-          ) : posts.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center py-16 text-center">
-                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-surface-subtle">
-                  <ImageIcon className="h-8 w-8 text-content-muted" />
-                </div>
-                <p className="mt-4 text-sm font-medium text-content-body">{t("feed.noPosts")}</p>
-                <p className="mt-1 text-xs text-content-muted">{t("feed.noPostsSub")}</p>
-                <Button className="mt-4" size="sm" onClick={() => navigate("/feed")}>
-                  {t("feed.createPost")}
-                </Button>
-              </CardContent>
-            </Card>
-          ) : layout === "grid" ? (
-            <div className="grid grid-cols-3 gap-1 sm:gap-1.5">
-              {posts.map((post) => {
-                const hasMedia = post.image_url || post.video_url;
-                return (
-                  <button
-                    key={post.id}
-                    onClick={() => hasMedia ? setLightboxUrl(post.image_url) : undefined}
-                    className="group relative aspect-square overflow-hidden rounded-lg bg-surface-subtle"
-                  >
-                    {post.image_url ? (
-                      <img src={post.image_url} alt="" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
-                    ) : post.video_url ? (
-                      <div className="relative h-full w-full bg-slate-900">
-                        <video src={post.video_url} className="h-full w-full object-cover" muted />
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/80 shadow-lg">
-                            <MessageCircle className="h-5 w-5 text-slate-700" />
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-primary-50 to-primary-100 p-3">
-                        <p className="line-clamp-4 text-center text-[11px] font-medium leading-snug text-content-body">{post.content}</p>
-                      </div>
-                    )}
-                    {/* Hover overlay with stats */}
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition-all duration-200 group-hover:bg-black/40 group-hover:opacity-100">
-                      <div className="flex items-center gap-4 text-white">
-                        <span className="flex items-center gap-1 text-sm font-semibold">
-                          <Heart className="h-4 w-4 fill-white" />
-                          {post.like_count}
-                        </span>
-                        <span className="flex items-center gap-1 text-sm font-semibold">
-                          <MessageCircle className="h-4 w-4" />
-                          {post.comment_count}
-                        </span>
-                      </div>
-                    </div>
-                    {/* Delete button */}
-                    <span
-                      onClick={(e) => { e.stopPropagation(); deletePost(post.id); }}
-                      className="absolute right-1.5 top-1.5 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-black/50 text-white opacity-0 transition-opacity hover:bg-red-500 group-hover:opacity-100"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+            <div className="flex h-32 items-center justify-center border-t border-slate-200 dark:border-edge-base"><div className="h-6 w-6 animate-spin rounded-full border-2 border-primary-500 border-t-transparent" /></div>
+          ) : visiblePosts.length === 0 ? (
+            <div className="border-t border-slate-200 px-5 py-12 text-center dark:border-edge-base"><p className="font-semibold">Ainda não há publicações</p><p className="mt-1 text-sm text-slate-500 dark:text-content-muted">Compartilhe sua primeira conquista no Feed.</p></div>
           ) : (
-            <div className="flex flex-col gap-4">
-              {posts.map((post) => (
-                <Card key={post.id} className="overflow-hidden transition-shadow hover:shadow-md">
-                  {post.image_url && (
-                    <button onClick={() => setLightboxUrl(post.image_url)} className="block w-full">
-                      <img src={post.image_url} alt="" className="w-full object-contain" style={{ maxHeight: "600px" }} />
-                    </button>
-                  )}
-                  {post.video_url && (
-                    <div className="w-full overflow-hidden bg-black">
-                      <video src={post.video_url} controls playsInline className="w-full" />
-                    </div>
-                  )}
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <AvatarPreview
-                          src={profile?.avatar_url}
-                          name={name}
-                          userId={profileId}
-                          size="sm"
-                        />
-                        <div>
-                          <p className="text-sm font-semibold text-content-strong">{name}</p>
-                          <p className="text-xs text-content-muted">{timeAgo(post.created_at)}</p>
-                        </div>
-                      </div>
-                      <button onClick={() => deletePost(post.id)} className="text-content-muted transition-colors hover:text-red-500">
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                    {post.content && <p className="mt-3 break-words text-sm leading-relaxed text-content-body">{post.content}</p>}
-                    <div className="mt-3 flex items-center gap-4 border-t border-slate-100 pt-3">
-                      <button
-                        onClick={() => toggleLike(post.id, post.liked_by_me)}
-                        className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${post.liked_by_me ? "text-rose-600" : "text-content-muted hover:text-rose-500"}`}
-                      >
-                        <Heart className={`h-4 w-4 ${post.liked_by_me ? "fill-rose-500" : ""}`} />
-                        {post.like_count > 0 && <span>{post.like_count}</span>}
-                      </button>
-                      <button className="flex items-center gap-1.5 text-sm font-medium text-content-muted hover:text-primary-500">
-                        <MessageCircle className="h-4 w-4" />
-                        {post.comment_count > 0 && <span>{post.comment_count}</span>}
-                      </button>
-                      <button onClick={() => handleShare(post)} className="flex items-center gap-1.5 text-sm font-medium text-content-muted hover:text-primary-500">
-                        <Share2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </CardContent>
-                </Card>
+            <div className="grid grid-cols-3 gap-0.5 border-t border-slate-200 dark:border-edge-base">
+              {visiblePosts.map((post) => (
+                <button key={post.id} onClick={() => post.image_url && setLightbox(post.image_url)} className="group relative aspect-square overflow-hidden bg-slate-100 text-left dark:bg-slate-800">
+                  {post.image_url ? <img src={post.image_url} alt="" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" /> : post.video_url ? <video src={post.video_url} className="h-full w-full object-cover" muted /> : <div className="flex h-full items-center justify-center bg-sky-50 p-3 dark:bg-sky-950/30"><p className="line-clamp-5 text-center text-xs">{post.content}</p></div>}
+                  <div className="absolute inset-0 flex items-center justify-center gap-4 bg-black/0 text-white opacity-0 transition-all group-hover:bg-black/45 group-hover:opacity-100"><span className="flex items-center gap-1 text-sm font-bold"><Heart className="h-4 w-4 fill-white" />{post.like_count}</span><span className="flex items-center gap-1 text-sm font-bold"><MessageCircle className="h-4 w-4" />{post.comment_count}</span></div>
+                </button>
               ))}
             </div>
           )}
-        </>
-      )}
+        </main>
 
-      {tab === "followers" && (
-        listLoading ? (
-          <div className="flex h-40 items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
+        <aside className="hidden pt-3 lg:block">
+          <label className="flex items-center gap-3 rounded-full border border-slate-300 px-4 py-2.5 text-slate-500 focus-within:border-primary-500 dark:border-edge-base dark:bg-surface-card">
+            <Search className="h-5 w-5" />
+            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar" className="w-full bg-transparent text-sm outline-none" />
+          </label>
+          <div className="mt-3 overflow-hidden rounded-2xl border border-slate-200 dark:border-edge-base">
+            <h3 className="px-4 pt-4 text-xl font-extrabold">Talvez você goste</h3>
+            {filteredSuggestions.map((person) => <SuggestionRow key={person.id} person={person} onClick={() => navigate(`/profile/${person.id}`)} />)}
+            {filteredSuggestions.length === 0 && <p className="px-4 py-5 text-sm text-slate-500">Nenhuma sugestão encontrada.</p>}
+            <button onClick={() => navigate("/feed")} className="px-4 pb-4 pt-2 text-sm text-sky-500 hover:underline">Ver mais</button>
           </div>
-        ) : followers.length === 0 ? (
-          <Card><CardContent className="flex flex-col items-center py-12 text-center">
-            <Users className="mb-3 h-10 w-10 text-slate-200" />
-            <p className="text-sm font-medium text-content-body">{t("myProfile.noFollowers")}</p>
-          </CardContent></Card>
-        ) : (
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {followers.map((f) => (
-              <button
-                key={f.id}
-                onClick={() => navigate(`/profile/${f.id}`)}
-                className="flex items-center gap-3 rounded-xl bg-surface-card p-3 text-left transition-colors hover:bg-surface-subtle"
-              >
-                <AvatarPreview src={f.avatar_url} name={f.full_name ?? "Usuario"} userId={f.id} size="sm" />
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-content-strong">{f.full_name ?? "Usuario"}</p>
-                  {f.is_professional && <p className="text-xs text-primary-600">{f.professional_role}</p>}
-                </div>
-              </button>
-            ))}
+          <div className="mt-4 rounded-2xl border border-slate-200 p-4 dark:border-edge-base">
+            <h3 className="text-xl font-extrabold">O que está acontecendo</h3>
+            {[["Fitness · Em alta", "Treino e bem-estar"], ["Nutrição · Em alta", "Receitas saudáveis"], ["Comunidade FitSync", "Compartilhe sua evolução"]].map(([label, title]) => <div key={title} className="mt-5 flex items-start justify-between"><div><p className="text-xs text-slate-500 dark:text-content-muted">{label}</p><p className="mt-1 text-sm font-bold">{title}</p></div><MoreHorizontal className="h-4 w-4 text-slate-500" /></div>)}
+            <button onClick={() => navigate("/feed")} className="mt-5 text-sm text-sky-500 hover:underline">Ver mais</button>
           </div>
-        )
-      )}
+          <p className="px-4 py-4 text-xs leading-6 text-slate-500">Termos · Privacidade · Cookies · Acessibilidade · © 2026 FitSync</p>
+        </aside>
+      </div>
 
-      {tab === "following" && (
-        listLoading ? (
-          <div className="flex h-40 items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
-          </div>
-        ) : following.length === 0 ? (
-          <Card><CardContent className="flex flex-col items-center py-12 text-center">
-            <UserPlus className="mb-3 h-10 w-10 text-slate-200" />
-            <p className="text-sm font-medium text-content-body">{t("myProfile.noFollowing")}</p>
-          </CardContent></Card>
-        ) : (
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {following.map((f) => (
-              <button
-                key={f.id}
-                onClick={() => navigate(`/profile/${f.id}`)}
-                className="flex items-center gap-3 rounded-xl bg-surface-card p-3 text-left transition-colors hover:bg-surface-subtle"
-              >
-                <AvatarPreview src={f.avatar_url} name={f.full_name ?? "Usuario"} userId={f.id} size="sm" />
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-content-strong">{f.full_name ?? "Usuario"}</p>
-                  {f.is_professional && <p className="text-xs text-primary-600">{f.professional_role}</p>}
-                </div>
-              </button>
-            ))}
-          </div>
-        )
-      )}
-
-      {/* Story viewer */}
-      {activeStoryGroup && (
-        <StoryViewer
-          group={activeStoryGroup}
-          index={activeStoryIndex}
-          onIndexChange={setActiveStoryIndex}
-          onClose={() => { setActiveStoryGroup(null); setActiveStoryIndex(0); }}
-          allGroups={[activeStoryGroup]}
-          onGroupChange={() => {}}
-        />
-      )}
-
-      {/* Lightbox */}
-      {lightboxUrl && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
-          onClick={() => setLightboxUrl(null)}
-        >
-          <img src={lightboxUrl} alt="" className="max-h-full max-w-full rounded-xl object-contain" />
-          <button className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20">
-            <Eye className="h-5 w-5" />
-          </button>
-        </div>
-      )}
+      {lightbox && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={() => setLightbox(null)}><img src={lightbox} alt="" className="max-h-full max-w-full rounded-xl object-contain" /></div>}
     </div>
   );
+}
+
+function SetupCard({ icon: Icon, color, title, onClick }: { icon: typeof UserRound; color: string; title: string; onClick: () => void }) {
+  return <button onClick={onClick} className="group text-left"><div className={`flex aspect-[1.15] items-center justify-center rounded-xl bg-gradient-to-br ${color} text-white shadow-sm transition-transform group-hover:-translate-y-0.5`}><Icon className="h-8 w-8" /></div><p className="mt-2 text-xs font-bold leading-snug">{title}</p></button>;
+}
+
+function SuggestionRow({ person, onClick }: { person: SuggestedProfile; onClick: () => void }) {
+  const name = person.full_name || "Usuário";
+  return <button onClick={onClick} className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-50 dark:hover:bg-surface-subtle"><AvatarPreview src={person.avatar_url} name={name} userId={person.id} size="sm" /><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{name}</p><p className="truncate text-xs text-slate-500 dark:text-content-muted">@{name.toLowerCase().replace(/[^a-z0-9]+/g, "").slice(0, 20) || "fitsync"}</p></div><span className="rounded-full bg-slate-950 px-3 py-1.5 text-xs font-bold text-white">Seguir</span></button>;
 }

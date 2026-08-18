@@ -1,12 +1,11 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   Heart, Send, Trash2, ImagePlus, X, Loader2, Plus,
-  MessageCircle, Share2, Eye, Lock, Unlock, Ban, Shield, Video, Flag, ZoomIn, Sparkles, TrendingUp, Hash,
+  MessageCircle, Share2, Ban, Flag, ZoomIn, Sparkles, TrendingUp, Hash,
 } from "lucide-react";
 import { AutoTextarea } from "../components/ui/textarea";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
-import { Avatar, AvatarImage, AvatarFallback } from "../components/ui/avatar";
 import { AvatarPreview } from "../components/ui/AvatarPreview";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
@@ -538,7 +537,7 @@ export function Feed() {
     setDeletingStoryId(null);
   }
 
-  async function reportComment(commentId: string, postId: string) {
+  async function reportComment(commentId: string, _postId: string) {
     if (!commentReportReason.trim() || !user) return;
     setCommentReportSubmitting(true);
     const { error } = await supabase.from("comment_reports").insert({
