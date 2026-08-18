@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import {
   Heart, Send, Trash2, ImagePlus, X, Loader2, Plus,
-  MessageCircle, Share2, Ban, Flag, ZoomIn, Sparkles, TrendingUp, Hash,
+  MessageCircle, Share2, Ban, Flag, ZoomIn, Sparkles, TrendingUp, Hash, Search, Users,
 } from "lucide-react";
 import { AutoTextarea } from "../components/ui/textarea";
 import { Card, CardContent } from "../components/ui/card";
@@ -47,6 +47,17 @@ interface StoryWithProfile {
   profiles: { full_name: string | null; avatar_url: string | null } | null;
 }
 
+interface SearchResult {
+  id: string;
+  full_name: string | null;
+  avatar_url: string | null;
+  is_professional: boolean | null;
+  professional_role: string | null;
+  handle: string | null;
+}
+
+type FeedTab = "foryou" | "following";
+
 function initials(name: string) {
   return name.split(" ").slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("");
 }
@@ -68,8 +79,10 @@ export function Feed() {
   const { t } = useI18n();
   const navigate = useNavigate();
   const [posts, setPosts] = useState<PostWithProfile[]>([]);
+  const [followingPosts, setFollowingPosts] = useState<PostWithProfile[]>([]);
   const [stories, setStories] = useState<StoryWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [followingLoading, setFollowingLoading] = useState(false);
   const [content, setContent] = useState("");
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
@@ -100,13 +113,15 @@ export function Feed() {
   const [commentReportDesc, setCommentReportDesc] = useState("");
   const [commentReportSubmitting, setCommentReportSubmitting] = useState(false);
   const [deletingStoryId, setDeletingStoryId] = useState<string | null>(null);
-  const [feedTab, setFeedTab] = useState<"feed" | "foryou">("feed");
-  const [recommendedPosts, setRecommendedPosts] = useState<PostWithProfile[]>([]);
-  const [recommendedLoading, setRecommendedLoading] = useState(false);
+  const [feedTab, setFeedTab] = useState<FeedTab>("foryou");
   const [trendingTags, setTrendingTags] = useState<{ tag: string; post_count: number }[]>([]);
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [tagPosts, setTagPosts] = useState<PostWithProfile[]>([]);
   const [tagLoading, setTagLoading] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
 
   useEffect(() => {
     if (profile) {
@@ -144,6 +159,45 @@ export function Feed() {
     setLoading(false);
   }, [user]);
 
+  const loadFollowingPosts = useCallback(async () => {
+    if (!user) return;
+    setFollowingLoading(true);
+    const { data: following } = await supabase
+      .from("follows")
+      .select("followee_id")
+      .eq("follower_id", user.id)
+      .eq("status", "accepted");
+    const followedIds = (following || []).map((f) => f.followee_id);
+    followedIds.push(user.id);
+    if (followedIds.length === 0) { setFollowingPosts([]); setFollowingLoading(false); return; }
+    const { data: postData } = await supabase
+      .from("feed_posts")
+      .select("*, profiles:user_id(full_name, avatar_url)")
+      .in("user_id", followedIds)
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (!postData || postData.length === 0) { setFollowingPosts([]); setFollowingLoading(false); return; }
+    const postIds = postData.map((p) => p.id);
+    const [{ data: likes }, { data: myLikes }, { data: commentCounts }] = await Promise.all([
+      supabase.from("feed_likes").select("post_id").in("post_id", postIds),
+      supabase.from("feed_likes").select("post_id").eq("user_id", user.id).in("post_id", postIds),
+      supabase.from("feed_comments").select("post_id").in("post_id", postIds),
+    ]);
+    const likeMap: Record<string, number> = {};
+    (likes || []).forEach((l) => { likeMap[l.post_id] = (likeMap[l.post_id] || 0) + 1; });
+    const myLikeSet = new Set((myLikes || []).map((l) => l.post_id));
+    const commentMap: Record<string, number> = {};
+    (commentCounts || []).forEach((c) => { commentMap[c.post_id] = (commentMap[c.post_id] || 0) + 1; });
+    setFollowingPosts(postData.map((p) => ({
+      ...p,
+      profiles: p.profiles as PostWithProfile["profiles"],
+      like_count: likeMap[p.id] || 0,
+      liked_by_me: myLikeSet.has(p.id),
+      comment_count: commentMap[p.id] || 0,
+    })) as PostWithProfile[]);
+    setFollowingLoading(false);
+  }, [user]);
+
   const loadStories = useCallback(async () => {
     if (!user) return;
     const now = new Date().toISOString();
@@ -165,74 +219,6 @@ export function Feed() {
     setStories((data ?? []) as StoryWithProfile[]);
   }, [user]);
 
-  const loadRecommended = useCallback(async () => {
-    if (!user) return;
-    setRecommendedLoading(true);
-    // 1. Get authors the user has liked posts from
-    const { data: myLikes } = await supabase
-      .from("feed_likes")
-      .select("post_id")
-      .eq("user_id", user.id)
-      .limit(100);
-    const likedPostIds = (myLikes || []).map((l) => l.post_id);
-    const likedAuthorIds = new Set<string>();
-    if (likedPostIds.length > 0) {
-      const { data: likedPosts } = await supabase
-        .from("feed_posts")
-        .select("user_id")
-        .in("id", likedPostIds);
-      (likedPosts || []).forEach((p) => likedAuthorIds.add(p.user_id));
-    }
-    // 2. Get followed authors
-    const { data: following } = await supabase
-      .from("follows")
-      .select("followee_id")
-      .eq("follower_id", user.id)
-      .eq("status", "accepted");
-    const followedSet = new Set((following || []).map((f) => f.followee_id));
-    // 3. Load all recent posts (excluding own)
-    const { data: postData } = await supabase
-      .from("feed_posts")
-      .select("*, profiles:user_id(full_name, avatar_url)")
-      .neq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(80);
-    if (!postData || postData.length === 0) { setRecommendedPosts([]); setRecommendedLoading(false); return; }
-    // 4. Score each post
-    const scored = postData.map((p) => {
-      let score = 0;
-      if (followedSet.has(p.user_id)) score += 100;
-      if (likedAuthorIds.has(p.user_id)) score += 50;
-      // Recency boost: newer posts get higher scores
-      const ageHours = (Date.now() - new Date(p.created_at).getTime()) / 3600000;
-      score += Math.max(0, 24 - ageHours);
-      return { post: p, score };
-    });
-    // Sort by score descending, take top 20
-    scored.sort((a, b) => b.score - a.score);
-    const top = scored.slice(0, 20).map((s) => s.post);
-    // 5. Fetch likes and comments for recommended posts
-    const topIds = top.map((p) => p.id);
-    const [{ data: likes }, { data: myLikes2 }, { data: commentCounts }] = await Promise.all([
-      supabase.from("feed_likes").select("post_id").in("post_id", topIds),
-      supabase.from("feed_likes").select("post_id").eq("user_id", user.id).in("post_id", topIds),
-      supabase.from("feed_comments").select("post_id").in("post_id", topIds),
-    ]);
-    const likeMap: Record<string, number> = {};
-    (likes || []).forEach((l) => { likeMap[l.post_id] = (likeMap[l.post_id] || 0) + 1; });
-    const myLikeSet = new Set((myLikes2 || []).map((l) => l.post_id));
-    const commentMap: Record<string, number> = {};
-    (commentCounts || []).forEach((c) => { commentMap[c.post_id] = (commentMap[c.post_id] || 0) + 1; });
-    setRecommendedPosts(top.map((p) => ({
-      ...p,
-      profiles: p.profiles as PostWithProfile["profiles"],
-      like_count: likeMap[p.id] || 0,
-      liked_by_me: myLikeSet.has(p.id),
-      comment_count: commentMap[p.id] || 0,
-    })) as PostWithProfile[]);
-    setRecommendedLoading(false);
-  }, [user]);
-
   const loadTrending = useCallback(async () => {
     const { data } = await supabase
       .from("trending_hashtags")
@@ -245,17 +231,30 @@ export function Feed() {
     loadPosts();
     loadStories();
     loadTrending();
-    if (feedTab === "foryou") loadRecommended();
+    loadFollowingPosts();
     const channel = supabase
       .channel("feed-realtime")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "feed_posts" }, () => loadPosts())
-      .on("postgres_changes", { event: "DELETE", schema: "public", table: "feed_posts" }, () => loadPosts())
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "feed_posts" }, () => { loadPosts(); if (feedTab === "following") loadFollowingPosts(); })
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "feed_posts" }, () => { loadPosts(); if (feedTab === "following") loadFollowingPosts(); })
       .on("postgres_changes", { event: "*", schema: "public", table: "feed_likes" }, () => loadPosts())
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "stories" }, () => loadStories())
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "feed_comments" }, () => loadPosts())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [loadPosts, loadStories, loadTrending]);
+  }, [loadPosts, loadStories, loadTrending, loadFollowingPosts]);
+
+  // Debounced people search
+  useEffect(() => {
+    if (!searchOpen) return;
+    if (!searchQuery.trim()) { setSearchResults([]); return; }
+    setSearchLoading(true);
+    const timer = setTimeout(async () => {
+      const { data } = await supabase.rpc("search_profiles", { p_query: searchQuery.trim().replace(/^@/, ""), p_limit: 12 });
+      setSearchResults((data ?? []) as SearchResult[]);
+      setSearchLoading(false);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery, searchOpen]);
 
   async function handleMediaUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -337,13 +336,15 @@ export function Feed() {
       .select("*, profiles:user_id(full_name, avatar_url)")
       .single();
     if (data) {
-      setPosts((prev) => [{
+      const newPost: PostWithProfile = {
         ...data,
         profiles: data.profiles as PostWithProfile["profiles"],
         like_count: 0,
         liked_by_me: false,
         comment_count: 0,
-      } as PostWithProfile, ...prev]);
+      };
+      setPosts((prev) => [newPost, ...prev]);
+      setFollowingPosts((prev) => [newPost, ...prev]);
       const tags = parseHashtags(content);
       if (tags.length > 0) {
         for (const tag of tags) {
@@ -374,7 +375,7 @@ export function Feed() {
       ...p, liked_by_me: !liked, like_count: p.like_count + (liked ? -1 : 1),
     } : p);
     setPosts(updateFn);
-    setRecommendedPosts(updateFn);
+    setFollowingPosts(updateFn);
     setTagPosts(updateFn);
   }
 
@@ -419,11 +420,13 @@ export function Feed() {
   async function deletePost(id: string) {
     await supabase.from("feed_posts").delete().eq("id", id);
     setPosts((prev) => prev.filter((p) => p.id !== id));
+    setFollowingPosts((prev) => prev.filter((p) => p.id !== id));
   }
 
   async function deletePostAsOwner(id: string) {
     await supabase.rpc("delete_post_as_owner", { p_post_id: id });
     setPosts((prev) => prev.filter((p) => p.id !== id));
+    setFollowingPosts((prev) => prev.filter((p) => p.id !== id));
   }
 
   async function handleFollow(targetUserId: string) {
@@ -475,7 +478,10 @@ export function Feed() {
         [postId]: [...(prev[postId] || []), data as CommentWithProfile],
       }));
       setCommentDrafts((prev) => ({ ...prev, [postId]: "" }));
-      setPosts((prev) => prev.map((p) => p.id === postId ? { ...p, comment_count: p.comment_count + 1 } : p));
+      const updateFn = (prev: PostWithProfile[]) => prev.map((p) => p.id === postId ? { ...p, comment_count: p.comment_count + 1 } : p);
+      setPosts(updateFn);
+      setFollowingPosts(updateFn);
+      setTagPosts(updateFn);
     }
     setCommentLoading((prev) => { const n = new Set(prev); n.delete(postId); return n; });
   }
@@ -486,7 +492,10 @@ export function Feed() {
       ...prev,
       [postId]: (prev[postId] || []).filter((c) => c.id !== commentId),
     }));
-    setPosts((prev) => prev.map((p) => p.id === postId ? { ...p, comment_count: p.comment_count - 1 } : p));
+    const updateFn = (prev: PostWithProfile[]) => prev.map((p) => p.id === postId ? { ...p, comment_count: p.comment_count - 1 } : p);
+    setPosts(updateFn);
+    setFollowingPosts(updateFn);
+    setTagPosts(updateFn);
   }
 
   async function handleShare(post: PostWithProfile) {
@@ -565,607 +574,574 @@ export function Feed() {
 
   const taCls = "w-full rounded-xl border border-edge-base bg-surface-base px-4 py-3 text-sm text-content-strong placeholder:text-content-muted focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100";
 
-  return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 sm:p-6 lg:p-8">
-      <header>
-        <h1 className="text-2xl font-bold text-content-strong">{t("feed.title")}</h1>
-        <p className="mt-0.5 text-sm text-content-muted">{t("feed.subtitle")}</p>
-      </header>
+  const activePosts = feedTab === "following" ? followingPosts : posts;
+  const activeLoading = feedTab === "following" ? followingLoading : loading;
 
-      {/* Feed / For You tabs */}
-      <div className="flex gap-2 rounded-xl bg-surface-subtle p-1">
-        <button
-          onClick={() => setFeedTab("feed")}
-          className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-semibold transition-all ${feedTab === "feed" ? "bg-surface-card shadow-sm text-primary-600" : "text-content-muted hover:text-content-body"}`}
-        >
-          {t("recommend.tabFeed")}
-        </button>
-        <button
-          onClick={() => { setFeedTab("foryou"); loadRecommended(); }}
-          className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-semibold transition-all ${feedTab === "foryou" ? "bg-surface-card shadow-sm text-primary-600" : "text-content-muted hover:text-content-body"}`}
-        >
-          <Sparkles className="h-4 w-4" />
-          {t("recommend.tabForYou")}
-        </button>
-      </div>
-
-      {/* Trending topics */}
-      {trendingTags.length > 0 && (
-        <div className="rounded-xl border border-edge-base bg-surface-card p-4">
-          <div className="mb-2 flex items-center gap-2">
-            <TrendingUp className="h-4 w-4 text-primary-600" />
-            <h3 className="text-sm font-semibold text-content-strong">Em alta</h3>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {trendingTags.map((tag) => (
-              <button
-                key={tag.tag}
-                onClick={() => activeTag === tag.tag ? setActiveTag(null) : loadPostsByTag(tag.tag)}
-                className={`flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-medium transition-all ${activeTag === tag.tag ? "bg-primary-600 text-white shadow-sm" : "bg-primary-50 text-primary-600 hover:bg-primary-100"}`}
-              >
-                <Hash className="h-3 w-3" />
-                {tag.tag}
-                <span className={`ml-1 rounded-full px-1.5 py-0.5 text-[10px] ${activeTag === tag.tag ? "bg-white/20 text-white" : "bg-primary-100 text-primary-700"}`}>
-                  {tag.post_count}
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Hashtag-filtered posts */}
-      {activeTag && (
-        <div>
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="flex items-center gap-1.5 text-base font-semibold text-content-strong">
-              <Hash className="h-4 w-4 text-primary-600" />
-              {activeTag}
-            </h2>
-            <button onClick={() => setActiveTag(null)} className="text-sm text-content-muted hover:text-content-body">
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-          {tagLoading ? (
-            <div className="flex h-40 items-center justify-center">
-              <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
+  function renderPostCard(post: PostWithProfile) {
+    const name = post.profiles?.full_name || "Usuario";
+    const isOwn = post.user_id === user?.id;
+    const followStatus = followStatuses[post.user_id];
+    const showComments = expandedComments.has(post.id);
+    return (
+      <Card key={post.id}>
+        <CardContent className="p-4">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-3">
+              <AvatarPreview
+                src={post.profiles?.avatar_url}
+                name={name}
+                userId={post.user_id}
+                size="sm"
+              />
+              <div>
+                <button onClick={() => navigate(`/profile/${post.user_id}`)} className="text-left">
+                  <p className="text-sm font-semibold text-content-strong hover:underline">{name}</p>
+                </button>
+                <p className="text-xs text-content-muted">{timeAgo(post.created_at)}</p>
+              </div>
             </div>
-          ) : tagPosts.length === 0 ? (
-            <Card><CardContent className="py-12 text-center text-sm text-content-muted">
-              Nenhuma postagem com esta hashtag ainda.
-            </CardContent></Card>
-          ) : (
-            <div className="flex flex-col gap-4">
-              {tagPosts.map((post) => {
-                const name = post.profiles?.full_name || "Usuario";
-                return (
-                  <Card key={post.id}>
-                    <CardContent className="p-4">
-                      <div className="flex items-center gap-3">
-                        <AvatarPreview src={post.profiles?.avatar_url} name={name} userId={post.user_id} size="sm" />
-                        <div>
-                          <button onClick={() => navigate(`/profile/${post.user_id}`)} className="text-left">
-                            <p className="text-sm font-semibold text-content-strong hover:underline">{name}</p>
-                          </button>
-                          <p className="text-xs text-content-muted">{timeAgo(post.created_at)}</p>
-                        </div>
-                      </div>
-                      {post.content && <p className="mt-3 break-words text-sm leading-relaxed text-content-body">{post.content}</p>}
-                      {post.image_url && (
-                        <img src={post.image_url} alt="" className="mt-3 w-full rounded-xl object-contain" style={{ maxHeight: "600px" }} />
-                      )}
-                      {post.video_url && (
-                        <video src={post.video_url} controls playsInline className="mt-3 w-full rounded-xl" />
-                      )}
-                      <div className="mt-3 flex items-center gap-4 border-t border-slate-100 pt-3">
-                        <button
-                          onClick={() => toggleLike(post.id, post.liked_by_me)}
-                          className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${post.liked_by_me ? "text-rose-600" : "text-content-muted hover:text-rose-500"}`}
-                        >
-                          <Heart className={`h-4 w-4 ${post.liked_by_me ? "fill-rose-500" : ""}`} />
-                          {post.like_count > 0 && <span>{post.like_count}</span>}
-                        </button>
-                        <button className="flex items-center gap-1.5 text-sm font-medium text-content-muted">
-                          <MessageCircle className="h-4 w-4" />
-                          {post.comment_count > 0 && <span>{post.comment_count}</span>}
-                        </button>
-                        <button onClick={() => handleShare(post)} className="flex items-center gap-1.5 text-sm font-medium text-content-muted hover:text-primary-500">
-                          <Share2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+            <div className="flex items-center gap-2">
+              {!isOwn && (
+                followStatus === "pending" || followStatus === "accepted" ? (
+                  <button onClick={() => handleUnfollow(post.user_id)} className="rounded-lg px-3 py-1 text-xs font-medium text-content-muted transition-colors hover:bg-surface-subtle">
+                    {followStatus === "accepted" ? t("feed.following") : t("feed.followPending")}
+                  </button>
+                ) : (
+                  <button onClick={() => handleFollow(post.user_id)} className="rounded-lg bg-primary-50 px-3 py-1 text-xs font-semibold text-primary-600 transition-colors hover:bg-primary-100">
+                    {t("feed.follow")}
+                  </button>
+                )
+              )}
+              <div className="flex items-center gap-1">
+                {!isOwn && (
+                  <button onClick={() => setReportingPost(post.id)} className="rounded-lg p-1.5 text-content-muted transition-colors hover:bg-amber-50 hover:text-amber-600" title="Denunciar">
+                    <Flag className="h-4 w-4" />
+                  </button>
+                )}
+                {isOwn ? (
+                  <button onClick={() => deletePost(post.id)} className="rounded-lg p-1.5 text-content-muted transition-colors hover:bg-red-50 hover:text-red-600">
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                ) : isOwner ? (
+                  <>
+                    <button onClick={() => handleBanUser(post.user_id)} className="rounded-lg p-1.5 text-content-muted transition-colors hover:bg-red-50 hover:text-red-600" title={t("feed.banUser")}>
+                      <Ban className="h-4 w-4" />
+                    </button>
+                    <button onClick={() => deletePostAsOwner(post.id)} className="rounded-lg p-1.5 text-content-muted transition-colors hover:bg-red-50 hover:text-red-600" title={t("feed.deletePostModeration")}>
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </>
+                ) : null}
+              </div>
+            </div>
+          </div>
+          {post.content && <p className="mt-3 break-words text-sm leading-relaxed text-content-body">{post.content}</p>}
+          {post.image_url && (
+            <button onClick={() => setLightboxUrl(post.image_url)} className="group relative mt-3 block w-full">
+              <img src={post.image_url} alt="" className="w-full rounded-xl object-contain" style={{ maxHeight: "600px" }} />
+              <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/0 opacity-0 transition-all group-hover:bg-black/10 group-hover:opacity-100">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/80 shadow-lg">
+                  <ZoomIn className="h-5 w-5 text-slate-700" />
+                </div>
+              </div>
+            </button>
+          )}
+          {post.video_url && (
+            <video src={post.video_url} controls playsInline className="mt-3 w-full rounded-xl" />
+          )}
+
+          {/* Report modal */}
+          {reportingPost === post.id && (
+            <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-semibold text-amber-900">Denunciar postagem</h4>
+                <button onClick={() => setReportingPost(null)} className="text-amber-700 hover:text-amber-900">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <select
+                value={reportReason}
+                onChange={(e) => setReportReason(e.target.value)}
+                className="mt-3 w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm text-content-strong focus:outline-none"
+              >
+                <option value="">Selecione o motivo</option>
+                <option value="spam">Spam ou conteúdo repetitivo</option>
+                <option value="harassment">Assédio ou bullying</option>
+                <option value="inappropriate">Conteúdo inadequado</option>
+                <option value="misinformation">Desinformação</option>
+                <option value="violence">Ameaça ou violência</option>
+                <option value="other">Outro</option>
+              </select>
+              <textarea
+                value={reportDesc}
+                onChange={(e) => setReportDesc(e.target.value)}
+                placeholder="Descreva o problema (opcional)..."
+                rows={2}
+                className="mt-2 w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm text-content-strong placeholder:text-content-muted focus:outline-none"
+              />
+              <div className="mt-3 flex justify-end gap-2">
+                <Button variant="outline" size="sm" onClick={() => setReportingPost(null)}>Cancelar</Button>
+                <Button size="sm" onClick={() => submitReport(post.id)} disabled={!reportReason || reportSubmitting} className="gap-2">
+                  {reportSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Flag className="h-4 w-4" />}
+                  Enviar denúncia
+                </Button>
+              </div>
             </div>
           )}
-        </div>
-      )}
 
-      {/* Stories bar */}
-      <div className="flex gap-3 overflow-x-auto pb-2">
-        <button
-          onClick={() => storyInput?.click()}
-          disabled={storyUploading || isBanned}
-          className="flex flex-col items-center gap-1.5"
-        >
-          <div className="relative flex h-16 w-16 items-center justify-center rounded-full border-2 border-dashed border-primary-300 bg-primary-50 transition-colors hover:border-primary-500 hover:bg-primary-100 disabled:opacity-40">
-            {storyUploading ? (
-              <Loader2 className="h-6 w-6 animate-spin text-primary-500" />
+          {/* Action bar */}
+          <div className="mt-3 flex items-center gap-4 border-t border-slate-100 pt-3">
+            <button
+              onClick={() => toggleLike(post.id, post.liked_by_me)}
+              className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${post.liked_by_me ? "text-rose-600" : "text-content-muted hover:text-rose-500"}`}
+            >
+              <Heart className={`h-4 w-4 ${post.liked_by_me ? "fill-rose-500" : ""}`} />
+              {post.like_count > 0 && <span>{post.like_count}</span>}
+            </button>
+            <button
+              onClick={() => toggleComments(post.id)}
+              className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${showComments ? "text-primary-600" : "text-content-muted hover:text-primary-500"}`}
+            >
+              <MessageCircle className="h-4 w-4" />
+              {post.comment_count > 0 && <span>{post.comment_count}</span>}
+            </button>
+            <button
+              onClick={() => handleShare(post)}
+              className="flex items-center gap-1.5 text-sm font-medium text-content-muted transition-colors hover:text-primary-500"
+            >
+              <Share2 className="h-4 w-4" />
+            </button>
+          </div>
+
+          {/* Comments section */}
+          {showComments && (
+            <div className="mt-3 flex flex-col gap-3 border-t border-slate-100 pt-3">
+              {(commentsByPost[post.id] || []).length === 0 ? (
+                <p className="text-xs text-content-muted">{t("feed.noComments")}</p>
+              ) : (
+                (commentsByPost[post.id] || []).map((c) => {
+                  const cName = c.profiles?.full_name || "Usuario";
+                  const cIsOwn = c.user_id === user?.id;
+                  return (
+                    <div key={c.id} className="flex items-start gap-2">
+                      <AvatarPreview
+                        src={c.profiles?.avatar_url}
+                        name={cName}
+                        userId={c.user_id}
+                        size="xs"
+                      />
+                      <div className="flex-1">
+                        <div className="rounded-xl bg-slate-50 px-3 py-2">
+                          <div className="flex items-center justify-between">
+                            <button onClick={() => navigate(`/profile/${c.user_id}`)} className="text-xs font-semibold text-content-strong hover:underline">{cName}</button>
+                            <div className="flex items-center gap-2">
+                              {!cIsOwn && (
+                                <button onClick={() => setReportingComment({ commentId: c.id, postId: post.id })} className="text-content-muted transition-colors hover:text-amber-500" title="Denunciar comentário">
+                                  <Flag className="h-3 w-3" />
+                                </button>
+                              )}
+                              {(cIsOwn || isOwner) && (
+                                <button onClick={() => deleteComment(c.id, post.id)} className="text-content-muted transition-colors hover:text-red-500">
+                                  <Trash2 className="h-3 w-3" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                          <p className="mt-0.5 break-words text-sm text-content-body">{c.content}</p>
+                        </div>
+                        <p className="mt-0.5 pl-3 text-[10px] text-content-muted">{timeAgo(c.created_at)}</p>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+              {!isBanned && (
+                <div className="flex items-center gap-2">
+                  <input
+                    value={commentDrafts[post.id] || ""}
+                    onChange={(e) => setCommentDrafts((prev) => ({ ...prev, [post.id]: e.target.value }))}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); submitComment(post.id); } }}
+                    placeholder={t("feed.commentPlaceholder")}
+                    className="flex-1 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-primary-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-100"
+                  />
+                  <button
+                    onClick={() => submitComment(post.id)}
+                    disabled={!(commentDrafts[post.id] || "").trim() || commentLoading.has(post.id)}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-600 text-white transition-colors hover:bg-primary-700 disabled:opacity-40"
+                  >
+                    {commentLoading.has(post.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="mx-auto flex w-full max-w-2xl flex-col">
+      {/* Sticky header with tabs */}
+      <header className="sticky top-0 z-20 border-b border-edge-base bg-white/90 backdrop-blur dark:bg-surface-card/90">
+        <div className="flex items-center justify-between px-4 py-2">
+          <h1 className="text-lg font-bold text-content-strong">{t("feed.title")}</h1>
+          <button
+            onClick={() => setSearchOpen(true)}
+            className="flex items-center gap-2 rounded-full border border-edge-base px-3 py-1.5 text-sm text-content-muted transition-colors hover:bg-surface-subtle"
+          >
+            <Search className="h-4 w-4" />
+            <span className="hidden sm:inline">Buscar pessoas</span>
+          </button>
+        </div>
+        <nav className="flex">
+          {(["foryou", "following"] as FeedTab[]).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => { setFeedTab(tab); if (tab === "following") loadFollowingPosts(); }}
+              className={`relative flex flex-1 items-center justify-center gap-1.5 py-3 text-sm font-bold transition-colors ${feedTab === tab ? "text-content-strong" : "text-content-muted hover:text-content-body"}`}
+            >
+              {tab === "foryou" ? (
+                <><Sparkles className="h-4 w-4" /> Para você</>
+              ) : (
+                <><Users className="h-4 w-4" /> Seguindo</>
+              )}
+              {feedTab === tab && <span className="absolute inset-x-0 bottom-0 h-1 rounded-full bg-primary-500" />}
+            </button>
+          ))}
+        </nav>
+      </header>
+
+      <div className="flex flex-col gap-4 px-4 py-4">
+        {/* Trending topics */}
+        {trendingTags.length > 0 && (
+          <div className="rounded-xl border border-edge-base bg-surface-card p-4">
+            <div className="mb-2 flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-primary-600" />
+              <h3 className="text-sm font-semibold text-content-strong">Em alta</h3>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {trendingTags.map((tag) => (
+                <button
+                  key={tag.tag}
+                  onClick={() => activeTag === tag.tag ? setActiveTag(null) : loadPostsByTag(tag.tag)}
+                  className={`flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-medium transition-all ${activeTag === tag.tag ? "bg-primary-600 text-white shadow-sm" : "bg-primary-50 text-primary-600 hover:bg-primary-100"}`}
+                >
+                  <Hash className="h-3 w-3" />
+                  {tag.tag}
+                  <span className={`ml-1 rounded-full px-1.5 py-0.5 text-[10px] ${activeTag === tag.tag ? "bg-white/20 text-white" : "bg-primary-100 text-primary-700"}`}>
+                    {tag.post_count}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Hashtag-filtered posts */}
+        {activeTag && (
+          <div>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="flex items-center gap-1.5 text-base font-semibold text-content-strong">
+                <Hash className="h-4 w-4 text-primary-600" />
+                {activeTag}
+              </h2>
+              <button onClick={() => setActiveTag(null)} className="text-sm text-content-muted hover:text-content-body">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            {tagLoading ? (
+              <div className="flex h-40 items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
+              </div>
+            ) : tagPosts.length === 0 ? (
+              <Card><CardContent className="py-12 text-center text-sm text-content-muted">
+                Nenhuma postagem com esta hashtag ainda.
+              </CardContent></Card>
             ) : (
-              <Plus className="h-6 w-6 text-primary-500" />
+              <div className="flex flex-col gap-4">
+                {tagPosts.map((post) => renderPostCard(post))}
+              </div>
             )}
           </div>
-          <span className="max-w-[64px] truncate text-[10px] font-medium text-content-muted">
-            {storyUploading ? "..." : t("feed.addStory")}
-          </span>
-        </button>
-        <input ref={(el) => setStoryInput(el)} type="file" accept="image/*,video/*" onChange={handleStoryUpload} className="hidden" />
+        )}
 
-        {Object.entries(storiesByUser).map(([uid, userStories]) => {
-          const first = userStories[0];
-          const name = first.profiles?.full_name || "Usuario";
-          const isOwn = uid === user?.id;
-          return (
-            <div key={uid} className="flex flex-col items-center gap-1.5">
-              <button onClick={() => { setActiveStoryGroup({ userId: uid, stories: userStories }); setActiveStoryIndex(0); }} className="relative h-16 w-16 rounded-full bg-gradient-to-tr from-primary-400 to-primary-600 p-0.5">
-                <div className="h-full w-full overflow-hidden rounded-full border-2 border-white">
-                  {first.profiles?.avatar_url ? (
-                    <img src={first.profiles.avatar_url} alt={name} className="h-full w-full object-cover" />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center bg-primary-100 text-sm font-bold text-primary-600">{initials(name)}</div>
-                  )}
-                </div>
-                {isOwn && (
-                  <span onClick={(e) => { e.stopPropagation(); setDeletingStoryId(first.id); }} className="absolute -right-0.5 -top-0.5 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full bg-red-500 text-white shadow-sm transition-colors hover:bg-red-600">
-                    <X className="h-3 w-3" />
-                  </span>
-                )}
-              </button>
-              <span className="max-w-[64px] truncate text-[10px] font-medium text-content-muted">
-                {isOwn ? "Voce" : name.split(" ")[0]}
-              </span>
+        {/* Stories bar */}
+        <div className="flex gap-3 overflow-x-auto pb-2">
+          <button
+            onClick={() => storyInput?.click()}
+            disabled={storyUploading || isBanned}
+            className="flex flex-col items-center gap-1.5"
+          >
+            <div className="relative flex h-16 w-16 items-center justify-center rounded-full border-2 border-dashed border-primary-300 bg-primary-50 transition-colors hover:border-primary-500 hover:bg-primary-100 disabled:opacity-40">
+              {storyUploading ? (
+                <Loader2 className="h-6 w-6 animate-spin text-primary-500" />
+              ) : (
+                <Plus className="h-6 w-6 text-primary-500" />
+              )}
             </div>
-          );
-        })}
-      </div>
+            <span className="max-w-[64px] truncate text-[10px] font-medium text-content-muted">
+              {storyUploading ? "..." : t("feed.addStory")}
+            </span>
+          </button>
+          <input ref={(el) => setStoryInput(el)} type="file" accept="image/*,video/*" onChange={handleStoryUpload} className="hidden" />
 
-      {/* Story viewer */}
-      {activeStoryGroup && (
-        <StoryViewer
-          group={activeStoryGroup}
-          index={activeStoryIndex}
-          onIndexChange={setActiveStoryIndex}
-          onClose={() => { setActiveStoryGroup(null); setActiveStoryIndex(0); }}
-          allGroups={Object.entries(storiesByUser).map(([uid, ss]) => ({ userId: uid, stories: ss }))}
-          onGroupChange={(g) => { setActiveStoryGroup(g); setActiveStoryIndex(0); }}
-        />
-      )}
-
-      {isBanned && (
-        <Card><CardContent className="flex items-center gap-3 py-4 text-sm text-red-600">
-          <Ban className="h-5 w-5 shrink-0" />
-          {t("feed.userBanned")}
-        </CardContent></Card>
-      )}
-
-      {/* For You - recommended posts */}
-      {feedTab === "foryou" && (
-        recommendedLoading ? (
-          <div className="flex h-40 items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
-          </div>
-        ) : recommendedPosts.length === 0 ? (
-          <Card><CardContent className="flex flex-col items-center py-16 text-center">
-            <Sparkles className="mb-3 h-12 w-12 text-slate-200" />
-            <h3 className="text-base font-semibold text-content-body">{t("recommend.title")}</h3>
-            <p className="mt-1 text-sm text-content-muted">{t("recommend.empty")}</p>
-          </CardContent></Card>
-        ) : (
-          <div className="flex flex-col gap-4">
-            {recommendedPosts.map((post) => {
-              const name = post.profiles?.full_name || "Usuario";
-              return (
-                <Card key={post.id}>
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-3">
-                        <AvatarPreview
-                          src={post.profiles?.avatar_url}
-                          name={name}
-                          userId={post.user_id}
-                          size="sm"
-                        />
-                        <div>
-                          <button onClick={() => navigate(`/profile/${post.user_id}`)} className="text-left">
-                            <p className="text-sm font-semibold text-content-strong hover:underline">{name}</p>
-                          </button>
-                          <p className="text-xs text-content-muted">{timeAgo(post.created_at)}</p>
-                        </div>
-                      </div>
-                    </div>
-                    {post.content && <p className="mt-3 break-words text-sm leading-relaxed text-content-body">{post.content}</p>}
-                    {post.image_url && (
-                      <button onClick={() => setLightboxUrl(post.image_url)} className="group relative mt-3 block w-full">
-                        <img src={post.image_url} alt="" className="w-full rounded-xl object-contain" style={{ maxHeight: "600px" }} />
-                      </button>
-                    )}
-                    {post.video_url && (
-                      <video src={post.video_url} controls playsInline className="mt-3 w-full rounded-xl" />
-                    )}
-                    <div className="mt-3 flex items-center gap-4 border-t border-slate-100 pt-3">
-                      <button
-                        onClick={() => toggleLike(post.id, post.liked_by_me)}
-                        className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${post.liked_by_me ? "text-rose-600" : "text-content-muted hover:text-rose-500"}`}
-                      >
-                        <Heart className={`h-4 w-4 ${post.liked_by_me ? "fill-rose-500" : ""}`} />
-                        {post.like_count > 0 && <span>{post.like_count}</span>}
-                      </button>
-                      <button className="flex items-center gap-1.5 text-sm font-medium text-content-muted hover:text-primary-500">
-                        <MessageCircle className="h-4 w-4" />
-                        {post.comment_count > 0 && <span>{post.comment_count}</span>}
-                      </button>
-                      <button onClick={() => handleShare(post)} className="flex items-center gap-1.5 text-sm font-medium text-content-muted transition-colors hover:text-primary-500">
-                        <Share2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        )
-      )}
-
-      {/* Posts - regular feed (only on feed tab) */}
-      {feedTab === "feed" && (loading ? (
-        <div className="flex h-40 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
-        </div>
-      ) : posts.length === 0 ? (
-        <Card><CardContent className="flex flex-col items-center py-16 text-center">
-          <Heart className="mb-3 h-12 w-12 text-slate-200" />
-          <h3 className="text-base font-semibold text-content-body">{t("feed.noPosts")}</h3>
-          <p className="mt-1 text-sm text-content-muted">{t("feed.noPostsSub")}</p>
-        </CardContent></Card>
-      ) : (
-        <div className="flex flex-col gap-4">
-          {posts.map((post) => {
-            const name = post.profiles?.full_name || "Usuario";
-            const isOwn = post.user_id === user?.id;
-            const followStatus = followStatuses[post.user_id];
-            const showComments = expandedComments.has(post.id);
+          {Object.entries(storiesByUser).map(([uid, userStories]) => {
+            const first = userStories[0];
+            const name = first.profiles?.full_name || "Usuario";
+            const isOwn = uid === user?.id;
             return (
-              <Card key={post.id}>
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      <AvatarPreview
-                        src={post.profiles?.avatar_url}
-                        name={name}
-                        userId={post.user_id}
-                        size="sm"
-                      />
-                      <div>
-                        <button onClick={() => navigate(`/profile/${post.user_id}`)} className="text-left">
-                          <p className="text-sm font-semibold text-content-strong hover:underline">{name}</p>
-                        </button>
-                        <p className="text-xs text-content-muted">{timeAgo(post.created_at)}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {!isOwn && (
-                        followStatus === "pending" || followStatus === "accepted" ? (
-                          <button onClick={() => handleUnfollow(post.user_id)} className="rounded-lg px-3 py-1 text-xs font-medium text-content-muted transition-colors hover:bg-surface-subtle">
-                            {followStatus === "accepted" ? t("feed.following") : t("feed.followPending")}
-                          </button>
-                        ) : (
-                          <button onClick={() => handleFollow(post.user_id)} className="rounded-lg bg-primary-50 px-3 py-1 text-xs font-semibold text-primary-600 transition-colors hover:bg-primary-100">
-                            {t("feed.follow")}
-                          </button>
-                        )
-                      )}
-                      <div className="flex items-center gap-1">
-                        {!isOwn && (
-                          <button onClick={() => setReportingPost(post.id)} className="rounded-lg p-1.5 text-content-muted transition-colors hover:bg-amber-50 hover:text-amber-600" title="Denunciar">
-                            <Flag className="h-4 w-4" />
-                          </button>
-                        )}
-                        {isOwn ? (
-                          <button onClick={() => deletePost(post.id)} className="rounded-lg p-1.5 text-content-muted transition-colors hover:bg-red-50 hover:text-red-600">
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        ) : isOwner ? (
-                          <>
-                            <button onClick={() => handleBanUser(post.user_id)} className="rounded-lg p-1.5 text-content-muted transition-colors hover:bg-red-50 hover:text-red-600" title={t("feed.banUser")}>
-                              <Ban className="h-4 w-4" />
-                            </button>
-                            <button onClick={() => deletePostAsOwner(post.id)} className="rounded-lg p-1.5 text-content-muted transition-colors hover:bg-red-50 hover:text-red-600" title={t("feed.deletePostModeration")}>
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </>
-                        ) : null}
-                      </div>
-                    </div>
+              <div key={uid} className="flex flex-col items-center gap-1.5">
+                <button onClick={() => { setActiveStoryGroup({ userId: uid, stories: userStories }); setActiveStoryIndex(0); }} className="relative h-16 w-16 rounded-full bg-gradient-to-tr from-primary-400 to-primary-600 p-0.5">
+                  <div className="h-full w-full overflow-hidden rounded-full border-2 border-white">
+                    {first.profiles?.avatar_url ? (
+                      <img src={first.profiles.avatar_url} alt={name} className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center bg-primary-100 text-sm font-bold text-primary-600">{initials(name)}</div>
+                    )}
                   </div>
-                  {post.content && <p className="mt-3 break-words text-sm leading-relaxed text-content-body">{post.content}</p>}
-                  {post.image_url && (
-                    <button onClick={() => setLightboxUrl(post.image_url)} className="group relative mt-3 block w-full">
-                      <img src={post.image_url} alt="" className="w-full rounded-xl object-contain" style={{ maxHeight: "600px" }} />
-                      <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/0 opacity-0 transition-all group-hover:bg-black/10 group-hover:opacity-100">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/80 shadow-lg">
-                          <ZoomIn className="h-5 w-5 text-slate-700" />
-                        </div>
-                      </div>
-                    </button>
+                  {isOwn && (
+                    <span onClick={(e) => { e.stopPropagation(); setDeletingStoryId(first.id); }} className="absolute -right-0.5 -top-0.5 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full bg-red-500 text-white shadow-sm transition-colors hover:bg-red-600">
+                      <X className="h-3 w-3" />
+                    </span>
                   )}
-                  {post.video_url && (
-                    <video src={post.video_url} controls playsInline className="mt-3 w-full rounded-xl" />
-                  )}
-
-                  {/* Report modal */}
-                  {reportingPost === post.id && (
-                    <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
-                      <div className="flex items-center justify-between">
-                        <h4 className="text-sm font-semibold text-amber-900">Denunciar postagem</h4>
-                        <button onClick={() => setReportingPost(null)} className="text-amber-700 hover:text-amber-900">
-                          <X className="h-4 w-4" />
-                        </button>
-                      </div>
-                      <select
-                        value={reportReason}
-                        onChange={(e) => setReportReason(e.target.value)}
-                        className="mt-3 w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm text-content-strong focus:outline-none"
-                      >
-                        <option value="">Selecione o motivo</option>
-                        <option value="spam">Spam ou conteúdo repetitivo</option>
-                        <option value="harassment">Assédio ou bullying</option>
-                        <option value="inappropriate">Conteúdo inadequado</option>
-                        <option value="misinformation">Desinformação</option>
-                        <option value="violence">Ameaça ou violência</option>
-                        <option value="other">Outro</option>
-                      </select>
-                      <textarea
-                        value={reportDesc}
-                        onChange={(e) => setReportDesc(e.target.value)}
-                        placeholder="Descreva o problema (opcional)..."
-                        rows={2}
-                        className="mt-2 w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm text-content-strong placeholder:text-content-muted focus:outline-none"
-                      />
-                      <div className="mt-3 flex justify-end gap-2">
-                        <Button variant="outline" size="sm" onClick={() => setReportingPost(null)}>Cancelar</Button>
-                        <Button size="sm" onClick={() => submitReport(post.id)} disabled={!reportReason || reportSubmitting} className="gap-2">
-                          {reportSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Flag className="h-4 w-4" />}
-                          Enviar denúncia
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Action bar */}
-                  <div className="mt-3 flex items-center gap-4 border-t border-slate-100 pt-3">
-                    <button
-                      onClick={() => toggleLike(post.id, post.liked_by_me)}
-                      className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${post.liked_by_me ? "text-rose-600" : "text-content-muted hover:text-rose-500"}`}
-                    >
-                      <Heart className={`h-4 w-4 ${post.liked_by_me ? "fill-rose-500" : ""}`} />
-                      {post.like_count > 0 && <span>{post.like_count}</span>}
-                    </button>
-                    <button
-                      onClick={() => toggleComments(post.id)}
-                      className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${showComments ? "text-primary-600" : "text-content-muted hover:text-primary-500"}`}
-                    >
-                      <MessageCircle className="h-4 w-4" />
-                      {post.comment_count > 0 && <span>{post.comment_count}</span>}
-                    </button>
-                    <button
-                      onClick={() => handleShare(post)}
-                      className="flex items-center gap-1.5 text-sm font-medium text-content-muted transition-colors hover:text-primary-500"
-                    >
-                      <Share2 className="h-4 w-4" />
-                    </button>
-                  </div>
-
-                  {/* Comments section */}
-                  {showComments && (
-                    <div className="mt-3 flex flex-col gap-3 border-t border-slate-100 pt-3">
-                      {(commentsByPost[post.id] || []).length === 0 ? (
-                        <p className="text-xs text-content-muted">{t("feed.noComments")}</p>
-                      ) : (
-                        (commentsByPost[post.id] || []).map((c) => {
-                          const cName = c.profiles?.full_name || "Usuario";
-                          const cIsOwn = c.user_id === user?.id;
-                          return (
-                            <div key={c.id} className="flex items-start gap-2">
-                              <AvatarPreview
-                                src={c.profiles?.avatar_url}
-                                name={cName}
-                                userId={c.user_id}
-                                size="xs"
-                              />
-                              <div className="flex-1">
-                                <div className="rounded-xl bg-slate-50 px-3 py-2">
-                                  <div className="flex items-center justify-between">
-                                    <button onClick={() => navigate(`/profile/${c.user_id}`)} className="text-xs font-semibold text-content-strong hover:underline">{cName}</button>
-                                    <div className="flex items-center gap-2">
-                                      {!cIsOwn && (
-                                        <button onClick={() => setReportingComment({ commentId: c.id, postId: post.id })} className="text-content-muted transition-colors hover:text-amber-500" title="Denunciar comentário">
-                                          <Flag className="h-3 w-3" />
-                                        </button>
-                                      )}
-                                      {(cIsOwn || isOwner) && (
-                                        <button onClick={() => deleteComment(c.id, post.id)} className="text-content-muted transition-colors hover:text-red-500">
-                                          <Trash2 className="h-3 w-3" />
-                                        </button>
-                                      )}
-                                    </div>
-                                  </div>
-                                  <p className="mt-0.5 break-words text-sm text-content-body">{c.content}</p>
-                                </div>
-                                <p className="mt-0.5 pl-3 text-[10px] text-content-muted">{timeAgo(c.created_at)}</p>
-                              </div>
-                            </div>
-                          );
-                        })
-                      )}
-                      {!isBanned && (
-                        <div className="flex items-center gap-2">
-                          <input
-                            value={commentDrafts[post.id] || ""}
-                            onChange={(e) => setCommentDrafts((prev) => ({ ...prev, [post.id]: e.target.value }))}
-                            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); submitComment(post.id); } }}
-                            placeholder={t("feed.commentPlaceholder")}
-                            className="flex-1 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-primary-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-100"
-                          />
-                          <button
-                            onClick={() => submitComment(post.id)}
-                            disabled={!(commentDrafts[post.id] || "").trim() || commentLoading.has(post.id)}
-                            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-600 text-white transition-colors hover:bg-primary-700 disabled:opacity-40"
-                          >
-                            {commentLoading.has(post.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                </button>
+                <span className="max-w-[64px] truncate text-[10px] font-medium text-content-muted">
+                  {isOwn ? "Voce" : name.split(" ")[0]}
+                </span>
+              </div>
             );
           })}
         </div>
-      ))}
 
-      {/* Photo lightbox */}
-      {lightboxUrl && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => setLightboxUrl(null)}>
-          <button className="absolute right-4 top-4 z-10 rounded-full bg-white/10 p-2 text-white transition-colors hover:bg-white/20">
-            <X className="h-6 w-6" />
+        {/* Story viewer */}
+        {activeStoryGroup && (
+          <StoryViewer
+            group={activeStoryGroup}
+            index={activeStoryIndex}
+            onIndexChange={setActiveStoryIndex}
+            onClose={() => { setActiveStoryGroup(null); setActiveStoryIndex(0); }}
+            allGroups={Object.entries(storiesByUser).map(([uid, ss]) => ({ userId: uid, stories: ss }))}
+            onGroupChange={(g) => { setActiveStoryGroup(g); setActiveStoryIndex(0); }}
+          />
+        )}
+
+        {isBanned && (
+          <Card><CardContent className="flex items-center gap-3 py-4 text-sm text-red-600">
+            <Ban className="h-5 w-5 shrink-0" />
+            {t("feed.userBanned")}
+          </CardContent></Card>
+        )}
+
+        {/* Posts */}
+        {activeTag ? null : activeLoading ? (
+          <div className="flex h-40 items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
+          </div>
+        ) : activePosts.length === 0 ? (
+          <Card><CardContent className="flex flex-col items-center py-16 text-center">
+            <Heart className="mb-3 h-12 w-12 text-slate-200" />
+            <h3 className="text-base font-semibold text-content-body">
+              {feedTab === "following" ? "Nada por aqui ainda" : t("feed.noPosts")}
+            </h3>
+            <p className="mt-1 text-sm text-content-muted">
+              {feedTab === "following" ? "Siga pessoas para ver as postagens delas aqui." : t("feed.noPostsSub")}
+            </p>
+          </CardContent></Card>
+        ) : (
+          <div className="flex flex-col gap-4">
+            {activePosts.map((post) => renderPostCard(post))}
+          </div>
+        )}
+
+        {/* Photo lightbox */}
+        {lightboxUrl && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => setLightboxUrl(null)}>
+            <button className="absolute right-4 top-4 z-10 rounded-full bg-white/10 p-2 text-white transition-colors hover:bg-white/20">
+              <X className="h-6 w-6" />
+            </button>
+            <img src={lightboxUrl} alt="" className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain" onClick={(e) => e.stopPropagation()} />
+          </div>
+        )}
+
+        {/* Floating post button */}
+        {!isBanned && (
+          <button
+            onClick={() => setComposerOpen(true)}
+            className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-primary-600 text-white shadow-lg shadow-primary-600/30 transition-all hover:scale-105 hover:bg-primary-700 active:scale-95"
+            title={t("feed.post")}
+          >
+            <Plus className="h-6 w-6" />
           </button>
-          <img src={lightboxUrl} alt="" className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain" onClick={(e) => e.stopPropagation()} />
-        </div>
-      )}
+        )}
 
-      {/* Floating post button */}
-      {!isBanned && (
-        <button
-          onClick={() => setComposerOpen(true)}
-          className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-primary-600 text-white shadow-lg shadow-primary-600/30 transition-all hover:scale-105 hover:bg-primary-700 active:scale-95"
-          title={t("feed.post")}
-        >
-          <Plus className="h-6 w-6" />
-        </button>
-      )}
-
-      {/* Post composer modal */}
-      {composerOpen && !isBanned && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm sm:items-center" onClick={() => setComposerOpen(false)}>
-          <div className="w-full max-w-lg rounded-t-2xl bg-surface-card p-5 shadow-2xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-content-strong">{t("feed.post")}</h2>
-              <button onClick={() => setComposerOpen(false)} className="rounded-full p-1.5 text-content-muted transition-colors hover:bg-surface-subtle">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <div className="flex flex-col gap-3">
-              <AutoTextarea
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder={t("feed.placeholder")}
-                minRows={3}
-                className={taCls}
-              />
-              {imageUrl && (
-                <div className="relative">
-                  <img src={imageUrl} alt="" className="max-h-64 rounded-xl object-cover" />
-                  <button onClick={() => { setImageUrl(null); setMediaType("image"); }} className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 text-white">
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              )}
-              {videoUrl && (
-                <div className="relative">
-                  <video src={videoUrl} controls className="max-h-64 rounded-xl" />
-                  <button onClick={() => { setVideoUrl(null); setMediaType("image"); }} className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 text-white">
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              )}
-              {error && <p className="text-sm text-red-500">{error}</p>}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <input ref={(el) => setFileInput(el)} type="file" accept="image/*,video/*" onChange={handleMediaUpload} className="hidden" />
-                  <Button variant="outline" size="sm" onClick={() => fileInput?.click()} disabled={uploading} className="gap-2">
-                    {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
-                    Foto/Vídeo
+        {/* Post composer modal */}
+        {composerOpen && !isBanned && (
+          <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm sm:items-center" onClick={() => setComposerOpen(false)}>
+            <div className="w-full max-w-lg rounded-t-2xl bg-surface-card p-5 shadow-2xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-lg font-bold text-content-strong">{t("feed.post")}</h2>
+                <button onClick={() => setComposerOpen(false)} className="rounded-full p-1.5 text-content-muted transition-colors hover:bg-surface-subtle">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="flex flex-col gap-3">
+                <AutoTextArea
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  placeholder={t("feed.placeholder")}
+                  minRows={3}
+                  className={taCls}
+                />
+                {imageUrl && (
+                  <div className="relative">
+                    <img src={imageUrl} alt="" className="max-h-64 rounded-xl object-cover" />
+                    <button onClick={() => { setImageUrl(null); setMediaType("image"); }} className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 text-white">
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
+                {videoUrl && (
+                  <div className="relative">
+                    <video src={videoUrl} controls className="max-h-64 rounded-xl" />
+                    <button onClick={() => { setVideoUrl(null); setMediaType("image"); }} className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 text-white">
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
+                {error && <p className="text-sm text-red-500">{error}</p>}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <input ref={(el) => setFileInput(el)} type="file" accept="image/*,video/*" onChange={handleMediaUpload} className="hidden" />
+                    <Button variant="outline" size="sm" onClick={() => fileInput?.click()} disabled={uploading} className="gap-2">
+                      {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
+                      Foto/Vídeo
+                    </Button>
+                  </div>
+                  <Button onClick={() => { createPost(); setComposerOpen(false); }} disabled={posting} className="gap-2">
+                    {posting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                    {t("feed.post")}
                   </Button>
                 </div>
-                <Button onClick={() => { createPost(); setComposerOpen(false); }} disabled={posting} className="gap-2">
-                  {posting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                  {t("feed.post")}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Story delete confirmation */}
+        {deletingStoryId && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setDeletingStoryId(null)}>
+            <div className="w-full max-w-sm rounded-2xl bg-surface-card p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <h3 className="text-base font-bold text-content-strong">Excluir story?</h3>
+              <p className="mt-1 text-sm text-content-muted">Esta ação não pode ser desfeita.</p>
+              <div className="mt-4 flex justify-end gap-2">
+                <Button variant="outline" size="sm" onClick={() => setDeletingStoryId(null)}>Cancelar</Button>
+                <Button size="sm" onClick={confirmDeleteStory} className="gap-2 bg-red-600 hover:bg-red-700">
+                  <Trash2 className="h-4 w-4" />
+                  Excluir
                 </Button>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Story delete confirmation */}
-      {deletingStoryId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setDeletingStoryId(null)}>
-          <div className="w-full max-w-sm rounded-2xl bg-surface-card p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-base font-bold text-content-strong">Excluir story?</h3>
-            <p className="mt-1 text-sm text-content-muted">Esta ação não pode ser desfeita.</p>
-            <div className="mt-4 flex justify-end gap-2">
-              <Button variant="outline" size="sm" onClick={() => setDeletingStoryId(null)}>Cancelar</Button>
-              <Button size="sm" onClick={confirmDeleteStory} className="gap-2 bg-red-600 hover:bg-red-700">
-                <Trash2 className="h-4 w-4" />
-                Excluir
-              </Button>
+        {/* Comment report modal */}
+        {reportingComment && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setReportingComment(null)}>
+            <div className="w-full max-w-sm rounded-2xl bg-surface-card p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between">
+                <h3 className="text-base font-bold text-content-strong">Denunciar comentário</h3>
+                <button onClick={() => setReportingComment(null)} className="text-content-muted hover:text-content-strong">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <select
+                value={commentReportReason}
+                onChange={(e) => setCommentReportReason(e.target.value)}
+                className="mt-3 w-full rounded-lg border border-edge-base bg-surface-base px-3 py-2 text-sm text-content-strong focus:outline-none"
+              >
+                <option value="">Selecione o motivo</option>
+                <option value="spam">Spam ou conteúdo repetitivo</option>
+                <option value="harassment">Assédio ou bullying</option>
+                <option value="inappropriate">Conteúdo inadequado</option>
+                <option value="misinformation">Desinformação</option>
+                <option value="violence">Ameaça ou violência</option>
+                <option value="other">Outro</option>
+              </select>
+              <textarea
+                value={commentReportDesc}
+                onChange={(e) => setCommentReportDesc(e.target.value)}
+                placeholder="Descreva o problema (opcional)..."
+                rows={2}
+                className="mt-2 w-full rounded-lg border border-edge-base bg-surface-base px-3 py-2 text-sm text-content-strong placeholder:text-content-muted focus:outline-none"
+              />
+              <div className="mt-3 flex justify-end gap-2">
+                <Button variant="outline" size="sm" onClick={() => setReportingComment(null)}>Cancelar</Button>
+                <Button size="sm" onClick={() => reportComment(reportingComment.commentId, reportingComment.postId)} disabled={!commentReportReason || commentReportSubmitting} className="gap-2">
+                  {commentReportSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Flag className="h-4 w-4" />}
+                  Enviar denúncia
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Comment report modal */}
-      {reportingComment && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setReportingComment(null)}>
-          <div className="w-full max-w-sm rounded-2xl bg-surface-card p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-bold text-content-strong">Denunciar comentário</h3>
-              <button onClick={() => setReportingComment(null)} className="text-content-muted hover:text-content-strong">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <select
-              value={commentReportReason}
-              onChange={(e) => setCommentReportReason(e.target.value)}
-              className="mt-3 w-full rounded-lg border border-edge-base bg-surface-base px-3 py-2 text-sm text-content-strong focus:outline-none"
-            >
-              <option value="">Selecione o motivo</option>
-              <option value="spam">Spam ou conteúdo repetitivo</option>
-              <option value="harassment">Assédio ou bullying</option>
-              <option value="inappropriate">Conteúdo inadequado</option>
-              <option value="misinformation">Desinformação</option>
-              <option value="violence">Ameaça ou violência</option>
-              <option value="other">Outro</option>
-            </select>
-            <textarea
-              value={commentReportDesc}
-              onChange={(e) => setCommentReportDesc(e.target.value)}
-              placeholder="Descreva o problema (opcional)..."
-              rows={2}
-              className="mt-2 w-full rounded-lg border border-edge-base bg-surface-base px-3 py-2 text-sm text-content-strong placeholder:text-content-muted focus:outline-none"
-            />
-            <div className="mt-3 flex justify-end gap-2">
-              <Button variant="outline" size="sm" onClick={() => setReportingComment(null)}>Cancelar</Button>
-              <Button size="sm" onClick={() => reportComment(reportingComment.commentId, reportingComment.postId)} disabled={!commentReportReason || commentReportSubmitting} className="gap-2">
-                {commentReportSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Flag className="h-4 w-4" />}
-                Enviar denúncia
-              </Button>
+        {/* People search modal */}
+        {searchOpen && (
+          <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 backdrop-blur-sm" onClick={() => setSearchOpen(false)}>
+            <div className="mt-[10vh] w-full max-w-lg rounded-2xl bg-surface-card p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="text-lg font-bold text-content-strong">Buscar pessoas</h2>
+                <button onClick={() => setSearchOpen(false)} className="rounded-full p-1.5 text-content-muted transition-colors hover:bg-surface-subtle">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <label className="flex items-center gap-3 rounded-full border border-edge-base bg-surface-base px-4 py-2.5 text-content-muted focus-within:border-primary-500">
+                <Search className="h-5 w-5" />
+                <input
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Digite o @ ou nome..."
+                  className="w-full bg-transparent text-sm text-content-strong outline-none"
+                  autoFocus
+                />
+              </label>
+              <div className="mt-4 flex flex-col gap-1">
+                {searchLoading ? (
+                  <div className="flex h-20 items-center justify-center">
+                    <Loader2 className="h-6 w-6 animate-spin text-primary-600" />
+                  </div>
+                ) : searchResults.length === 0 ? (
+                  <p className="py-8 text-center text-sm text-content-muted">
+                    {searchQuery.trim() ? "Nenhum resultado encontrado." : "Comece a digitar para buscar pessoas."}
+                  </p>
+                ) : (
+                  searchResults.map((person) => {
+                    const name = person.full_name || "Usuario";
+                    const handle = person.handle ? `@${person.handle}` : "";
+                    return (
+                      <button
+                        key={person.id}
+                        onClick={() => { navigate(`/profile/${person.id}`); setSearchOpen(false); }}
+                        className="flex items-center gap-3 rounded-xl p-3 text-left transition-colors hover:bg-surface-subtle"
+                      >
+                        <AvatarPreview src={person.avatar_url} name={name} userId={person.id} size="sm" />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-content-strong">{name}</p>
+                          {handle && <p className="truncate text-xs text-content-muted">{handle}</p>}
+                          {person.is_professional && person.professional_role && (
+                            <p className="truncate text-xs text-primary-600">{person.professional_role}</p>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

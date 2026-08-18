@@ -32,6 +32,7 @@ export interface Database {
           onboarding_completed: boolean;
           last_active_at: string | null;
           onboarding_due_at: string | null;
+          handle: string | null;
           created_at: string;
           updated_at: string;
         };
