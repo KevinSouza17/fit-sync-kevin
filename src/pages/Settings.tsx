@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Bell, Shield, Smartphone, Moon, Globe, Key, Check, Loader2, Eye, EyeOff } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Bell, Shield, Moon, Globe, Key, Check, Loader2, Eye, EyeOff, Smartphone, QrCode, Lock, Trash2 } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -38,12 +38,6 @@ const notifItems = [
   { label: "Dicas de saúde semanais", key: "weeklyTips" },
 ];
 
-const deviceItems = [
-  { label: "Apple Health", key: "appleHealth" },
-  { label: "Google Fit", key: "googleFit" },
-  { label: "Garmin Connect", key: "garmin" },
-];
-
 export function Settings() {
   const { darkMode, reducedMotion, toggleDarkMode, toggleReducedMotion } = useTheme();
   const { t, lang, setLang } = useI18n();
@@ -53,12 +47,9 @@ export function Settings() {
     dailySummary: true,
     weeklyTips: false,
   });
-  const [deviceToggles, setDeviceToggles] = useState<Record<string, boolean>>({
-    appleHealth: false,
-    googleFit: true,
-    garmin: false,
-  });
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [activeModal, setActiveModal] = useState<"password" | "twofactor" | null>(null);
+  const [mfaEnabled, setMfaEnabled] = useState(false);
+  const [mfaLoading, setMfaLoading] = useState(true);
 
   const langOptions: { value: Lang; label: string }[] = [
     { value: "pt", label: "Português (Brasil)" },
@@ -66,11 +57,25 @@ export function Settings() {
     { value: "es", label: "Español" },
   ];
 
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const { data } = await supabase.auth.mfa.listFactors();
+        if (mounted) {
+          setMfaEnabled((data?.totp ?? []).length > 0);
+        }
+      } catch {
+        if (mounted) setMfaEnabled(false);
+      } finally {
+        if (mounted) setMfaLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
   function toggleNotif(key: string) {
     setNotifToggles((prev) => ({ ...prev, [key]: !prev[key] }));
-  }
-  function toggleDevice(key: string) {
-    setDeviceToggles((prev) => ({ ...prev, [key]: !prev[key] }));
   }
 
   return (
@@ -135,29 +140,6 @@ export function Settings() {
           </CardContent>
         </Card>
 
-        {/* Devices */}
-        <Card>
-          <CardContent className="p-5">
-            <div className="mb-4 flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-50">
-                <Smartphone className="h-5 w-5 text-primary-600" />
-              </div>
-              <div>
-                <h2 className="text-base font-semibold text-content-strong">{t("settings.devices")}</h2>
-                <p className="text-xs text-content-muted">{t("settings.devicesSub")}</p>
-              </div>
-            </div>
-            <div className="flex flex-col gap-3">
-              {deviceItems.map((item) => (
-                <div key={item.key} className="flex items-center justify-between">
-                  <span className="text-sm text-content-body">{item.label}</span>
-                  <Toggle enabled={deviceToggles[item.key]} onChange={() => toggleDevice(item.key)} />
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
         {/* Security */}
         <Card>
           <CardContent className="p-5">
@@ -171,15 +153,20 @@ export function Settings() {
               </div>
             </div>
             <div className="flex flex-col gap-3">
-              <Button variant="outline" className="justify-start gap-2" onClick={() => setShowPasswordModal(true)}>
+              <Button variant="outline" className="justify-start gap-2" onClick={() => setActiveModal("password")}>
                 <Key className="h-4 w-4" />
                 {t("settings.changePassword")}
               </Button>
-              <Button variant="outline" className="justify-start">
+              <Button variant="outline" className="justify-start gap-2" onClick={() => setActiveModal("twofactor")}>
+                <Smartphone className="h-4 w-4" />
                 {t("settings.twoFactor")}
-              </Button>
-              <Button variant="outline" className="justify-start">
-                {t("settings.connectedDevices")}
+                {!mfaLoading && (
+                  <span className={`ml-auto rounded-full px-2 py-0.5 text-xs font-semibold ${
+                    mfaEnabled ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"
+                  }`}>
+                    {mfaEnabled ? "Ativada" : "Desativada"}
+                  </span>
+                )}
               </Button>
             </div>
           </CardContent>
@@ -222,15 +209,21 @@ export function Settings() {
         </Card>
       </div>
 
-      {showPasswordModal && (
-        <PasswordModal onClose={() => setShowPasswordModal(false)} />
+      {activeModal === "password" && (
+        <PasswordModal onClose={() => setActiveModal(null)} />
+      )}
+      {activeModal === "twofactor" && (
+        <TwoFactorModal
+          enabled={mfaEnabled}
+          onStatusChange={setMfaEnabled}
+          onClose={() => setActiveModal(null)}
+        />
       )}
     </div>
   );
 }
 
 function PasswordModal({ onClose }: { onClose: () => void }) {
-  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPasswords, setShowPasswords] = useState(false);
@@ -249,17 +242,13 @@ function PasswordModal({ onClose }: { onClose: () => void }) {
       setError("As senhas não coincidem");
       return;
     }
-    if (newPassword === currentPassword) {
-      setError("A nova senha deve ser diferente da atual");
-      return;
-    }
 
     setSaving(true);
     const { error: err } = await supabase.auth.updateUser({ password: newPassword });
     setSaving(false);
 
     if (err) {
-      setError(err.message === "Invalid credentials" ? "Senha atual incorreta" : "Erro ao alterar senha. Tente novamente.");
+      setError("Erro ao alterar senha. Tente novamente.");
       return;
     }
 
@@ -269,7 +258,7 @@ function PasswordModal({ onClose }: { onClose: () => void }) {
 
   if (success) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
         <div className="w-full max-w-sm rounded-2xl bg-surface-card p-6 text-center shadow-xl">
           <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-green-50">
             <Check className="h-6 w-6 text-green-600" />
@@ -282,7 +271,7 @@ function PasswordModal({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
       <div className="w-full max-w-sm rounded-2xl bg-surface-card p-6 shadow-xl">
         <div className="mb-5 flex items-center justify-between">
           <h2 className="text-lg font-bold text-content-strong">Alterar Senha</h2>
@@ -333,6 +322,232 @@ function PasswordModal({ onClose }: { onClose: () => void }) {
             {saving ? "Alterando..." : "Alterar Senha"}
           </Button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function TwoFactorModal({
+  enabled,
+  onStatusChange,
+  onClose,
+}: {
+  enabled: boolean;
+  onStatusChange: (v: boolean) => void;
+  onClose: () => void;
+}) {
+  const [step, setStep] = useState<"intro" | "qr" | "code" | "done">("intro");
+  const [factorId, setFactorId] = useState("");
+  const [qrCode, setQrCode] = useState("");
+  const [secret, setSecret] = useState("");
+  const [challengeId, setChallengeId] = useState("");
+  const [code, setCode] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [unenrollConfirm, setUnenrollConfirm] = useState(false);
+
+  async function handleEnroll() {
+    setError("");
+    setLoading(true);
+    try {
+      const { data, error: enrollError } = await supabase.auth.mfa.enroll({
+        factorType: "totp",
+        issuer: "FitSync",
+        friendlyName: "FitSync",
+      });
+      if (enrollError) throw enrollError;
+      if (data?.totp) {
+        setFactorId(data.totp.id);
+        setQrCode(data.totp.qr_code);
+        setSecret(data.totp.secret);
+        setStep("qr");
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erro ao ativar verificação");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleChallenge() {
+    setError("");
+    setLoading(true);
+    try {
+      const { data, error: chError } = await supabase.auth.mfa.challenge({ factorId });
+      if (chError) throw chError;
+      setChallengeId(data!.id);
+      setStep("code");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erro ao gerar código");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleVerify() {
+    setError("");
+    setLoading(true);
+    try {
+      const { error: vError } = await supabase.auth.mfa.verify({
+        factorId,
+        challengeId,
+        code,
+      });
+      if (vError) throw vError;
+      setStep("done");
+      onStatusChange(true);
+      setTimeout(() => onClose(), 1800);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Código inválido");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleUnenroll() {
+    setError("");
+    setLoading(true);
+    try {
+      const { data: factors } = await supabase.auth.mfa.listFactors();
+      const totp = (factors?.totp ?? [])[0];
+      if (!totp) throw new Error("Nenhum fator encontrado");
+      const { error: uError } = await supabase.auth.mfa.unenroll({ factorId: totp.id });
+      if (uError) throw uError;
+      onStatusChange(false);
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erro ao desativar");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (enabled && step === "intro") {
+    return (
+      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
+        <div className="w-full max-w-sm rounded-2xl bg-surface-card p-6 shadow-xl">
+          <div className="mb-5 flex items-center justify-between">
+            <h2 className="flex items-center gap-2 text-lg font-bold text-content-strong">
+              <Shield className="h-5 w-5 text-emerald-600" />
+              Verificação em duas etapas
+            </h2>
+            <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+              <span className="text-xl">x</span>
+            </button>
+          </div>
+          <div className="flex flex-col items-center gap-3 py-2 text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50">
+              <Check className="h-7 w-7 text-emerald-600" />
+            </div>
+            <p className="text-sm text-content-body">
+              A verificação em duas etapas está <strong>ativada</strong>. Sua conta está protegida com um código adicional do app autenticador.
+            </p>
+          </div>
+          {error && <p className="mt-3 text-sm text-red-500">{error}</p>}
+          {!unenrollConfirm ? (
+            <div className="mt-5 flex gap-3">
+              <Button variant="outline" className="flex-1" onClick={onClose}>Fechar</Button>
+              <Button variant="outline" className="flex-1 gap-2 text-red-600 hover:bg-red-50" onClick={() => setUnenrollConfirm(true)}>
+                <Trash2 className="h-4 w-4" />
+                Desativar
+              </Button>
+            </div>
+          ) : (
+            <div className="mt-5">
+              <p className="mb-3 text-sm text-content-muted">Tem certeza? Sua conta ficará menos protegida.</p>
+              <div className="flex gap-3">
+                <Button variant="outline" className="flex-1" onClick={() => setUnenrollConfirm(false)}>Cancelar</Button>
+                <Button className="flex-1 gap-2" onClick={handleUnenroll} disabled={loading}>
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                  Confirmar
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (step === "done") {
+    return (
+      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
+        <div className="w-full max-w-sm rounded-2xl bg-surface-card p-6 text-center shadow-xl">
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-green-50">
+            <Check className="h-6 w-6 text-green-600" />
+          </div>
+          <h2 className="text-lg font-bold text-content-strong">Verificação ativada!</h2>
+          <p className="mt-1 text-sm text-content-muted">Sua conta agora está mais protegida</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-sm rounded-2xl bg-surface-card p-6 shadow-xl">
+        <div className="mb-5 flex items-center justify-between">
+          <h2 className="flex items-center gap-2 text-lg font-bold text-content-strong">
+            <Lock className="h-5 w-5 text-primary-600" />
+            Verificação em duas etapas
+          </h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+            <span className="text-xl">x</span>
+          </button>
+        </div>
+
+        {step === "intro" && (
+          <div className="flex flex-col items-center gap-3 py-2 text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary-50">
+              <Smartphone className="h-7 w-7 text-primary-600" />
+            </div>
+            <p className="text-sm text-content-body">
+              Proteja sua conta com uma camada extra de segurança. Use um app autenticador (Google Authenticator, Authy, 1Password) para gerar códigos de verificação.
+            </p>
+            <Button className="mt-2 w-full gap-2" onClick={handleEnroll} disabled={loading}>
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4" />}
+              Ativar verificação
+            </Button>
+          </div>
+        )}
+
+        {step === "qr" && (
+          <div className="flex flex-col items-center gap-3 py-2 text-center">
+            <p className="text-sm text-content-body">Escaneie o QR code com seu app autenticador:</p>
+            {qrCode && (
+              <img src={qrCode} alt="QR Code" className="h-44 w-44 rounded-lg border border-edge-base bg-white p-2" />
+            )}
+            <div className="w-full">
+              <p className="text-xs text-content-muted">Ou digite manualmente:</p>
+              <code className="mt-1 block w-full break-all rounded-lg bg-surface-subtle px-3 py-2 text-xs text-content-body">{secret}</code>
+            </div>
+            <Button className="mt-2 w-full" onClick={handleChallenge} disabled={loading}>
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Já escaneiei"}
+            </Button>
+          </div>
+        )}
+
+        {step === "code" && (
+          <div className="flex flex-col gap-3 py-2">
+            <p className="text-sm text-content-body">Digite o código de 6 dígitos do seu app autenticador:</p>
+            <Input
+              type="text"
+              inputMode="numeric"
+              maxLength={6}
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+              placeholder="000000"
+              className="text-center text-lg tracking-[0.3em]"
+              autoFocus
+            />
+            {error && <p className="text-sm text-red-500">{error}</p>}
+            <Button className="w-full" onClick={handleVerify} disabled={loading || code.length !== 6}>
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Verificar e ativar"}
+            </Button>
+          </div>
+        )}
+
+        {error && step === "intro" && <p className="mt-3 text-sm text-red-500">{error}</p>}
       </div>
     </div>
   );
