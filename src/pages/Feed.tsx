@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import {
-  Heart, Send, Trash2, ImagePlus, X, Loader2, Plus,
+  Heart, Send, Trash2, ImagePlus, X, Loader2, Plus, Pencil,
   MessageCircle, Share2, Ban, Flag, ZoomIn, Sparkles, TrendingUp, Hash, Search, Users,
 } from "lucide-react";
 import { AutoTextarea } from "../components/ui/textarea";
@@ -122,6 +122,9 @@ export function Feed() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [editingPost, setEditingPost] = useState<PostWithProfile | null>(null);
+  const [editContent, setEditContent] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
 
   useEffect(() => {
     if (profile) {
@@ -421,6 +424,39 @@ export function Feed() {
     await supabase.from("feed_posts").delete().eq("id", id);
     setPosts((prev) => prev.filter((p) => p.id !== id));
     setFollowingPosts((prev) => prev.filter((p) => p.id !== id));
+    setTagPosts((prev) => prev.filter((p) => p.id !== id));
+  }
+
+  function openEditPost(post: PostWithProfile) {
+    setEditingPost(post);
+    setEditContent(post.content);
+  }
+
+  async function saveEditPost() {
+    if (!editingPost) return;
+    const trimmed = editContent.trim();
+    if (!trimmed && !editingPost.image_url && !editingPost.video_url) return;
+    setEditSaving(true);
+    const { data } = await supabase
+      .from("feed_posts")
+      .update({ content: trimmed })
+      .eq("id", editingPost.id)
+      .select("*, profiles:user_id(full_name, avatar_url)")
+      .single();
+    if (data) {
+      const updated: PostWithProfile = {
+        ...editingPost,
+        ...data,
+        profiles: data.profiles as PostWithProfile["profiles"],
+      };
+      const updateFn = (prev: PostWithProfile[]) => prev.map((p) => p.id === editingPost.id ? { ...p, content: trimmed } : p);
+      setPosts(updateFn);
+      setFollowingPosts(updateFn);
+      setTagPosts(updateFn);
+    }
+    setEditSaving(false);
+    setEditingPost(null);
+    setEditContent("");
   }
 
   async function deletePostAsOwner(id: string) {
@@ -619,9 +655,14 @@ export function Feed() {
                   </button>
                 )}
                 {isOwn ? (
-                  <button onClick={() => deletePost(post.id)} className="rounded-lg p-1.5 text-content-muted transition-colors hover:bg-red-50 hover:text-red-600">
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  <>
+                    <button onClick={() => openEditPost(post)} className="rounded-lg p-1.5 text-content-muted transition-colors hover:bg-primary-50 hover:text-primary-600" title="Editar">
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                    <button onClick={() => deletePost(post.id)} className="rounded-lg p-1.5 text-content-muted transition-colors hover:bg-red-50 hover:text-red-600" title="Excluir">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </>
                 ) : isOwner ? (
                   <>
                     <button onClick={() => handleBanUser(post.user_id)} className="rounded-lg p-1.5 text-content-muted transition-colors hover:bg-red-50 hover:text-red-600" title={t("feed.banUser")}>
@@ -1080,6 +1121,37 @@ export function Feed() {
                 <Button size="sm" onClick={() => reportComment(reportingComment.commentId, reportingComment.postId)} disabled={!commentReportReason || commentReportSubmitting} className="gap-2">
                   {commentReportSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Flag className="h-4 w-4" />}
                   Enviar denúncia
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit post modal */}
+        {editingPost && (
+          <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm sm:items-center" onClick={() => { setEditingPost(null); setEditContent(""); }}>
+            <div className="w-full max-w-lg rounded-t-2xl bg-surface-card p-5 shadow-2xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-lg font-bold text-content-strong">Editar postagem</h2>
+                <button onClick={() => { setEditingPost(null); setEditContent(""); }} className="rounded-full p-1.5 text-content-muted transition-colors hover:bg-surface-subtle">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <AutoTextArea
+                value={editContent}
+                onChange={(e) => setEditContent(e.target.value)}
+                placeholder="Escreva algo..."
+                minRows={3}
+                className={taCls}
+              />
+              {(editingPost.image_url || editingPost.video_url) && (
+                <p className="mt-2 text-xs text-content-muted">A mídia anexada não pode ser alterada.</p>
+              )}
+              <div className="mt-4 flex justify-end gap-2">
+                <Button variant="outline" size="sm" onClick={() => { setEditingPost(null); setEditContent(""); }}>Cancelar</Button>
+                <Button size="sm" onClick={saveEditPost} disabled={editSaving} className="gap-2">
+                  {editSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Pencil className="h-4 w-4" />}
+                  Salvar
                 </Button>
               </div>
             </div>

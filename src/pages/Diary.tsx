@@ -31,6 +31,8 @@ export function Diary() {
   ];
   const [tasks, setTasks] = useState<DiaryTask[]>([]);
   const [exercises, setExercises] = useState<Exercise[]>([]);
+  const [waterTotal, setWaterTotal] = useState(0);
+  const [totalCalories, setTotalCalories] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const [showTaskModal, setShowTaskModal] = useState(false);
@@ -48,16 +50,28 @@ export function Diary() {
 
   useEffect(() => {
     loadData();
+    const channel = supabase
+      .channel("diary-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "diary_tasks", filter: `task_date=eq.${today}` }, () => loadData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "exercises", filter: `exercise_date=eq.${today}` }, () => loadData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "water_logs", filter: `logged_date=eq.${today}` }, () => loadData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "meals", filter: `logged_date=eq.${today}` }, () => loadData())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   async function loadData() {
     setLoading(true);
-    const [tasksRes, exRes] = await Promise.all([
+    const [tasksRes, exRes, waterRes, mealsRes] = await Promise.all([
       supabase.from("diary_tasks").select("*").eq("task_date", today).order("sort_order").order("created_at"),
       supabase.from("exercises").select("*").eq("exercise_date", today).order("created_at"),
+      supabase.from("water_logs").select("amount_liters").eq("logged_date", today),
+      supabase.from("meals").select("calories").eq("logged_date", today),
     ]);
     if (tasksRes.data) setTasks(tasksRes.data);
     if (exRes.data) setExercises(exRes.data);
+    if (waterRes.data) setWaterTotal(waterRes.data.reduce((s, r) => s + Number(r.amount_liters), 0));
+    if (mealsRes.data) setTotalCalories(mealsRes.data.reduce((s, r) => s + Number(r.calories), 0));
     setLoading(false);
   }
 
@@ -122,10 +136,14 @@ export function Diary() {
   }
 
   const done = tasks.filter((t) => t.done).length;
+  const waterGoal = profile?.daily_water_goal_liters ?? 2.5;
+  const calGoal = profile?.daily_calorie_goal ?? 2400;
+  const waterPct = waterGoal > 0 ? Math.min(100, (waterTotal / waterGoal) * 100) : 0;
+  const calPct = calGoal > 0 ? Math.min(100, (totalCalories / calGoal) * 100) : 0;
 
   const dailyStats = [
-    { icon: Droplets, label: t("diary.water"), value: "–", progress: 0, color: "bg-primary-500", iconColor: "text-primary-500", bg: "bg-primary-50" },
-    { icon: Apple, label: "Calorias", value: "–", progress: 0, color: "bg-orange-400", iconColor: "text-orange-500", bg: "bg-orange-50" },
+    { icon: Droplets, label: t("diary.water"), value: `${waterTotal.toFixed(2).replace(/\.?0+$/, "")}L`, progress: waterPct, color: "bg-primary-500", iconColor: "text-primary-500", bg: "bg-primary-50" },
+    { icon: Apple, label: "Calorias", value: `${totalCalories} kcal`, progress: calPct, color: "bg-orange-400", iconColor: "text-orange-500", bg: "bg-orange-50" },
     { icon: Dumbbell, label: t("diary.workout"), value: `${exercises.filter((e) => e.done).length} / ${exercises.length}`, progress: exercises.length > 0 ? (exercises.filter((e) => e.done).length / exercises.length) * 100 : 0, color: "bg-violet-500", iconColor: "text-violet-500", bg: "bg-violet-50" },
     { icon: Moon, label: t("diary.tasks"), value: `${done} / ${tasks.length}`, progress: tasks.length > 0 ? (done / tasks.length) * 100 : 0, color: "bg-indigo-500", iconColor: "text-indigo-500", bg: "bg-indigo-50" },
   ];
