@@ -11,19 +11,10 @@ import { FitSyncLogo } from "../components/FitSyncLogo";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
 import { supabase } from "../lib/supabase";
+import { generateDietPlan, generateWorkoutPlan, goalLabel } from "../lib/recommendations";
+import type { Diet, Experience, Goal, RecommendationAnswers } from "../lib/recommendations";
 
-type Goal = "lose_weight" | "build_muscle" | "maintain" | "endurance" | "general";
-type Experience = "beginner" | "intermediate" | "advanced";
-type Diet = "omnivore" | "vegetarian" | "vegan" | "low_carb" | "flexible";
-
-interface Answers {
-  goal: Goal;
-  experience: Experience;
-  workout_days: number;
-  diet: Diet;
-  allergies: string;
-  equipment: string[];
-}
+type Answers = Omit<RecommendationAnswers, "allergies"> & { allergies: string };
 
 const goalOptions: { value: Goal; labelKey: string; icon: typeof Target }[] = [
   { value: "lose_weight", labelKey: "onboarding.goalLoseWeight", icon: Target },
@@ -57,127 +48,6 @@ const equipmentOptions: { value: string; labelKey: string }[] = [
 
 const dayOptions = [2, 3, 4, 5, 6];
 
-function generateWorkoutPlan(answers: Answers): { dayName: string; exercises: { name: string; sets: number; reps: string; rest: number }[] }[] {
-  const { goal, experience, workout_days, equipment } = answers;
-  const isBeginner = experience === "beginner";
-  const setsBase = isBeginner ? 3 : experience === "intermediate" ? 4 : 5;
-  const repsByGoal: Record<Goal, string> = {
-    lose_weight: "12-15",
-    build_muscle: "8-12",
-    maintain: "10-12",
-    endurance: "15-20",
-    general: "10-15",
-  };
-  const reps = repsByGoal[goal];
-  const rest = goal === "endurance" ? 30 : goal === "lose_weight" ? 45 : 90;
-
-  const hasGym = equipment.includes("gym") || equipment.includes("dumbbells");
-  const bodyOnly = equipment.includes("bodyweight") && !hasGym;
-
-  const pushExercises = hasGym
-    ? ["Supino Reto", "Supino Inclinado", "Desenvolvimento", "Tríceps Pulley", "Elevação Lateral"]
-    : ["Flexão de Braço", "Flexão Inclinada", "Tríceps no Banco", "Prancha Lateral"];
-  const pullExercises = hasGym
-    ? ["Puxada Frontal", "Remada Baixa", "Levantamento Terra", "Rosca Direta", "Face Pull"]
-    : ["Barra Fixa", "Remada Invertida", "Superman", "Prancha"];
-  const legExercises = hasGym
-    ? ["Agachamento Livre", "Leg Press 45", "Cadeira Extensora", "Stiff", "Panturrilha"]
-    : ["Agachamento Livre", "Afundo", "Ponte de Glúteo", "Panturrilha em Pé"];
-  const cardioExercises = bodyOnly
-    ? ["Burpees", "Polichinelo", "Mountain Climber", "Corrida Estacionária"]
-    : ["Esteira (corrida)", "Bicicleta", "Elíptico", "Remo"];
-
-  const upperExercises = [...pushExercises.slice(0, 3), ...pullExercises.slice(0, 2)];
-  const lowerExercises = legExercises.slice(0, 5);
-
-  const days: { dayName: string; exercises: { name: string; sets: number; reps: string; rest: number }[] }[] = [];
-  const dayLabels = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
-
-  if (workout_days <= 3) {
-    // Full body split
-    const fullBody = [...upperExercises.slice(0, 3), ...lowerExercises.slice(0, 2)];
-    for (let i = 0; i < workout_days; i++) {
-      days.push({
-        dayName: dayLabels[i] || `Dia ${i + 1}`,
-        exercises: fullBody.map((name) => ({ name, sets: setsBase, reps, rest })),
-      });
-    }
-  } else if (workout_days <= 4) {
-    // Upper/Lower split
-    const pattern = ["upper", "lower", "upper", "lower"];
-    for (let i = 0; i < workout_days; i++) {
-      const isUpper = pattern[i] === "upper";
-      days.push({
-        dayName: dayLabels[i] || `Dia ${i + 1}`,
-        exercises: (isUpper ? upperExercises : lowerExercises).map((name) => ({ name, sets: setsBase, reps, rest })),
-      });
-    }
-  } else {
-    // PPL + cardio
-    const pattern = ["push", "pull", "legs", "push", "pull", "cardio"];
-    for (let i = 0; i < workout_days; i++) {
-      const type = pattern[i] || "legs";
-      const exList = type === "push" ? pushExercises : type === "pull" ? pullExercises : type === "cardio" ? cardioExercises : legExercises;
-      days.push({
-        dayName: dayLabels[i] || `Dia ${i + 1}`,
-        exercises: exList.map((name) => ({ name, sets: type === "cardio" ? 1 : setsBase, reps: type === "cardio" ? "20-30 min" : reps, rest: type === "cardio" ? 0 : rest })),
-      });
-    }
-  }
-
-  return days;
-}
-
-function generateDietPlan(answers: Answers): { meal: string; items: string; calories: number; protein: number }[] {
-  const { goal, diet, allergies } = answers;
-  const isVegan = diet === "vegan";
-  const isVegetarian = diet === "vegetarian" || isVegan;
-  const isLowCarb = diet === "low_carb";
-
-  const calTarget = goal === "lose_weight" ? 1800 : goal === "build_muscle" ? 2800 : 2200;
-  const proteinPerKg = goal === "build_muscle" ? 2.0 : goal === "lose_weight" ? 1.6 : 1.4;
-  const totalProtein = Math.round(75 * proteinPerKg);
-
-  const allergens = allergies.toLowerCase();
-
-  const proteinSources = isVegan
-    ? ["Tofu", "Grão-de-bico", "Lentilha", "Proteína vegetal texturizada"]
-    : isVegetarian
-    ? ["Ovos", "Queijo cottage", "Iogurte grego", "Whey protein"]
-    : ["Frango grelhado", "Ovos", "Carne magra", "Peixe", "Whey protein"];
-
-  const carbSources = isLowCarb
-    ? ["Batata-doce (pequena)", "Abóbora", "Folhas verdes"]
-    : ["Arroz integral", "Aveia", "Batata-doce", "Frutas", "Pão integral"];
-
-  const fatSources = ["Abacate", "Azeite", "Castanhas", "Amêndoas"];
-
-  const filterAllergens = (items: string[]) =>
-    items.filter((i) => {
-      const lower = i.toLowerCase();
-      return !allergens.split(",").some((a) => a.trim() && lower.includes(a.trim().toLowerCase()));
-    });
-
-  const safeProtein = filterAllergens(proteinSources);
-  const safeCarbs = filterAllergens(carbSources);
-  const safeFats = filterAllergens(fatSources);
-
-  const p = safeProtein[0] || "Fonte de proteína";
-  const p2 = safeProtein[1] || safeProtein[0] || "Fonte de proteína";
-  const c = safeCarbs[0] || "Fonte de carboidrato";
-  const c2 = safeCarbs[1] || safeCarbs[0] || "Fonte de carboidrato";
-  const f = safeFats[0] || "Fonte de gordura";
-
-  const meals = [
-    { meal: "Café da Manhã", items: `${c} (100g), ${p} (2 unidades/100g), ${f} (1 colher)`, calories: Math.round(calTarget * 0.25), protein: Math.round(totalProtein * 0.25) },
-    { meal: "Lanche da Manhã", items: `${c2} (1 porção), ${safeFats[1] || f} (1 punhado)`, calories: Math.round(calTarget * 0.1), protein: Math.round(totalProtein * 0.1) },
-    { meal: "Almoço", items: `${p} (150g), ${c} (150g), salada verde à vontade, ${f} (1 colher)`, calories: Math.round(calTarget * 0.3), protein: Math.round(totalProtein * 0.35) },
-    { meal: "Lanche da Tarde", items: `${p2} (100g), ${c2} (1 porção)`, calories: Math.round(calTarget * 0.1), protein: Math.round(totalProtein * 0.1) },
-    { meal: "Jantar", items: `${p2} (150g), ${c2} (100g), legumes refogados, ${f} (1 colher)`, calories: Math.round(calTarget * 0.25), protein: Math.round(totalProtein * 0.2) },
-  ];
-
-  return meals;
-}
 
 export function Onboarding() {
   const { user, refreshProfile } = useAuth();
@@ -218,8 +88,9 @@ export function Onboarding() {
 
   async function finish() {
     setSubmitting(true);
-    const workout = generateWorkoutPlan(answers);
-    const diet = generateDietPlan(answers);
+    const recommendationAnswers: RecommendationAnswers = { ...answers, allergies: answers.allergies };
+    const workout = generateWorkoutPlan(recommendationAnswers);
+    const diet = generateDietPlan(recommendationAnswers);
 
     const allergiesArray = answers.allergies
       .split(",")
@@ -242,7 +113,7 @@ export function Onboarding() {
       .from("workout_programs")
       .insert({
         user_id: user?.id,
-        name: `Plano ${t("onboarding.goalBuildMuscle")}`,
+        name: `Plano ${goalLabel(answers.goal)}`,
         description: `Gerado automaticamente - ${answers.workout_days} dias/semana`,
         is_active: true,
       })
@@ -304,16 +175,6 @@ export function Onboarding() {
     setDone(true);
   }
 
-  function goalLabel(g: Goal): string {
-    const map: Record<Goal, string> = {
-      lose_weight: "Perda de Peso",
-      build_muscle: "Hipertrofia Muscular",
-      maintain: "Manutenção",
-      endurance: "Resistência Cardiovascular",
-      general: "Melhora da Saúde Geral",
-    };
-    return map[g];
-  }
 
   if (done && plan) {
     return (
