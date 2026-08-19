@@ -33,6 +33,9 @@ export interface Database {
           last_active_at: string | null;
           onboarding_due_at: string | null;
           handle: string | null;
+          macro_protein_pct: number;
+          macro_carbs_pct: number;
+          macro_fat_pct: number;
           created_at: string;
           updated_at: string;
         };

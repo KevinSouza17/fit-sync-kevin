@@ -259,12 +259,16 @@ function DeleteAccountModal({ onClose }: { onClose: () => void }) {
     setDeleting(true);
     setError("");
     try {
-      const { error: rpcError } = await supabase.rpc("delete_account");
+      const { data: result, error: rpcError } = await supabase.rpc("delete_account");
       if (rpcError) throw rpcError;
+      if (result && result !== "OK") {
+        throw new Error(result);
+      }
       await signOut();
       navigate("/login");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Erro ao excluir conta. Tente novamente.");
+      const msg = e instanceof Error ? e.message : "Erro ao excluir conta. Tente novamente.";
+      setError(msg.startsWith("Erro") ? msg : "Erro ao excluir conta. Tente novamente.");
       setDeleting(false);
     }
   }

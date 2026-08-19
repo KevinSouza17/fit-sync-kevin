@@ -51,6 +51,7 @@ interface CommunityRecipe {
   fat_g: number;
   image_url: string | null;
   created_at: string;
+  is_official: boolean;
   profiles: { full_name: string } | null;
   ratings_count: number;
   ratings_sum: number;
@@ -332,7 +333,7 @@ export function Recipes() {
       .single();
     setSaving(false);
     if (data) {
-      const newRecipe = { ...data, profiles: { full_name: "" }, ratings_count: 0, ratings_sum: 0 } as CommunityRecipe;
+      const newRecipe = { ...data, is_official: false, profiles: { full_name: "" }, ratings_count: 0, ratings_sum: 0 } as CommunityRecipe;
       setCommunityRecipes((prev) => [newRecipe, ...prev]);
       setShowRecipeModal(false);
       setRecipeForm({ title: "", description: "", ingredients: "", instructions: "", prep_time_min: "", servings: "1", calories: "", protein_g: "", carbs_g: "", fat_g: "" });
@@ -638,7 +639,7 @@ export function Recipes() {
                       <div className="mb-2 flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <h3 className="text-sm font-bold text-content-strong leading-tight">{r.title}</h3>
-                          <p className="text-[11px] text-content-muted">por {r.profiles?.full_name || "Anônimo"}</p>
+                          <p className="text-[11px] text-content-muted">{r.is_official ? "Adicionada por FitSync" : `por ${r.profiles?.full_name || "Anônimo"}`}</p>
                         </div>
                         <div className="flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5">
                           <Star className="h-3 w-3 fill-amber-400 text-amber-400" />

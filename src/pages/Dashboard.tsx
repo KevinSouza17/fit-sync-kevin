@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { Droplets, Flame, Scale, Plus, X, Search, UtensilsCrossed, Coffee, Sun, Moon, Cookie, Trash2 } from "lucide-react";
+import { Droplets, Flame, Scale, Plus, X, Search, UtensilsCrossed, Coffee, Sun, Moon, Cookie, Trash2, SlidersHorizontal } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";
 import { Progress } from "../components/ui/progress";
 import { Button } from "../components/ui/button";
@@ -67,6 +67,10 @@ export function Dashboard() {
   const [selectedFood, setSelectedFood] = useState<Food | null>(null);
   const [servings, setServings] = useState("1");
   const [customEntry, setCustomEntry] = useState(false);
+  const [showMacroModal, setShowMacroModal] = useState(false);
+  const [macroProtein, setMacroProtein] = useState(30);
+  const [macroCarbs, setMacroCarbs] = useState(45);
+  const [macroFat, setMacroFat] = useState(25);
   const searchRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
@@ -90,6 +94,9 @@ export function Dashboard() {
 
   const calGoal = dietPlan?.target_calories ?? profile?.daily_calorie_goal ?? 2400;
   const waterGoal = profile?.daily_water_goal_liters ?? 2.5;
+  const pPct = profile?.macro_protein_pct ?? 30;
+  const cPct = profile?.macro_carbs_pct ?? 45;
+  const fPct = profile?.macro_fat_pct ?? 25;
 
   useEffect(() => {
     loadData();
@@ -249,9 +256,9 @@ export function Dashboard() {
   const totalCarbs = meals.reduce((s, m) => s + Number(m.carbs_g), 0);
   const totalFat = meals.reduce((s, m) => s + Number(m.fat_g), 0);
 
-  const proteinGoal = dietPlan?.target_protein_g != null ? Math.round(Number(dietPlan.target_protein_g)) : Math.round(calGoal * 0.3 / 4);
-  const carbsGoal = dietPlan?.target_carbs_g != null ? Math.round(Number(dietPlan.target_carbs_g)) : Math.round(calGoal * 0.45 / 4);
-  const fatGoal = dietPlan?.target_fat_g != null ? Math.round(Number(dietPlan.target_fat_g)) : Math.round(calGoal * 0.25 / 9);
+  const proteinGoal = dietPlan?.target_protein_g != null ? Math.round(Number(dietPlan.target_protein_g)) : Math.round(calGoal * pPct / 100 / 4);
+  const carbsGoal = dietPlan?.target_carbs_g != null ? Math.round(Number(dietPlan.target_carbs_g)) : Math.round(calGoal * cPct / 100 / 4);
+  const fatGoal = dietPlan?.target_fat_g != null ? Math.round(Number(dietPlan.target_fat_g)) : Math.round(calGoal * fPct / 100 / 9);
 
   const calPct = Math.min(100, Math.round((totalCalories / calGoal) * 100));
   const radius = 80;
@@ -297,8 +304,32 @@ export function Dashboard() {
 
   async function deleteDietPlan() {
     if (!dietPlan) return;
-    await supabase.from("client_plans").delete().eq("id", dietPlan.id);
-    setDietPlan(null);
+    if (!confirm("Excluir o plano alimentar recebido?")) return;
+    const { error } = await supabase.from("client_plans").delete().eq("id", dietPlan.id);
+    if (error) {
+      alert("Erro ao excluir plano: " + error.message);
+    } else {
+      setDietPlan(null);
+    }
+  }
+
+  async function saveMacros() {
+    setSaving(true);
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        macro_protein_pct: macroProtein,
+        macro_carbs_pct: macroCarbs,
+        macro_fat_pct: macroFat,
+      })
+      .eq("id", user?.id ?? "");
+    if (error) {
+      alert("Erro ao salvar macros: " + error.message);
+    } else {
+      setShowMacroModal(false);
+      window.location.reload();
+    }
+    setSaving(false);
   }
 
   async function logWater() {
@@ -436,7 +467,23 @@ export function Dashboard() {
                   </div>
                 </div>
                 <div className="flex flex-1 flex-col gap-5">
-                  <h3 className="text-lg font-semibold text-content-strong">{t("dashboard.macros")}</h3>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-content-strong">{t("dashboard.macros")}</h3>
+                    {!dietPlan && (
+                      <button
+                        onClick={() => {
+                          setMacroProtein(pPct);
+                          setMacroCarbs(cPct);
+                          setMacroFat(fPct);
+                          setShowMacroModal(true);
+                        }}
+                        className="rounded-lg p-1.5 text-content-muted transition-colors hover:bg-surface-base hover:text-primary-600"
+                        title="Ajustar divisão de macros"
+                      >
+                        <SlidersHorizontal className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
                   {macros.map((m) => (
                     <div key={m.name} className="flex flex-col gap-2">
                       <div className="flex items-center justify-between">
@@ -830,6 +877,76 @@ export function Dashboard() {
               <Button variant="outline" className="flex-1" onClick={() => setShowWeightModal(false)}>{t("cancel")}</Button>
               <Button className="flex-1" onClick={logWeight} disabled={saving || !newWeight}>
                 {saving ? t("saving") : t("dashboard.register")}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Macro Editor Modal */}
+      {showMacroModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-surface-card p-6 shadow-xl">
+            <div className="mb-5 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-content-strong">Ajustar Macros</h2>
+              <button onClick={() => setShowMacroModal(false)} className="text-content-muted hover:text-content-body">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <p className="mb-4 text-xs text-content-muted">
+              Defina a porcentagem de cada macronutriente. A soma deve ser 100%. As metas em gramas sao calculadas a partir de {calGoal} kcal.
+            </p>
+            <div className="space-y-4">
+              <div>
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-content-body">Proteina</label>
+                  <span className="text-sm font-semibold text-primary-600">{macroProtein}% = {Math.round(calGoal * macroProtein / 100 / 4)}g</span>
+                </div>
+                <input type="range" min="5" max="60" value={macroProtein}
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value);
+                    setMacroProtein(v);
+                    setMacroFat(100 - v - macroCarbs);
+                  }}
+                  className="mt-2 w-full accent-primary-600"
+                />
+              </div>
+              <div>
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-content-body">Carboidratos</label>
+                  <span className="text-sm font-semibold text-orange-600">{macroCarbs}% = {Math.round(calGoal * macroCarbs / 100 / 4)}g</span>
+                </div>
+                <input type="range" min="5" max="70" value={macroCarbs}
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value);
+                    setMacroCarbs(v);
+                    setMacroFat(100 - v - macroProtein);
+                  }}
+                  className="mt-2 w-full accent-orange-500"
+                />
+              </div>
+              <div>
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-content-body">Gorduras</label>
+                  <span className="text-sm font-semibold text-amber-600">{macroFat}% = {Math.round(calGoal * macroFat / 100 / 9)}g</span>
+                </div>
+                <input type="range" min="5" max="60" value={macroFat}
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value);
+                    setMacroFat(v);
+                    setMacroCarbs(100 - v - macroProtein);
+                  }}
+                  className="mt-2 w-full accent-amber-500"
+                />
+              </div>
+              <div className={`rounded-lg p-3 text-center text-sm font-semibold ${macroProtein + macroCarbs + macroFat === 100 ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
+                Total: {macroProtein + macroCarbs + macroFat}%
+              </div>
+            </div>
+            <div className="mt-5 flex gap-3">
+              <Button variant="outline" className="flex-1" onClick={() => setShowMacroModal(false)}>Cancelar</Button>
+              <Button className="flex-1" onClick={saveMacros} disabled={saving || macroProtein + macroCarbs + macroFat !== 100}>
+                {saving ? "Salvando..." : "Salvar"}
               </Button>
             </div>
           </div>

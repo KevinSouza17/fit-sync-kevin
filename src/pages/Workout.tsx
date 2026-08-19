@@ -183,6 +183,13 @@ export function Workout() {
     }
   }
 
+  async function deleteAssignedPlan() {
+    if (!assignedPlan) return;
+    if (!confirm("Excluir o plano de treino recebido?")) return;
+    const { error } = await supabase.from("client_plans").delete().eq("id", assignedPlan.id);
+    if (!error) setAssignedPlan(null);
+  }
+
   function openDay(dow: number) {
     const existing = daysByDow.get(dow);
     setDayModalDow(dow);
@@ -322,9 +329,14 @@ export function Workout() {
       {assignedPlan && (assignedPlan.content as WorkoutPlanContent)?.days?.length ? (
         <Card className="border-primary-300 bg-surface-card">
           <CardContent className="p-5">
-            <div className="mb-3 flex items-center gap-2">
-              <ClipboardList className="h-5 w-5 text-primary-600" />
-              <h2 className="text-base font-bold text-content-strong">{assignedPlan.title}</h2>
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <ClipboardList className="h-5 w-5 text-primary-600" />
+                <h2 className="text-base font-bold text-content-strong">{assignedPlan.title}</h2>
+              </div>
+              <button onClick={deleteAssignedPlan} className="rounded-lg p-1.5 text-content-muted transition-colors hover:bg-red-50 hover:text-red-600" title="Excluir plano de treino">
+                <Trash2 className="h-4 w-4" />
+              </button>
             </div>
             {assignedPlan.description && <p className="mb-4 text-xs text-content-muted">{assignedPlan.description}</p>}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
