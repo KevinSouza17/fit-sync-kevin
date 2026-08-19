@@ -166,6 +166,23 @@ export function Workout() {
     await supabase.from("workout_programs").update({ is_active: true }).eq("id", program.id);
   }
 
+  async function deleteProgram(program: Program) {
+    if (!confirm(`Excluir o programa "${program.name}"? Todos os dias e exercicios serao removidos.`)) return;
+    const dayIds = days.filter((d) => d.program_id === program.id).map((d) => d.id);
+    if (dayIds.length) {
+      await supabase.from("workout_exercises").delete().in("program_day_id", dayIds);
+      await supabase.from("workout_days").delete().in("id", dayIds);
+    }
+    await supabase.from("workout_programs").delete().eq("id", program.id);
+    const remaining = programs.filter((p) => p.id !== program.id);
+    setPrograms(remaining);
+    if (activeProgram?.id === program.id) {
+      const next = remaining.find((p) => p.is_active) ?? remaining[0] ?? null;
+      setActiveProgram(next);
+      if (!next) setDays([]);
+    }
+  }
+
   function openDay(dow: number) {
     const existing = daysByDow.get(dow);
     setDayModalDow(dow);
@@ -374,16 +391,15 @@ export function Workout() {
             <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-content-muted">{t("workout.myPrograms")}</h2>
             <div className="flex flex-wrap gap-2">
               {programs.map((p) => (
-                <button
+                <div
                   key={p.id}
-                  onClick={() => activateProgram(p)}
                   className={`group flex items-center gap-2 rounded-xl border px-4 py-2.5 text-left transition-all ${
                     activeProgram?.id === p.id
                       ? "border-primary-500 bg-primary-50 ring-1 ring-primary-200"
                       : "border-edge-base bg-surface-card hover:border-primary-300 hover:bg-surface-subtle"
                   }`}
                 >
-                  <div className="flex flex-col">
+                  <button onClick={() => activateProgram(p)} className="flex flex-1 flex-col">
                     <span className="text-sm font-semibold text-content-strong">{p.name}</span>
                     {activeProgram?.id === p.id ? (
                       <span className="flex items-center gap-1 text-[11px] font-medium text-primary-600">
@@ -392,8 +408,15 @@ export function Workout() {
                     ) : (
                       <span className="text-[11px] text-content-muted">{t("workout.activate")}</span>
                     )}
-                  </div>
-                </button>
+                  </button>
+                  <button
+                    onClick={() => deleteProgram(p)}
+                    className="shrink-0 text-slate-300 transition-colors hover:text-red-500"
+                    title="Excluir programa"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
               ))}
             </div>
             {activeProgram?.description && <p className="mt-3 text-sm text-content-muted">{activeProgram.description}</p>}

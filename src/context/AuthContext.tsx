@@ -9,7 +9,7 @@ interface AuthContextValue {
   profile: Profile | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
-  signUp: (email: string, password: string, fullName: string, professional?: { role: string; specialty: string; credentials: string; registrationType?: string; documentNumber?: string; city?: string }) => Promise<{ error: string | null }>;
+  signUp: (email: string, password: string, fullName: string, professional?: { role: string; specialty: string; credentials: string; registrationType?: string; documentNumber?: string; city?: string }, handle?: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -73,7 +73,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error: null };
   }
 
-  async function signUp(email: string, password: string, fullName: string, professional?: { role: string; specialty: string; credentials: string; registrationType?: string; documentNumber?: string; city?: string }) {
+  async function signUp(email: string, password: string, fullName: string, professional?: { role: string; specialty: string; credentials: string; registrationType?: string; documentNumber?: string; city?: string }, handle?: string) {
     const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) return { error: error.message };
     if (data.user) {
@@ -86,6 +86,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         p_registration_type: professional?.registrationType ?? "autonomo",
         p_document_number: professional?.documentNumber ?? null,
         p_location_city: professional?.city ?? null,
+        p_handle: handle ?? null,
       });
       if (rpcError) return { error: rpcError.message };
 

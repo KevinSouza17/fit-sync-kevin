@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { Droplets, Flame, Scale, Plus, X, Search, UtensilsCrossed, Coffee, Sun, Moon, Cookie } from "lucide-react";
+import { Droplets, Flame, Scale, Plus, X, Search, UtensilsCrossed, Coffee, Sun, Moon, Cookie, Trash2 } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";
 import { Progress } from "../components/ui/progress";
 import { Button } from "../components/ui/button";
@@ -295,6 +295,12 @@ export function Dashboard() {
     setMeals((prev) => prev.filter((m) => m.id !== id));
   }
 
+  async function deleteDietPlan() {
+    if (!dietPlan) return;
+    await supabase.from("client_plans").delete().eq("id", dietPlan.id);
+    setDietPlan(null);
+  }
+
   async function logWater() {
     const amount = parseFloat(waterAmount);
     if (!amount || amount <= 0) return;
@@ -511,9 +517,14 @@ export function Dashboard() {
             {dietPlan && (dietPlan.content as DietPlanContent)?.meals?.length ? (
               <Card>
                 <CardContent className="p-5">
-                  <div className="mb-3 flex items-center gap-2">
-                    <UtensilsCrossed className="h-4 w-4 text-primary-600" />
-                    <h3 className="text-base font-semibold text-content-strong">{dietPlan.title}</h3>
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <UtensilsCrossed className="h-4 w-4 text-primary-600" />
+                      <h3 className="text-base font-semibold text-content-strong">{dietPlan.title}</h3>
+                    </div>
+                    <button onClick={deleteDietPlan} className="rounded-lg p-1.5 text-content-muted transition-colors hover:bg-red-50 hover:text-red-600" title="Excluir plano alimentar">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
                   </div>
                   {dietPlan.description && <p className="mb-3 text-xs text-content-muted">{dietPlan.description}</p>}
                   <div className="flex flex-col gap-2">

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Camera, Save, Check, Briefcase, GraduationCap, Award, MapPin, Loader2, Building2, ShieldCheck, ShieldAlert, User, Lock, Unlock } from "lucide-react";
+import { Camera, Save, Check, Briefcase, GraduationCap, Award, MapPin, Loader2, Building2, ShieldCheck, ShieldAlert, User, Lock, Unlock, AtSign } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -45,6 +45,7 @@ interface FormState {
   registration_type: "autonomo" | "empresa";
   document_number: string;
   is_private: boolean;
+  handle: string;
 }
 
 const professionalRoles = [
@@ -96,6 +97,7 @@ export function EditProfile() {
     registration_type: "autonomo",
     document_number: "",
     is_private: false,
+    handle: "",
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -140,6 +142,7 @@ export function EditProfile() {
         registration_type: (profile.registration_type as "autonomo" | "empresa") ?? "autonomo",
         document_number: profile.document_number ?? "",
         is_private: profile.is_private ?? false,
+        handle: profile.handle ?? "",
       });
       setAvatarUrl(profile.avatar_url ?? null);
     }
@@ -189,6 +192,25 @@ export function EditProfile() {
   async function handleSave() {
     if (!user) return;
     setError("");
+
+    const cleanHandle = form.handle.trim().toLowerCase().replace(/[^a-z0-9_]/g, "");
+    if (cleanHandle && cleanHandle.length < 3) {
+      setError("O @ deve ter pelo menos 3 caracteres (apenas letras, números e _).");
+      return;
+    }
+    if (cleanHandle) {
+      const { data: existing } = await supabase
+        .from("profiles")
+        .select("id")
+        .ilike("handle", cleanHandle)
+        .neq("id", user.id)
+        .maybeSingle();
+      if (existing) {
+        setError("Este @ já está em uso. Escolha outro.");
+        return;
+      }
+    }
+
     setSaving(true);
     const payload = {
       full_name: form.full_name,
@@ -209,6 +231,7 @@ export function EditProfile() {
       registration_type: form.is_professional ? form.registration_type : "autonomo",
       document_number: form.is_professional ? form.document_number : null,
       is_private: form.is_private,
+      handle: cleanHandle || null,
       updated_at: new Date().toISOString(),
     };
     const { error: err } = await supabase
@@ -352,6 +375,21 @@ export function EditProfile() {
                     onChange={(e) => setField("full_name", e.target.value)}
                     placeholder="Seu nome completo"
                   />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-sm font-medium text-content-body">@ (usuário)</label>
+                  <div className="relative">
+                    <AtSign className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <Input
+                      type="text"
+                      value={form.handle}
+                      onChange={(e) => setField("handle", e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
+                      placeholder="seunome"
+                      className="pl-9"
+                      maxLength={20}
+                    />
+                  </div>
+                  <p className="text-xs text-content-muted">Apenas letras, números e _. Seu link: /@seunome</p>
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium text-content-body">E-mail</label>

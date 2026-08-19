@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Mail, Lock, Eye, EyeOff, User, Briefcase, GraduationCap, Award, MapPin, Loader2, Building2, CheckCircle2 } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, User, Briefcase, GraduationCap, Award, MapPin, Loader2, Building2, CheckCircle2, AtSign } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { FitSyncLogo } from "../components/FitSyncLogo";
@@ -36,6 +36,8 @@ export function Register() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [fullName, setFullName] = useState("");
+  const [handle, setHandle] = useState("");
+  const [handleError, setHandleError] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -80,11 +82,27 @@ export function Register() {
         return;
       }
     }
+    const cleanHandle = handle.trim().toLowerCase().replace(/[^a-z0-9_]/g, "");
+    if (cleanHandle && cleanHandle.length < 3) {
+      setError("O @ deve ter pelo menos 3 caracteres (apenas letras, números e _).");
+      return;
+    }
+    if (cleanHandle) {
+      const { data: existing } = await supabase
+        .from("profiles")
+        .select("id")
+        .ilike("handle", cleanHandle)
+        .maybeSingle();
+      if (existing) {
+        setError("Este @ já está em uso. Escolha outro.");
+        return;
+      }
+    }
     setLoading(true);
     const proData = accountType === "professional"
       ? { role: proRole, specialty: proSpecialty, credentials: proCredentials, registrationType: regType, documentNumber: docNumber.trim(), city: proCity.trim() }
       : undefined;
-    const { error } = await signUp(email, password, fullName, proData);
+    const { error } = await signUp(email, password, fullName, proData, cleanHandle || undefined);
     if (error) {
       if (error.includes("already registered") || error.includes("already been registered")) {
         setError(t("register.emailExists"));
@@ -210,6 +228,33 @@ export function Register() {
                   required
                 />
               </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-content-body">@ (usuário)</label>
+              <div className="relative">
+                <AtSign className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-content-muted" />
+                <Input
+                  type="text"
+                  placeholder="seunome"
+                  value={handle}
+                  onChange={async (e) => {
+                    const v = e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "");
+                    setHandle(v);
+                    setHandleError("");
+                    if (v.length >= 3) {
+                      const { data: existing } = await supabase
+                        .from("profiles").select("id").ilike("handle", v).maybeSingle();
+                      if (existing) setHandleError("Este @ já está em uso.");
+                    }
+                  }}
+                  className="pl-9"
+                  maxLength={20}
+                />
+              </div>
+              {handleError
+                ? <p className="text-xs text-red-500">{handleError}</p>
+                : <p className="text-xs text-content-muted">Apenas letras, números e _. Seu link: /@seunome</p>}
             </div>
 
             <div className="space-y-1.5">

@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
-import { Bell, Shield, Moon, Globe, Key, Check, Loader2, Eye, EyeOff, Smartphone, QrCode, Lock, Trash2 } from "lucide-react";
+import { Bell, Shield, Moon, Globe, Key, Check, Loader2, Eye, EyeOff, Smartphone, QrCode, Lock, Trash2, AlertTriangle } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { useTheme } from "../context/ThemeContext";
 import { useI18n, type Lang } from "../context/I18nContext";
 import { supabase } from "../lib/supabase";
+import { useAuth } from "../context/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 interface ToggleProps {
   enabled: boolean;
@@ -47,7 +49,7 @@ export function Settings() {
     dailySummary: true,
     weeklyTips: false,
   });
-  const [activeModal, setActiveModal] = useState<"password" | "twofactor" | null>(null);
+  const [activeModal, setActiveModal] = useState<"password" | "twofactor" | "delete" | null>(null);
   const [mfaEnabled, setMfaEnabled] = useState(false);
   const [mfaLoading, setMfaLoading] = useState(true);
 
@@ -209,6 +211,25 @@ export function Settings() {
         </Card>
       </div>
 
+      {/* Danger zone */}
+      <Card className="border-red-200">
+        <CardContent className="p-5">
+          <div className="mb-4 flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-red-50">
+              <AlertTriangle className="h-5 w-5 text-red-600" />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-content-strong">Zona de Perigo</h2>
+              <p className="text-xs text-content-muted">Ações irreversíveis</p>
+            </div>
+          </div>
+          <Button variant="outline" className="justify-start gap-2 text-red-600 hover:bg-red-50" onClick={() => setActiveModal("delete")}>
+            <Trash2 className="h-4 w-4" />
+            Excluir minha conta
+          </Button>
+        </CardContent>
+      </Card>
+
       {activeModal === "password" && (
         <PasswordModal onClose={() => setActiveModal(null)} />
       )}
@@ -219,6 +240,70 @@ export function Settings() {
           onClose={() => setActiveModal(null)}
         />
       )}
+      {activeModal === "delete" && (
+        <DeleteAccountModal onClose={() => setActiveModal(null)} />
+      )}
+    </div>
+  );
+}
+
+function DeleteAccountModal({ onClose }: { onClose: () => void }) {
+  const { signOut } = useAuth();
+  const navigate = useNavigate();
+  const [confirmText, setConfirmText] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleDelete() {
+    if (confirmText !== "EXCLUIR") return;
+    setDeleting(true);
+    setError("");
+    try {
+      const { error: rpcError } = await supabase.rpc("delete_account");
+      if (rpcError) throw rpcError;
+      await signOut();
+      navigate("/login");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erro ao excluir conta. Tente novamente.");
+      setDeleting(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-sm rounded-2xl bg-surface-card p-6 shadow-xl">
+        <div className="mb-5 flex items-center justify-between">
+          <h2 className="flex items-center gap-2 text-lg font-bold text-red-600">
+            <AlertTriangle className="h-5 w-5" />
+            Excluir conta
+          </h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+            <span className="text-xl">x</span>
+          </button>
+        </div>
+        <div className="rounded-xl bg-red-50 p-4 text-sm text-red-700">
+          <p className="font-semibold">Esta ação é permanente e não pode ser desfeita.</p>
+          <p className="mt-1">Todos os seus dados serão apagados: postagens, comentários, treinos, dieta, mensagens, e seu perfil.</p>
+        </div>
+        <div className="mt-4 space-y-2">
+          <p className="text-sm text-content-body">Digite <strong>EXCLUIR</strong> para confirmar:</p>
+          <Input
+            type="text"
+            value={confirmText}
+            onChange={(e) => setConfirmText(e.target.value)}
+            placeholder="EXCLUIR"
+            autoFocus
+          />
+          {error && <p className="text-sm text-red-500">{error}</p>}
+        </div>
+        <div className="mt-5 flex gap-3">
+          <Button variant="outline" className="flex-1" onClick={onClose} disabled={deleting}>Cancelar</Button>
+          <Button className="flex-1 gap-2 bg-red-600 hover:bg-red-700" onClick={handleDelete} disabled={deleting || confirmText !== "EXCLUIR"}>
+            {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+            {deleting ? "Excluindo..." : "Excluir conta"}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

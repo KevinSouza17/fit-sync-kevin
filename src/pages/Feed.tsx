@@ -325,19 +325,24 @@ export function Feed() {
     return [...new Set(matches.map((m) => m.slice(1).toLowerCase()))];
   }
 
-  async function createPost() {
-    if (!content.trim() && !imageUrl && !videoUrl) { setError(t("feed.emptyError")); return; }
-    if (isBanned) { setError(t("feed.userBanned")); return; }
+  async function createPost(): Promise<boolean> {
+    if (!content.trim() && !imageUrl && !videoUrl) { setError(t("feed.emptyError")); return false; }
+    if (isBanned) { setError(t("feed.userBanned")); return false; }
     setPosting(true);
     setError("");
     const insertData: Record<string, unknown> = { content: content.trim(), media_type: mediaType };
     if (mediaType === "video" && videoUrl) insertData.video_url = videoUrl;
     else if (imageUrl) insertData.image_url = imageUrl;
-    const { data } = await supabase
+    const { data, error: insertError } = await supabase
       .from("feed_posts")
       .insert(insertData)
       .select("*, profiles:user_id(full_name, avatar_url)")
       .single();
+    if (insertError) {
+      setError("Erro ao publicar. Tente novamente.");
+      setPosting(false);
+      return false;
+    }
     if (data) {
       const newPost: PostWithProfile = {
         ...data,
@@ -366,6 +371,7 @@ export function Feed() {
       setMediaType("image");
     }
     setPosting(false);
+    return true;
   }
 
   async function toggleLike(postId: string, liked: boolean) {
@@ -1018,8 +1024,8 @@ export function Feed() {
 
         {/* Post composer modal */}
         {composerOpen && !isBanned && (
-          <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm sm:items-center" onClick={() => setComposerOpen(false)}>
-            <div className="w-full max-w-lg rounded-t-2xl bg-surface-card p-5 shadow-2xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center" onClick={() => setComposerOpen(false)}>
+            <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-edge-base bg-surface-card p-5 shadow-2xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="text-lg font-bold text-content-strong">{t("feed.post")}</h2>
                 <button onClick={() => setComposerOpen(false)} className="rounded-full p-1.5 text-content-muted transition-colors hover:bg-surface-subtle">
@@ -1059,7 +1065,7 @@ export function Feed() {
                       Foto/Vídeo
                     </Button>
                   </div>
-                  <Button onClick={() => { createPost(); setComposerOpen(false); }} disabled={posting} className="gap-2">
+                  <Button onClick={async () => { const ok = await createPost(); if (ok) setComposerOpen(false); }} disabled={posting} className="gap-2">
                     {posting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                     {t("feed.post")}
                   </Button>
