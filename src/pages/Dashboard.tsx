@@ -587,9 +587,14 @@ export function Dashboard() {
             ) : recommendedMeals && recommendedMeals.length > 0 ? (
               <Card>
                 <CardContent className="p-5">
-                  <div className="mb-3 flex items-center gap-2">
-                    <UtensilsCrossed className="h-4 w-4 text-primary-600" />
-                    <h3 className="text-base font-semibold text-content-strong">Plano alimentar recomendado</h3>
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <UtensilsCrossed className="h-4 w-4 text-primary-600" />
+                      <h3 className="text-base font-semibold text-content-strong">Plano alimentar recomendado</h3>
+                    </div>
+                    <button onClick={() => setRecommendedMeals(null)} className="rounded-lg p-1.5 text-content-muted transition-colors hover:bg-red-50 hover:text-red-600" title="Remover recomendação">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
                   </div>
                   <p className="mb-3 text-xs text-content-muted">Personalizado para voce com base no seu questionario inicial</p>
                   <div className="flex flex-col gap-2">

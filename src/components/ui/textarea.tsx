@@ -15,6 +15,7 @@ export function AutoTextarea({
   ...props
 }: AutoTextareaProps) {
   const ref = useRef<HTMLTextAreaElement>(null);
+  const currentHeight = useRef(0);
 
   function resize() {
     const el = ref.current;
@@ -24,19 +25,15 @@ export function AutoTextarea({
     const minH = lineHeight * minRows;
     const maxH = lineHeight * maxRows;
     const scrollH = el.scrollHeight;
-    el.style.height = `${Math.min(Math.max(scrollH, minH), maxH)}px`;
+    const newH = Math.min(Math.max(scrollH, minH), maxH);
+    if (newH !== currentHeight.current) {
+      currentHeight.current = newH;
+      el.style.height = `${newH}px`;
+    }
     el.style.overflowY = scrollH > maxH ? "auto" : "hidden";
   }
 
   useEffect(() => { resize(); }, [value, minRows, maxRows]);
-  useEffect(() => {
-    resize();
-    const el = ref.current;
-    if (!el) return;
-    const ro = new ResizeObserver(resize);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
 
   return (
     <textarea
