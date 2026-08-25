@@ -35,6 +35,7 @@ interface MealForm {
   protein_g: string;
   carbs_g: string;
   fat_g: string;
+  fiber_g: string;
 }
 
 const emptyForm: MealForm = {
@@ -44,6 +45,7 @@ const emptyForm: MealForm = {
   protein_g: "",
   carbs_g: "",
   fat_g: "",
+  fiber_g: "",
 };
 
 export function Dashboard() {
@@ -66,6 +68,8 @@ export function Dashboard() {
   const [searching, setSearching] = useState(false);
   const [selectedFood, setSelectedFood] = useState<Food | null>(null);
   const [servings, setServings] = useState("1");
+  const [unitMode, setUnitMode] = useState<"portions" | "grams">("portions");
+  const [grams, setGrams] = useState("100");
   const [customEntry, setCustomEntry] = useState(false);
   const [showMacroModal, setShowMacroModal] = useState(false);
   const [macroProtein, setMacroProtein] = useState(30);
@@ -196,13 +200,10 @@ export function Dashboard() {
     debounceRef.current = setTimeout(() => searchFoods(value), 250);
   }
 
-  function selectFood(food: Food) {
-    setSelectedFood(food);
-    setFoodSearch(food.name);
-    setFoodResults([]);
-    setServings("1");
-    setCustomEntry(false);
-    const n = parseFloat(servings) || 1;
+  function computeFromFood(food: Food, mode: "portions" | "grams", amount: string) {
+    const n = mode === "grams"
+      ? (parseFloat(amount) || 100) / 100
+      : parseFloat(amount) || 1;
     setForm({
       ...form,
       name: food.name,
@@ -210,21 +211,31 @@ export function Dashboard() {
       protein_g: String((Number(food.protein_g) * n).toFixed(1)),
       carbs_g: String((Number(food.carbs_g) * n).toFixed(1)),
       fat_g: String((Number(food.fat_g) * n).toFixed(1)),
+      fiber_g: String((Number(food.fiber_g) * n).toFixed(1)),
     });
   }
 
-  function updateServings(value: string) {
-    setServings(value);
+  function selectFood(food: Food) {
+    setSelectedFood(food);
+    setFoodSearch(food.name);
+    setFoodResults([]);
+    setServings("1");
+    setGrams("100");
+    setCustomEntry(false);
+    computeFromFood(food, unitMode, unitMode === "grams" ? "100" : "1");
+  }
+
+  function updateAmount(value: string) {
+    if (unitMode === "grams") setGrams(value);
+    else setServings(value);
     if (!selectedFood) return;
-    const n = parseFloat(value) || 1;
-    setForm({
-      ...form,
-      name: selectedFood.name,
-      calories: String(Math.round(selectedFood.calories * n)),
-      protein_g: String((Number(selectedFood.protein_g) * n).toFixed(1)),
-      carbs_g: String((Number(selectedFood.carbs_g) * n).toFixed(1)),
-      fat_g: String((Number(selectedFood.fat_g) * n).toFixed(1)),
-    });
+    computeFromFood(selectedFood, unitMode, value);
+  }
+
+  function switchUnitMode(mode: "portions" | "grams") {
+    setUnitMode(mode);
+    if (!selectedFood) return;
+    computeFromFood(selectedFood, mode, mode === "grams" ? grams : servings);
   }
 
   function openMealModal() {
@@ -233,6 +244,8 @@ export function Dashboard() {
     setFoodResults([]);
     setSelectedFood(null);
     setServings("1");
+    setGrams("100");
+    setUnitMode("portions");
     setCustomEntry(false);
     setShowMealModal(true);
   }
@@ -255,6 +268,7 @@ export function Dashboard() {
   const totalProtein = meals.reduce((s, m) => s + Number(m.protein_g), 0);
   const totalCarbs = meals.reduce((s, m) => s + Number(m.carbs_g), 0);
   const totalFat = meals.reduce((s, m) => s + Number(m.fat_g), 0);
+  const totalFiber = meals.reduce((s, m) => s + Number(m.fiber_g ?? 0), 0);
 
   const proteinGoal = dietPlan?.target_protein_g != null ? Math.round(Number(dietPlan.target_protein_g)) : Math.round(calGoal * pPct / 100 / 4);
   const carbsGoal = dietPlan?.target_carbs_g != null ? Math.round(Number(dietPlan.target_carbs_g)) : Math.round(calGoal * cPct / 100 / 4);
@@ -539,7 +553,7 @@ export function Dashboard() {
                               <div>
                                 <p className="text-sm font-medium text-content-strong">{meal.name}</p>
                                 <p className="mt-0.5 text-xs text-content-muted">
-                                  P:{Math.round(Number(meal.protein_g))}g C:{Math.round(Number(meal.carbs_g))}g G:{Math.round(Number(meal.fat_g))}g
+                                  P:{Math.round(Number(meal.protein_g))}g C:{Math.round(Number(meal.carbs_g))}g G:{Math.round(Number(meal.fat_g))}g F:{Math.round(Number(meal.fiber_g ?? 0))}g
                                 </p>
                               </div>
                               <div className="flex items-center gap-2">
@@ -687,7 +701,7 @@ export function Dashboard() {
                           <div className="shrink-0 text-right">
                             <p className="text-sm font-semibold text-content-body">{food.calories} kcal</p>
                             <p className="text-[10px] text-content-muted">
-                              P:{food.protein_g}g C:{food.carbs_g}g G:{food.fat_g}g
+                              P:{food.protein_g}g C:{food.carbs_g}g G:{food.fat_g}g F:{food.fiber_g}g
                             </p>
                           </div>
                         </button>
@@ -716,17 +730,31 @@ export function Dashboard() {
                     </button>
                   </div>
                   <div className="mt-2 flex items-center gap-2">
-                    <label className="text-xs font-medium text-content-body">{t("dashboard.portions")}</label>
+                    <div className="flex rounded-lg border border-primary-200 bg-surface-card p-0.5">
+                      <button
+                        onClick={() => switchUnitMode("portions")}
+                        className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${unitMode === "portions" ? "bg-primary-500 text-white" : "text-content-muted hover:text-content-body"}`}
+                      >
+                        Porções
+                      </button>
+                      <button
+                        onClick={() => switchUnitMode("grams")}
+                        className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${unitMode === "grams" ? "bg-primary-500 text-white" : "text-content-muted hover:text-content-body"}`}
+                      >
+                        Gramas
+                      </button>
+                    </div>
                     <input
                       type="number"
-                      step="0.5"
-                      min="0.25"
-                      value={servings}
-                      onChange={(e) => updateServings(e.target.value)}
-                      className="w-20 rounded-lg border border-primary-300 bg-surface-card px-2 py-1 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-200"
+                      step={unitMode === "grams" ? "5" : "0.5"}
+                      min={unitMode === "grams" ? "1" : "0.25"}
+                      value={unitMode === "grams" ? grams : servings}
+                      onChange={(e) => updateAmount(e.target.value)}
+                      className="w-24 rounded-lg border border-primary-300 bg-surface-card px-2 py-1 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-200"
                     />
+                    <span className="text-xs text-content-muted">{unitMode === "grams" ? "g" : "porção(ões)"}</span>
                   </div>
-                  <div className="mt-2 grid grid-cols-4 gap-2 text-center">
+                  <div className="mt-2 grid grid-cols-5 gap-2 text-center">
                     <div className="rounded-lg bg-surface-card px-2 py-1">
                       <p className="text-sm font-bold text-content-strong">{form.calories}</p>
                       <p className="text-[10px] text-content-muted">kcal</p>
@@ -742,6 +770,10 @@ export function Dashboard() {
                     <div className="rounded-lg bg-surface-card px-2 py-1">
                       <p className="text-sm font-bold text-amber-600">{form.fat_g}</p>
                       <p className="text-[10px] text-content-muted">Gord (g)</p>
+                    </div>
+                    <div className="rounded-lg bg-surface-card px-2 py-1">
+                      <p className="text-sm font-bold text-green-600">{form.fiber_g || "0"}</p>
+                      <p className="text-[10px] text-content-muted">Fibra (g)</p>
                     </div>
                   </div>
                 </div>
@@ -789,6 +821,10 @@ export function Dashboard() {
                     <div>
                       <label className="text-sm font-medium text-content-body">{t("dashboard.fat")}</label>
                       <Input className="mt-1" type="number" placeholder="0" value={form.fat_g} onChange={(e) => setForm({ ...form, fat_g: e.target.value })} />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-content-body">{t("foods.fiber")}</label>
+                      <Input className="mt-1" type="number" placeholder="0" value={form.fiber_g} onChange={(e) => setForm({ ...form, fiber_g: e.target.value })} />
                     </div>
                   </div>
                 </>
