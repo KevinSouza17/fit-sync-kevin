@@ -1025,7 +1025,7 @@ export function Feed() {
         {/* Post composer modal */}
         {composerOpen && !isBanned && (
           <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center" onClick={() => setComposerOpen(false)}>
-            <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-edge-base bg-surface-card p-5 shadow-2xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-edge-base bg-surface-card p-5 pb-safe shadow-2xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="text-lg font-bold text-content-strong">{t("feed.post")}</h2>
                 <button onClick={() => setComposerOpen(false)} className="rounded-full p-1.5 text-content-muted transition-colors hover:bg-surface-subtle">
@@ -1033,7 +1033,7 @@ export function Feed() {
                 </button>
               </div>
               <div className="flex flex-col gap-3">
-                <AutoTextArea
+                <AutoTextarea
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
                   placeholder={t("feed.placeholder")}
@@ -1143,7 +1143,7 @@ export function Feed() {
                   <X className="h-5 w-5" />
                 </button>
               </div>
-              <AutoTextArea
+              <AutoTextarea
                 value={editContent}
                 onChange={(e) => setEditContent(e.target.value)}
                 placeholder="Escreva algo..."

@@ -19,6 +19,7 @@ import {
   CalendarCheck,
   Newspaper,
   Shield,
+  Compass,
   Star,
   Trophy,
 } from "lucide-react";
@@ -48,6 +49,7 @@ const navSections: NavSection[] = [
     items: [
       { to: "/dashboard", key: "nav.dashboard", icon: LayoutDashboard },
       { to: "/feed", key: "nav.feed", icon: Newspaper },
+      { to: "/explore", key: "nav.explore", icon: Compass },
       { to: "/reviews", key: "nav.reviews", icon: Star },
       { to: "/moderation", key: "nav.moderation", icon: Shield, ownerOnly: true },
     ],

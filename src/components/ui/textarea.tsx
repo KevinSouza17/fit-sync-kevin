@@ -20,16 +20,16 @@ export function AutoTextarea({
   function resize() {
     const el = ref.current;
     if (!el) return;
+    const prevH = currentHeight.current;
     el.style.height = "auto";
     const lineHeight = parseFloat(getComputedStyle(el).lineHeight) || 24;
     const minH = lineHeight * minRows;
     const maxH = lineHeight * maxRows;
     const scrollH = el.scrollHeight;
     const newH = Math.min(Math.max(scrollH, minH), maxH);
-    if (newH !== currentHeight.current) {
-      currentHeight.current = newH;
-      el.style.height = `${newH}px`;
-    }
+    el.style.height = `${newH}px`;
+    currentHeight.current = newH;
+    void prevH;
     el.style.overflowY = scrollH > maxH ? "auto" : "hidden";
   }
 
@@ -44,7 +44,7 @@ export function AutoTextarea({
         resize();
       }}
       rows={minRows}
-      className={cn("resize-none transition-[height] duration-100", className)}
+      className={cn("resize-none", className)}
       {...props}
     />
   );
