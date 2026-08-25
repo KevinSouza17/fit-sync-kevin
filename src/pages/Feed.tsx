@@ -682,7 +682,23 @@ export function Feed() {
               </div>
             </div>
           </div>
-          {post.content && <p className="mt-3 break-words text-sm leading-relaxed text-content-body">{post.content}</p>}
+          {post.content && (
+            <p className="mt-3 break-words text-sm leading-relaxed text-content-body">
+              {post.content.split(/(#[\w\u00C0-\u024F]+)/g).map((part, i) =>
+                part.startsWith("#") ? (
+                  <button
+                    key={i}
+                    onClick={() => loadPostsByTag(part.slice(1).toLowerCase())}
+                    className="font-medium text-primary-600 hover:underline"
+                  >
+                    {part}
+                  </button>
+                ) : (
+                  <span key={i}>{part}</span>
+                )
+              )}
+            </p>
+          )}
           {post.image_url && (
             <button onClick={() => setLightboxUrl(post.image_url)} className="group relative mt-3 block w-full">
               <img src={post.image_url} alt="" className="w-full rounded-xl object-contain" style={{ maxHeight: "600px" }} />
