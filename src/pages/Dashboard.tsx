@@ -291,6 +291,7 @@ export function Dashboard() {
         protein_g: parseFloat(form.protein_g) || 0,
         carbs_g: parseFloat(form.carbs_g) || 0,
         fat_g: parseFloat(form.fat_g) || 0,
+        fiber_g: parseFloat(form.fiber_g) || 0,
         logged_date: today,
       })
       .select()
@@ -398,10 +399,12 @@ export function Dashboard() {
     },
   ];
 
+  const fiberGoal = 25;
   const macros = [
     { name: t("dashboard.protein"), current: totalProtein, goal: proteinGoal, unit: "g", color: "bg-primary-500" },
     { name: t("dashboard.carbs"), current: totalCarbs, goal: carbsGoal, unit: "g", color: "bg-orange-400" },
     { name: t("dashboard.fat"), current: totalFat, goal: fatGoal, unit: "g", color: "bg-violet-500" },
+    { name: t("foods.fiber"), current: totalFiber, goal: fiberGoal, unit: "g", color: "bg-green-500" },
   ];
 
   return (
