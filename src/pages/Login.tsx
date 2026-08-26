@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, ArrowLeft, CheckCircle } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { FitSyncLogo } from "../components/FitSyncLogo";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
+import { supabase } from "../lib/supabase";
 
 export function Login() {
   const [showPassword, setShowPassword] = useState(false);
@@ -13,6 +14,10 @@ export function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotSent, setForgotSent] = useState(false);
   const { signIn } = useAuth();
   const { t } = useI18n();
   const navigate = useNavigate();
@@ -28,6 +33,22 @@ export function Login() {
       navigate("/dashboard");
     }
     setLoading(false);
+  }
+
+  async function handleForgotPassword(e: React.FormEvent) {
+    e.preventDefault();
+    if (!forgotEmail.trim()) return;
+    setForgotLoading(true);
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+      forgotEmail.trim(),
+      { redirectTo: `${window.location.origin}/reset-password` },
+    );
+    setForgotLoading(false);
+    if (resetError) {
+      setError(resetError.message);
+    } else {
+      setForgotSent(true);
+    }
   }
 
   return (
@@ -89,7 +110,68 @@ export function Login() {
               {loading ? "Entrando..." : t("login.signIn")}
             </Button>
           </form>
+
+          <button
+            type="button"
+            onClick={() => { setForgotOpen(true); setForgotEmail(email); }}
+            className="mt-4 w-full text-center text-sm text-primary-600 hover:text-primary-700"
+          >
+            Esqueceu sua senha?
+          </button>
         </div>
+
+        {forgotOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => { if (!forgotLoading) setForgotOpen(false); }}>
+            <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl dark:bg-surface-card" onClick={(e) => e.stopPropagation()}>
+              {forgotSent ? (
+                <div className="flex flex-col items-center text-center">
+                  <CheckCircle className="mb-3 h-12 w-12 text-green-500" />
+                  <h2 className="text-lg font-bold text-content-strong">E-mail enviado!</h2>
+                  <p className="mt-2 text-sm text-content-muted">
+                    Verifique seu e-mail <span className="font-semibold">{forgotEmail}</span> para redefinir sua senha.
+                  </p>
+                  <Button className="mt-5 w-full" onClick={() => { setForgotOpen(false); setForgotSent(false); setForgotEmail(""); }}>
+                    Entendi
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <div className="mb-4 flex items-center gap-2">
+                    <button onClick={() => { if (!forgotLoading) setForgotOpen(false); }} className="text-content-muted hover:text-content-body">
+                      <ArrowLeft className="h-5 w-5" />
+                    </button>
+                    <h2 className="text-lg font-bold text-content-strong">Recuperar senha</h2>
+                  </div>
+                  <p className="mb-4 text-sm text-content-muted">
+                    Digite seu e-mail e enviaremos um link para redefinir sua senha.
+                  </p>
+                  {error && (
+                    <div className="mb-3 rounded-lg bg-red-50 px-4 py-2.5 text-sm text-red-600">{error}</div>
+                  )}
+                  <form onSubmit={handleForgotPassword} className="space-y-4">
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium text-content-body">{t("login.email")}</label>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-content-muted" />
+                        <Input
+                          type="email"
+                          placeholder="seu@email.com"
+                          value={forgotEmail}
+                          onChange={(e) => setForgotEmail(e.target.value)}
+                          className="pl-9"
+                          required
+                        />
+                      </div>
+                    </div>
+                    <Button type="submit" className="w-full" size="lg" disabled={forgotLoading}>
+                      {forgotLoading ? "Enviando..." : "Enviar link de recuperação"}
+                    </Button>
+                  </form>
+                </>
+              )}
+            </div>
+          </div>
+        )}
 
         <p className="mt-6 text-center text-sm text-content-muted">
           {t("login.noAccount")}{" "}

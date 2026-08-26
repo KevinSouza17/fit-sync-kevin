@@ -28,6 +28,7 @@ import { UserProfile } from "./pages/UserProfile";
 import { MyProfile } from "./pages/MyProfile";
 import { Moderation } from "./pages/Moderation";
 import { Onboarding } from "./pages/Onboarding";
+import { ResetPassword } from "./pages/ResetPassword";
 import { DashboardLayout } from "./components/layout/DashboardLayout";
 import { PageLoader, SplashScreen } from "./components/PageLoader";
 
@@ -127,6 +128,7 @@ export default function App() {
           <Route path="/appointments" element={<Appointments />} />
           <Route path="/my-clients" element={<ProfessionalRoute><MyClients /></ProfessionalRoute>} />
         </Route>
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </BrowserRouter>

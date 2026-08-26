@@ -441,6 +441,9 @@ export function Messages() {
                         {m.media_type === "image" && m.media_url && (
                           <img src={m.media_url} alt="" className="mb-1 max-h-60 rounded-lg object-cover" />
                         )}
+                        {m.media_type === "video" && m.media_url && (
+                          <video src={m.media_url} controls playsInline className="mb-1 max-h-60 rounded-lg" />
+                        )}
                         {m.media_type === "audio" && m.media_url && (
                           <div className="min-w-[200px]">
                             <AudioPlayer url={m.media_url} isMine={isMine} label={t("messages.audio")} />
