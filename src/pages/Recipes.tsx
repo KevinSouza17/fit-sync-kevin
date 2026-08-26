@@ -535,11 +535,12 @@ export function Recipes() {
                         <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${color.bg} ${color.text}`}>{t(`cat.${food.category}`)}</span>
                       </div>
                       <p className="mb-3 text-xs text-content-muted">{t("foods.serving")}: {food.serving_size}</p>
-                      <div className="grid grid-cols-4 gap-1 text-center">
+                      <div className="grid grid-cols-5 gap-1 text-center">
                         <div className="rounded-lg bg-surface-base px-1 py-1.5"><p className="text-sm font-bold text-content-strong">{food.calories}</p><p className="text-[9px] text-content-muted">kcal</p></div>
                         <div className="rounded-lg bg-primary-50 px-1 py-1.5"><p className="text-sm font-bold text-primary-600">{food.protein_g}</p><p className="text-[9px] text-content-muted">Prot</p></div>
                         <div className="rounded-lg bg-orange-50 px-1 py-1.5"><p className="text-sm font-bold text-orange-600">{food.carbs_g}</p><p className="text-[9px] text-content-muted">Carb</p></div>
                         <div className="rounded-lg bg-amber-50 px-1 py-1.5"><p className="text-sm font-bold text-amber-600">{food.fat_g}</p><p className="text-[9px] text-content-muted">Gord</p></div>
+                        <div className="rounded-lg bg-green-50 px-1 py-1.5"><p className="text-sm font-bold text-green-600">{food.fiber_g}</p><p className="text-[9px] text-content-muted">Fibra</p></div>
                       </div>
                     </CardContent>
                   </Card>
@@ -582,11 +583,12 @@ export function Recipes() {
                         </div>
                       </div>
                       <p className="mb-3 text-xs text-content-muted">{t("foods.serving")}: {food.serving_size}</p>
-                      <div className="grid grid-cols-4 gap-1 text-center">
+                      <div className="grid grid-cols-5 gap-1 text-center">
                         <div className="rounded-lg bg-surface-base px-1 py-1.5"><p className="text-sm font-bold text-content-strong">{food.calories}</p><p className="text-[9px] text-content-muted">kcal</p></div>
                         <div className="rounded-lg bg-primary-50 px-1 py-1.5"><p className="text-sm font-bold text-primary-600">{food.protein_g}</p><p className="text-[9px] text-content-muted">Prot</p></div>
                         <div className="rounded-lg bg-orange-50 px-1 py-1.5"><p className="text-sm font-bold text-orange-600">{food.carbs_g}</p><p className="text-[9px] text-content-muted">Carb</p></div>
                         <div className="rounded-lg bg-amber-50 px-1 py-1.5"><p className="text-sm font-bold text-amber-600">{food.fat_g}</p><p className="text-[9px] text-content-muted">Gord</p></div>
+                        <div className="rounded-lg bg-green-50 px-1 py-1.5"><p className="text-sm font-bold text-green-600">{food.fiber_g}</p><p className="text-[9px] text-content-muted">Fibra</p></div>
                       </div>
                       <button
                         onClick={(e) => { e.stopPropagation(); deleteCustomFood(food.id); }}

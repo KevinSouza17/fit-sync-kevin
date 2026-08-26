@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";
 import { AvatarPreview } from "../components/ui/AvatarPreview";
+import { ShareModal } from "../components/ShareModal";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
 import { useNavigate } from "react-router-dom";
@@ -86,6 +87,7 @@ export function Explore() {
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [tagPosts, setTagPosts] = useState<RecommendedPost[]>([]);
   const [tagLoading, setTagLoading] = useState(false);
+  const [sharePost, setSharePost] = useState<RecommendedPost | TrendingPost | null>(null);
 
   const loadTrendingTags = useCallback(async () => {
     const { data } = await supabase
@@ -196,15 +198,7 @@ export function Explore() {
   }
 
   async function handleShare(post: RecommendedPost | TrendingPost) {
-    const url = `${window.location.origin}/profile/${post.user_id}`;
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: "FitSync", text: post.content, url });
-      } else {
-        await navigator.clipboard.writeText(url);
-        alert("Link copiado!");
-      }
-    } catch { /* cancelled */ }
+    setSharePost(post);
   }
 
   function renderPostCard(
@@ -238,7 +232,23 @@ export function Explore() {
             )}
           </div>
 
-          {post.content && <p className="mt-3 break-words text-sm leading-relaxed text-content-body">{post.content}</p>}
+          {post.content && (
+            <p className="mt-3 break-words text-sm leading-relaxed text-content-body">
+              {post.content.split(/(#[\w\u00C0-\u024F]+)/g).map((part, i) =>
+                part.startsWith("#") ? (
+                  <button
+                    key={i}
+                    onClick={() => loadPostsByTag(part.slice(1).toLowerCase())}
+                    className="font-medium text-primary-600 hover:underline"
+                  >
+                    {part}
+                  </button>
+                ) : (
+                  <span key={i}>{part}</span>
+                )
+              )}
+            </p>
+          )}
 
           {post.image_url && (
             <button onClick={() => setLightboxUrl(post.image_url)} className="group relative mt-3 block w-full">
@@ -442,6 +452,14 @@ export function Explore() {
           </div>
         )}
       </div>
+      <ShareModal
+        open={!!sharePost}
+        onClose={() => setSharePost(null)}
+        shareUrl={`${window.location.origin}/profile/${sharePost?.user_id}`}
+        shareText={sharePost?.content || "Confira este post no FitSync!"}
+        mediaUrl={sharePost?.video_url || sharePost?.image_url}
+        mediaType={sharePost?.video_url ? "video" : "image"}
+      />
     </div>
   );
 }

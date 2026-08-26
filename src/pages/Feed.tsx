@@ -12,6 +12,7 @@ import { useI18n } from "../context/I18nContext";
 import { supabase } from "../lib/supabase";
 import { useNavigate } from "react-router-dom";
 import { StoryViewer } from "../components/StoryViewer";
+import { ShareModal } from "../components/ShareModal";
 
 interface PostWithProfile {
   id: string;
@@ -125,6 +126,7 @@ export function Feed() {
   const [editingPost, setEditingPost] = useState<PostWithProfile | null>(null);
   const [editContent, setEditContent] = useState("");
   const [editSaving, setEditSaving] = useState(false);
+  const [sharePost, setSharePost] = useState<PostWithProfile | null>(null);
 
   useEffect(() => {
     if (profile) {
@@ -356,12 +358,10 @@ export function Feed() {
       const tags = parseHashtags(content);
       if (tags.length > 0) {
         for (const tag of tags) {
-          await supabase.from("hashtags").upsert({ tag }, { onConflict: "tag" }).select("id").maybeSingle()
-            .then(async ({ data: hd }) => {
-              if (hd && data) {
-                await supabase.from("post_hashtags").insert({ post_id: data.id, hashtag_id: hd.id });
-              }
-            });
+          const { data: hd } = await supabase.from("hashtags").upsert({ tag }, { onConflict: "tag" }).select("id").maybeSingle();
+          if (hd && data) {
+            await supabase.from("post_hashtags").insert({ post_id: data.id, hashtag_id: hd.id });
+          }
         }
         loadTrending();
       }
@@ -459,6 +459,16 @@ export function Feed() {
       setPosts(updateFn);
       setFollowingPosts(updateFn);
       setTagPosts(updateFn);
+      // Re-sync hashtags
+      const tags = parseHashtags(trimmed);
+      await supabase.from("post_hashtags").delete().eq("post_id", editingPost.id);
+      for (const tag of tags) {
+        const { data: hd } = await supabase.from("hashtags").upsert({ tag }, { onConflict: "tag" }).select("id").maybeSingle();
+        if (hd) {
+          await supabase.from("post_hashtags").insert({ post_id: editingPost.id, hashtag_id: hd.id });
+        }
+      }
+      loadTrending();
     }
     setEditSaving(false);
     setEditingPost(null);
@@ -541,15 +551,7 @@ export function Feed() {
   }
 
   async function handleShare(post: PostWithProfile) {
-    const url = `${window.location.origin}/profile/${post.user_id}`;
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: "FitSync", text: post.content, url });
-      } else {
-        await navigator.clipboard.writeText(url);
-        alert("Link copiado!");
-      }
-    } catch { /* user cancelled */ }
+    setSharePost(post);
   }
 
   async function handleBanUser(userId: string) {
@@ -1236,6 +1238,14 @@ export function Feed() {
           </div>
         )}
       </div>
+      <ShareModal
+        open={!!sharePost}
+        onClose={() => setSharePost(null)}
+        shareUrl={`${window.location.origin}/profile/${sharePost?.user_id}`}
+        shareText={sharePost?.content || "Confira este post no FitSync!"}
+        mediaUrl={sharePost?.video_url || sharePost?.image_url}
+        mediaType={sharePost?.video_url ? "video" : "image"}
+      />
     </div>
   );
 }

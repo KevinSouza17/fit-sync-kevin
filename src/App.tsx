@@ -21,6 +21,7 @@ import { Appointments } from "./pages/Appointments";
 import { MyClients } from "./pages/MyClients";
 import { Feed } from "./pages/Feed";
 import { Explore } from "./pages/Explore";
+import { Syncs } from "./pages/Syncs";
 import { Achievements } from "./pages/Achievements";
 import { Reviews } from "./pages/Reviews";
 import { UserProfile } from "./pages/UserProfile";
@@ -111,6 +112,7 @@ export default function App() {
           <Route path="/professional-profile" element={<ProfessionalRoute><ProfessionalProfile /></ProfessionalRoute>} />
           <Route path="/professional/:id" element={<ProtectedRoute><ProfessionalProfile /></ProtectedRoute>} />
           <Route path="/feed" element={<Feed />} />
+          <Route path="/syncs" element={<Syncs />} />
           <Route path="/explore" element={<Explore />} />
           <Route path="/achievements" element={<Achievements />} />
           <Route path="/profile/:id" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />

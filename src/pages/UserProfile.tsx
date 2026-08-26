@@ -9,6 +9,7 @@ import { Button } from "../components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "../components/ui/avatar";
 import { AvatarPreview } from "../components/ui/AvatarPreview";
 import { StoryViewer } from "../components/StoryViewer";
+import { ShareModal } from "../components/ShareModal";
 import type { StoryItem, StoryGroup } from "../components/StoryViewer";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
@@ -72,6 +73,7 @@ export function UserProfile() {
   const [profileStories, setProfileStories] = useState<StoryItem[]>([]);
   const [activeStoryGroup, setActiveStoryGroup] = useState<StoryGroup | null>(null);
   const [activeStoryIndex, setActiveStoryIndex] = useState(0);
+  const [sharePost, setSharePost] = useState<PostWithProfile | null>(null);
 
   const profileId = paramId || user?.id || "";
   const isOwnProfile = profileId === user?.id;
@@ -371,7 +373,7 @@ export function UserProfile() {
                       <MessageCircle className="h-4 w-4" />
                       {post.comment_count > 0 && <span>{post.comment_count}</span>}
                     </button>
-                    <button className="flex items-center gap-1.5 text-sm font-medium text-content-muted hover:text-primary-500">
+                    <button onClick={() => setSharePost(post)} className="flex items-center gap-1.5 text-sm font-medium text-content-muted hover:text-primary-500">
                       <Share2 className="h-4 w-4" />
                     </button>
                   </div>
@@ -392,6 +394,14 @@ export function UserProfile() {
           onGroupChange={() => {}}
         />
       )}
+      <ShareModal
+        open={!!sharePost}
+        onClose={() => setSharePost(null)}
+        shareUrl={`${window.location.origin}/profile/${sharePost?.user_id}`}
+        shareText={sharePost?.content || "Confira este post no FitSync!"}
+        mediaUrl={sharePost?.image_url}
+        mediaType="image"
+      />
     </div>
   );
 }
