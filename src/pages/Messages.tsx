@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Send, Search, ArrowLeft, MessageCircle, UserCircle, UserPlus, ImagePlus, Mic, Loader2, X, Trash2, Square } from "lucide-react";
+import { Send, Search, ArrowLeft, MessageCircle, UserCircle, UserPlus, ImagePlus, Mic, Loader2, X, Trash2, Square, Paperclip, File as FileIcon, Download } from "lucide-react";
 import { AudioPlayer } from "../components/AudioPlayer";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
@@ -68,6 +68,8 @@ export function Messages() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [fileUploading, setFileUploading] = useState(false);
+  const fileDocInputRef = useRef<HTMLInputElement | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const recordTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -264,6 +266,32 @@ export function Messages() {
     setUploading(false);
   }
 
+  // ── Send file attachment ──
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !user || !activeId) return;
+    if (file.size > 50 * 1024 * 1024) return;
+    setFileUploading(true);
+    const ext = file.name.split(".").pop() || "bin";
+    const fileName = `${user.id}/file-${Date.now()}.${ext}`;
+    const { error: upErr } = await supabase.storage.from("avatars").upload(fileName, file);
+    if (upErr) { setFileUploading(false); return; }
+    const { data } = supabase.storage.from("avatars").getPublicUrl(fileName);
+    const mediaUrl = `${data.publicUrl}?t=${Date.now()}`;
+    const isVideo = file.type.startsWith("video/");
+    const mediaType = isVideo ? "video" : "file";
+    const { data: msg } = await supabase
+      .from("messages")
+      .insert({ conversation_id: activeId, sender_id: user.id, content: file.name, media_url: mediaUrl, media_type: mediaType })
+      .select("id, sender_id, content, media_url, media_type, created_at")
+      .single();
+    if (msg) {
+      setMessages((prev) => [...prev, msg]);
+      loadConversations();
+    }
+    setFileUploading(false);
+  }
+
   // ── Audio recording ──
   async function startRecording() {
     try {
@@ -437,12 +465,24 @@ export function Messages() {
                   const isMine = m.sender_id === user?.id;
                   return (
                     <div key={m.id} className={`group flex ${isMine ? "justify-end" : "justify-start"}`}>
-                      <div className={`relative max-w-[75%] break-words rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm ${isMine ? "rounded-br-md bg-primary-600 text-white" : "rounded-bl-md bg-white text-slate-700"}`}>
+                      <div className={`relative max-w-[75%] break-words text-sm leading-relaxed ${isMine ? "bg-primary-600 text-white" : "bg-white text-slate-700"} ${m.content && (m.media_type === "image" || m.media_type === "video" || m.media_type === "file") ? "rounded-2xl" : "rounded-2xl px-4 py-2.5 shadow-sm"} ${isMine && m.content && (m.media_type === "image" || m.media_type === "video" || m.media_type === "file") ? "rounded-br-md" : isMine ? "rounded-br-md" : "rounded-bl-md"} ${!m.content && (m.media_type === "image" || m.media_type === "video") ? "overflow-hidden" : ""}`}>
                         {m.media_type === "image" && m.media_url && (
-                          <img src={m.media_url} alt="" className="mb-1 max-h-60 rounded-lg object-cover" />
+                          <img src={m.media_url} alt="" className="block max-h-60 w-full rounded-2xl object-cover" />
                         )}
                         {m.media_type === "video" && m.media_url && (
-                          <video src={m.media_url} controls playsInline className="mb-1 max-h-60 rounded-lg" />
+                          <video src={m.media_url} controls playsInline className="block max-h-60 w-full rounded-2xl" />
+                        )}
+                        {m.media_type === "file" && m.media_url && (
+                          <a href={m.media_url} download={m.content || undefined} target="_blank" rel="noopener noreferrer" className={`flex items-center gap-3 rounded-2xl px-4 py-3 ${isMine ? "hover:bg-primary-700" : "hover:bg-slate-50"}`}>
+                            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${isMine ? "bg-white/20" : "bg-slate-100"}`}>
+                              <FileIcon className="h-5 w-5" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="truncate text-sm font-medium">{m.content || "Arquivo"}</p>
+                              <p className={`text-xs ${isMine ? "text-primary-100" : "text-slate-400"}`}>Toque para baixar</p>
+                            </div>
+                            <Download className="h-4 w-4 shrink-0" />
+                          </a>
                         )}
                         {m.media_type === "audio" && m.media_url && (
                           <div className="min-w-[200px]">
@@ -525,6 +565,10 @@ export function Messages() {
           <div className="border-t border-slate-200 bg-white px-4 pt-3 pb-safe">
             <div className="mx-auto flex max-w-2xl items-center gap-2">
               <input ref={(el) => { fileInputRef.current = el; }} type="file" accept="image/*" onChange={handlePhotoUpload} className="hidden" />
+              <input ref={(el) => { fileDocInputRef.current = el; }} type="file" onChange={handleFileUpload} className="hidden" />
+              <button onClick={() => fileDocInputRef.current?.click()} disabled={fileUploading || uploading || !!recordedUrl} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition-colors hover:bg-slate-200 disabled:opacity-40" title="Enviar arquivo">
+                {fileUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-5 w-5" />}
+              </button>
               <button onClick={() => fileInputRef.current?.click()} disabled={uploading || !!recordedUrl} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition-colors hover:bg-slate-200 disabled:opacity-40">
                 {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-5 w-5" />}
               </button>

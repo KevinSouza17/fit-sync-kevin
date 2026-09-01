@@ -3,6 +3,12 @@ import {
   Heart, MessageCircle, Share2, X, Plus, Music, Play, Loader2,
   Trash2, Send, Eye, ChevronUp, ChevronDown,
 } from "lucide-react";
+
+type TouchSwipe = {
+  startY: number;
+  currentY: number;
+  active: boolean;
+};
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
 import { useNavigate } from "react-router-dom";
@@ -83,6 +89,7 @@ export function Syncs() {
   const [shareSync, setShareSync] = useState<SyncWithProfile | null>(null);
   const videoRefs = useRef<Record<string, HTMLVideoElement | null>>({});
   const containerRef = useRef<HTMLDivElement>(null);
+  const touchRef = useRef<TouchSwipe>({ startY: 0, currentY: 0, active: false });
 
   const loadSyncs = useCallback(async () => {
     setLoading(true);
@@ -197,7 +204,7 @@ export function Syncs() {
       setLikedSyncs((prev) => { const n = new Set(prev); n.delete(syncId); return n; });
       setLikeCounts((prev) => ({ ...prev, [syncId]: Math.max((prev[syncId] || 0) - 1, 0) }));
     } else {
-      await supabase.from("sync_likes").insert({ sync_id: syncId });
+      await supabase.from("sync_likes").insert({ sync_id: syncId, user_id: user?.id ?? "" });
       setLikedSyncs((prev) => new Set(prev).add(syncId));
       setLikeCounts((prev) => ({ ...prev, [syncId]: (prev[syncId] || 0) + 1 }));
     }
@@ -218,7 +225,7 @@ export function Syncs() {
     setCommentLoading(true);
     const { data } = await supabase
       .from("sync_comments")
-      .insert({ sync_id: syncId, content: text })
+      .insert({ sync_id: syncId, user_id: user?.id ?? "", content: text })
       .select("*, profiles:user_id(full_name, avatar_url)")
       .single();
     if (data) {
@@ -435,6 +442,22 @@ export function Syncs() {
           if (showComments || shareSync) return;
           if (e.deltaY > 30) handleScroll("down");
           else if (e.deltaY < -30) handleScroll("up");
+        }}
+        onTouchStart={(e) => {
+          touchRef.current = { startY: e.touches[0].clientY, currentY: e.touches[0].clientY, active: true };
+        }}
+        onTouchMove={(e) => {
+          if (!touchRef.current.active) return;
+          touchRef.current.currentY = e.touches[0].clientY;
+        }}
+        onTouchEnd={() => {
+          if (!touchRef.current.active) return;
+          const delta = touchRef.current.startY - touchRef.current.currentY;
+          if (Math.abs(delta) > 50) {
+            if (delta > 0) handleScroll("down");
+            else handleScroll("up");
+          }
+          touchRef.current.active = false;
         }}
       >
         {syncs.map((sync, index) => (
