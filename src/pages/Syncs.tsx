@@ -89,6 +89,7 @@ export function Syncs() {
   const videoRefs = useRef<Record<string, HTMLVideoElement | null>>({});
   const containerRef = useRef<HTMLDivElement>(null);
   const touchRef = useRef<TouchSwipe>({ startY: 0, currentY: 0, active: false });
+  const viewedSyncs = useRef<Set<string>>(new Set());
 
   const loadSyncs = useCallback(async () => {
     setLoading(true);
@@ -135,9 +136,12 @@ export function Syncs() {
         video.pause();
       }
     });
-    supabase.rpc("increment_sync_view", { p_sync_id: currentSync.id }).then(() => {
-      setSyncs((prev) => prev.map((s) => s.id === currentSync.id ? { ...s, view_count: s.view_count + 1 } : s));
-    });
+    if (!viewedSyncs.current.has(currentSync.id)) {
+      viewedSyncs.current.add(currentSync.id);
+      supabase.rpc("increment_sync_view", { p_sync_id: currentSync.id }).then(() => {
+        setSyncs((prev) => prev.map((s) => s.id === currentSync.id ? { ...s, view_count: s.view_count + 1 } : s));
+      });
+    }
   }, [currentIndex, syncs]);
 
   function handleScroll(direction: "up" | "down") {
