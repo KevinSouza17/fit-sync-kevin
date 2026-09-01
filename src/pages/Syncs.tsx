@@ -135,7 +135,9 @@ export function Syncs() {
         video.pause();
       }
     });
-    supabase.rpc("increment_sync_view", { p_sync_id: currentSync.id });
+    supabase.rpc("increment_sync_view", { p_sync_id: currentSync.id }).then(() => {
+      setSyncs((prev) => prev.map((s) => s.id === currentSync.id ? { ...s, view_count: s.view_count + 1 } : s));
+    });
   }, [currentIndex, syncs]);
 
   function handleScroll(direction: "up" | "down") {
