@@ -28,7 +28,6 @@ interface SyncWithProfile {
     full_name: string | null;
     avatar_url: string | null;
   } | null;
-  is_feed_video?: boolean;
 }
 
 interface SyncComment {
@@ -93,62 +92,29 @@ export function Syncs() {
 
   const loadSyncs = useCallback(async () => {
     setLoading(true);
-    const [{ data: syncData }, { data: feedVideoData }] = await Promise.all([
-      supabase
-        .from("syncs")
-        .select("*, profiles:user_id(full_name, avatar_url)")
-        .order("created_at", { ascending: false })
-        .limit(30),
-      supabase
-        .from("feed_posts")
-        .select("id, user_id, video_url, content, created_at, profiles:user_id(full_name, avatar_url)")
-        .not("video_url", "is", null)
-        .order("created_at", { ascending: false })
-        .limit(30),
-    ]);
+    const { data: syncData } = await supabase
+      .from("syncs")
+      .select("*, profiles:user_id(full_name, avatar_url)")
+      .order("created_at", { ascending: false })
+      .limit(30);
 
     const syncList = (syncData ?? []) as unknown as SyncWithProfile[];
-    const feedVideos = ((feedVideoData ?? []) as unknown as Array<{
-      id: string;
-      user_id: string;
-      video_url: string;
-      content: string | null;
-      created_at: string;
-      profiles: { full_name: string | null; avatar_url: string | null } | null;
-    }>).map((p) => ({
-      id: p.id,
-      user_id: p.user_id,
-      video_url: p.video_url,
-      caption: p.content,
-      music_track: null,
-      duration_seconds: 0,
-      view_count: 0,
-      created_at: p.created_at,
-      profiles: p.profiles,
-      is_feed_video: true,
-    })) as SyncWithProfile[];
+    setSyncs(syncList);
 
-    const merged = [...syncList, ...feedVideos].sort(
-      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-    );
-    setSyncs(merged);
-
-    if (merged.length > 0) {
+    if (syncList.length > 0) {
       const syncIds = syncList.map((s) => s.id);
-      if (syncIds.length > 0) {
-        const [{ data: likes }, { data: myLikes }, { data: comments }] = await Promise.all([
-          supabase.from("sync_likes").select("sync_id").in("sync_id", syncIds),
-          supabase.from("sync_likes").select("sync_id").eq("user_id", user?.id ?? "").in("sync_id", syncIds),
-          supabase.from("sync_comments").select("sync_id").in("sync_id", syncIds),
-        ]);
-        const lc: Record<string, number> = {};
-        (likes || []).forEach((l) => { lc[l.sync_id] = (lc[l.sync_id] || 0) + 1; });
-        setLikeCounts(lc);
-        setLikedSyncs(new Set((myLikes || []).map((l) => l.sync_id)));
-        const cc: Record<string, number> = {};
-        (comments || []).forEach((c) => { cc[c.sync_id] = (cc[c.sync_id] || 0) + 1; });
-        setCommentCounts(cc);
-      }
+      const [{ data: likes }, { data: myLikes }, { data: comments }] = await Promise.all([
+        supabase.from("sync_likes").select("sync_id").in("sync_id", syncIds),
+        supabase.from("sync_likes").select("sync_id").eq("user_id", user?.id ?? "").in("sync_id", syncIds),
+        supabase.from("sync_comments").select("sync_id").in("sync_id", syncIds),
+      ]);
+      const lc: Record<string, number> = {};
+      (likes || []).forEach((l) => { lc[l.sync_id] = (lc[l.sync_id] || 0) + 1; });
+      setLikeCounts(lc);
+      setLikedSyncs(new Set((myLikes || []).map((l) => l.sync_id)));
+      const cc: Record<string, number> = {};
+      (comments || []).forEach((c) => { cc[c.sync_id] = (cc[c.sync_id] || 0) + 1; });
+      setCommentCounts(cc);
     }
     setLoading(false);
   }, [user]);
@@ -169,9 +135,7 @@ export function Syncs() {
         video.pause();
       }
     });
-    if (!currentSync.is_feed_video) {
-      supabase.rpc("increment_sync_view", { p_sync_id: currentSync.id });
-    }
+    supabase.rpc("increment_sync_view", { p_sync_id: currentSync.id });
   }, [currentIndex, syncs]);
 
   function handleScroll(direction: "up" | "down") {
@@ -485,17 +449,14 @@ export function Syncs() {
 
             {/* Right action bar */}
             <div className="absolute bottom-24 right-3 flex flex-col items-center gap-4 z-10 sm:bottom-28 sm:right-4 sm:gap-5">
-              {!sync.is_feed_video && (
-                <button onClick={() => toggleLike(sync.id)} className="flex flex-col items-center gap-1">
+              <button onClick={() => toggleLike(sync.id)} className="flex flex-col items-center gap-1">
                   <div className="flex h-12 w-12 items-center justify-center rounded-full bg-black/30 backdrop-blur-sm transition-transform active:scale-90">
                     <Heart className={`h-7 w-7 transition-colors ${likedSyncs.has(sync.id) ? "fill-rose-500 text-rose-500" : "text-white"}`} />
                   </div>
                   <span className="text-xs font-semibold text-white">{formatCount(likeCounts[sync.id] || 0)}</span>
                 </button>
-              )}
 
-              {!sync.is_feed_video && (
-                <button
+              <button
                   onClick={() => {
                     if (showComments === sync.id) setShowComments(null);
                     else { setShowComments(sync.id); loadComments(sync.id); }
@@ -507,7 +468,6 @@ export function Syncs() {
                   </div>
                   <span className="text-xs font-semibold text-white">{formatCount(commentCounts[sync.id] || 0)}</span>
                 </button>
-              )}
 
               <button
                 onClick={() => setShareSync(sync)}
@@ -519,16 +479,14 @@ export function Syncs() {
                 <span className="text-xs font-semibold text-white">Compartilhar</span>
               </button>
 
-              {!sync.is_feed_video && (
-                <div className="flex flex-col items-center gap-1">
+              <div className="flex flex-col items-center gap-1">
                   <div className="flex h-12 w-12 items-center justify-center rounded-full bg-black/30 backdrop-blur-sm">
                     <Eye className="h-7 w-7 text-white" />
                   </div>
                   <span className="text-xs font-semibold text-white">{formatCount(sync.view_count)}</span>
                 </div>
-              )}
 
-              {isOwn && !sync.is_feed_video && (
+              {isOwn && (
                 <button onClick={() => deleteSync(sync.id)} className="flex flex-col items-center gap-1">
                   <div className="flex h-12 w-12 items-center justify-center rounded-full bg-black/30 backdrop-blur-sm transition-transform active:scale-90">
                     <Trash2 className="h-7 w-7 text-white" />

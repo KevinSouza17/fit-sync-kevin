@@ -87,6 +87,7 @@ export function Feed() {
   const [content, setContent] = useState("");
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [videoDuration, setVideoDuration] = useState(0);
   const [mediaType, setMediaType] = useState<string>("image");
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState("");
@@ -266,6 +267,23 @@ export function Feed() {
     if (!file || !user) return;
     setUploading(true);
     const isVideo = file.type.startsWith("video");
+    if (isVideo) {
+      const v = document.createElement("video");
+      v.preload = "metadata";
+      v.src = URL.createObjectURL(file);
+      await new Promise<void>((resolve) => {
+        v.onloadedmetadata = () => { URL.revokeObjectURL(v.src); resolve(); };
+        v.onerror = () => resolve();
+      });
+      if (v.duration > 180) {
+        setError("O vídeo deve ter no máximo 3 minutos. Ele será postado no feed, mas vídeos curtos vão para os Syncs.");
+        setUploading(false);
+        return;
+      }
+      setVideoDuration(v.duration);
+    } else {
+      setVideoDuration(0);
+    }
     const ext = file.name.split(".").pop();
     const fileName = `${user.id}/feed-${Date.now()}.${ext}`;
     const { error: upErr } = await supabase.storage.from("avatars").upload(fileName, file);
@@ -368,7 +386,29 @@ export function Feed() {
       setContent("");
       setImageUrl(null);
       setVideoUrl(null);
+      setVideoDuration(0);
       setMediaType("image");
+
+      // If it's a video ≤ 3 min, also post to Syncs
+      if (mediaType === "video" && videoUrl && videoDuration > 0 && videoDuration <= 180 && data) {
+        const syncFileName = `${user.id}/${Date.now()}-sync.${videoUrl.split(".").pop()?.split("?")[0] || "mp4"}`;
+        // Re-upload to syncs bucket for proper CDN URL
+        try {
+          const resp = await fetch(videoUrl);
+          const blob = await resp.blob();
+          await supabase.storage.from("syncs").upload(syncFileName, blob, { contentType: blob.type });
+          const { data: syncUrlData } = supabase.storage.from("syncs").getPublicUrl(syncFileName);
+          await supabase.from("syncs").insert({
+            user_id: user.id,
+            video_url: syncUrlData.publicUrl,
+            caption: content.trim() || null,
+            music_track: null,
+            duration_seconds: Math.round(videoDuration),
+          });
+        } catch {
+          // Non-critical: feed post already succeeded
+        }
+      }
     }
     setPosting(false);
     return true;
@@ -1069,7 +1109,7 @@ export function Feed() {
                 {videoUrl && (
                   <div className="relative">
                     <video src={videoUrl} controls className="max-h-64 rounded-xl" />
-                    <button onClick={() => { setVideoUrl(null); setMediaType("image"); }} className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 text-white">
+                    <button onClick={() => { setVideoUrl(null); setVideoDuration(0); setMediaType("image"); }} className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 text-white">
                       <X className="h-4 w-4" />
                     </button>
                   </div>
