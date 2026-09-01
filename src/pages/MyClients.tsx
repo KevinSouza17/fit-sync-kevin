@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Users, UserPlus, UtensilsCrossed, Dumbbell, Plus, Trash2, X, Pencil,
   CheckCircle2, Loader2, Activity, Target, Calendar, Scale, Flame,
   TrendingUp, ArrowUp, ArrowDown, Bell, Eye, ClipboardList, LineChart, Table2,
+  Maximize2,
 } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -192,6 +194,7 @@ function BarChartSVG({
 export function MyClients() {
   const { user } = useAuth();
   const { t } = useI18n();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [clients, setClients] = useState<ClientProfile[]>([]);
   const [allPlans, setAllPlans] = useState<ClientPlan[]>([]);
@@ -693,7 +696,20 @@ export function MyClients() {
 
                 {/* Sheets tab */}
                 {tab === "sheets" && selectedClient && (
-                  <ClientSpreadsheets clientId={selectedClient.id} clientName={selectedClient.full_name || t("pro.unnamedClient")} />
+                  <div className="flex flex-col gap-3">
+                    <div className="flex justify-end">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigate(`/my-clients/${selectedClient.id}/spreadsheets`)}
+                        className="gap-1.5"
+                      >
+                        <Maximize2 className="h-4 w-4" />
+                        Abrir planilha em tela cheia
+                      </Button>
+                    </div>
+                    <ClientSpreadsheets clientId={selectedClient.id} clientName={selectedClient.full_name || t("pro.unnamedClient")} />
+                  </div>
                 )}
 
                 {/* Progress tab with diet/workout sub-tabs */}

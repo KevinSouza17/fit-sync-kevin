@@ -19,6 +19,7 @@ import { Workout } from "./pages/Workout";
 import { WorkoutProgression } from "./pages/WorkoutProgression";
 import { Appointments } from "./pages/Appointments";
 import { MyClients } from "./pages/MyClients";
+import { ClientSpreadsheetsPage } from "./pages/ClientSpreadsheetsPage";
 import { Feed } from "./pages/Feed";
 import { Explore } from "./pages/Explore";
 import { Syncs } from "./pages/Syncs";
@@ -127,6 +128,7 @@ export default function App() {
           <Route path="/workout/progression" element={<WorkoutProgression />} />
           <Route path="/appointments" element={<Appointments />} />
           <Route path="/my-clients" element={<ProfessionalRoute><MyClients /></ProfessionalRoute>} />
+          <Route path="/my-clients/:clientId/spreadsheets" element={<ProfessionalRoute><ClientSpreadsheetsPage /></ProfessionalRoute>} />
         </Route>
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
