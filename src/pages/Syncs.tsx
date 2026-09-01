@@ -89,7 +89,6 @@ export function Syncs() {
   const videoRefs = useRef<Record<string, HTMLVideoElement | null>>({});
   const containerRef = useRef<HTMLDivElement>(null);
   const touchRef = useRef<TouchSwipe>({ startY: 0, currentY: 0, active: false });
-  const viewedSyncs = useRef<Set<string>>(new Set());
 
   const loadSyncs = useCallback(async () => {
     setLoading(true);
@@ -128,20 +127,18 @@ export function Syncs() {
     if (syncs.length === 0) return;
     const currentSync = syncs[currentIndex];
     if (!currentSync) return;
-    Object.entries(videoRefs.current).forEach(([id, video]) => {
-      if (!video) return;
-      if (id === currentSync.id) {
-        video.play().catch(() => {});
-      } else {
-        video.pause();
-      }
+    const video = videoRefs.current[currentSync.id];
+    if (!video) return;
+    video.play().catch(() => {});
+    Object.entries(videoRefs.current).forEach(([id, v]) => {
+      if (v && id !== currentSync.id) v.pause();
     });
-    if (!viewedSyncs.current.has(currentSync.id)) {
-      viewedSyncs.current.add(currentSync.id);
-      supabase.rpc("increment_sync_view", { p_sync_id: currentSync.id }).then(() => {
-        setSyncs((prev) => prev.map((s) => s.id === currentSync.id ? { ...s, view_count: s.view_count + 1 } : s));
-      });
-    }
+    const handlePlay = () => {
+      supabase.rpc("increment_sync_view", { p_sync_id: currentSync.id });
+      setSyncs((prev) => prev.map((s) => s.id === currentSync.id ? { ...s, view_count: s.view_count + 1 } : s));
+    };
+    video.addEventListener("play", handlePlay);
+    return () => video.removeEventListener("play", handlePlay);
   }, [currentIndex, syncs]);
 
   function handleScroll(direction: "up" | "down") {
