@@ -153,8 +153,8 @@ export function Dashboard() {
     if (weightRes.data?.[0]) setLatestWeight(Number(weightRes.data[0].weight_kg));
     if (planRes.data) setDietPlan(planRes.data as ClientPlan);
     if (streakRes.data) setStreak(streakRes.data as { current_streak: number; longest_streak: number });
-    // Generate personalized diet recommendation from onboarding answers if no pro plan
-    if (!planRes.data && onboardingRes.data) {
+    // Generate personalized diet recommendation from onboarding answers if no pro plan and not dismissed
+    if (!planRes.data && onboardingRes.data && !(onboardingRes.data as { recommendation_dismissed?: boolean }).recommendation_dismissed) {
       const oa = onboardingRes.data as {
         goal: string; experience_level: string; workout_days: number;
         diet_preference: string; allergies: string[] | null; equipment: string[] | null;
@@ -609,7 +609,7 @@ export function Dashboard() {
                       <UtensilsCrossed className="h-4 w-4 text-primary-600" />
                       <h3 className="text-base font-semibold text-content-strong">Plano alimentar recomendado</h3>
                     </div>
-                    <button onClick={() => setRecommendedMeals(null)} className="rounded-lg p-1.5 text-content-muted transition-colors hover:bg-red-50 hover:text-red-600" title="Remover recomendação">
+                    <button onClick={async () => { setRecommendedMeals(null); await supabase.from("onboarding_answers").update({ recommendation_dismissed: true }).eq("user_id", user?.id ?? ""); }} className="rounded-lg p-1.5 text-content-muted transition-colors hover:bg-red-50 hover:text-red-600" title="Remover recomendação">
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
