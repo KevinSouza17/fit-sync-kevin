@@ -525,3 +525,13 @@ export type Follow = Database["public"]["Tables"]["follows"]["Row"];
 export type FeedComment = Database["public"]["Tables"]["feed_comments"]["Row"];
 export type DietStreak = Database["public"]["Tables"]["diet_streaks"]["Row"];
 export type OnboardingAnswers = Database["public"]["Tables"]["onboarding_answers"]["Row"];
+export type ClientSpreadsheet = {
+  id: string;
+  professional_id: string;
+  client_id: string;
+  title: string;
+  sheet_type: "diet" | "workout";
+  data: string[][];
+  created_at: string;
+  updated_at: string;
+};

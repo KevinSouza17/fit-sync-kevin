@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Users, UserPlus, UtensilsCrossed, Dumbbell, Plus, Trash2, X, Pencil,
   CheckCircle2, Loader2, Activity, Target, Calendar, Scale, Flame,
-  TrendingUp, ArrowUp, ArrowDown, Bell, Eye, ClipboardList, LineChart,
+  TrendingUp, ArrowUp, ArrowDown, Bell, Eye, ClipboardList, LineChart, Table2,
 } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -14,6 +14,7 @@ import { AutoTextarea } from "../components/ui/textarea";
 import { supabase } from "../lib/supabase";
 import type { ClientPlan, Meal, WeightLog, WorkoutLog } from "../lib/types";
 import { cn } from "../lib/utils";
+import { ClientSpreadsheets } from "../components/ClientSpreadsheets";
 
 interface ClientProfile {
   id: string; full_name: string; avatar_url: string | null;
@@ -209,7 +210,7 @@ export function MyClients() {
   const [fatPct, setFatPct] = useState("");
   const [meals, setMeals] = useState<MealEntry[]>([{ name: "", items: "" }]);
   const [days, setDays] = useState<DayEntry[]>([{ name: "", exercises: "" }]);
-  const [tab, setTab] = useState<"plans" | "progress" | "profile">("plans");
+  const [tab, setTab] = useState<"plans" | "sheets" | "progress" | "profile">("plans");
   const [planFilter, setPlanFilter] = useState<"all" | "diet" | "workout">("all");
   const [progressTab, setProgressTab] = useState<"diet" | "workout">("diet");
 
@@ -565,6 +566,7 @@ export function MyClients() {
                 <div className="flex gap-1 rounded-xl bg-surface-subtle p-1">
                   {([
                     { k: "plans" as const, label: t("plans.title"), icon: ClipboardList },
+                    { k: "sheets" as const, label: "Planilhas", icon: Table2 },
                     { k: "progress" as const, label: t("progress.title"), icon: TrendingUp },
                     { k: "profile" as const, label: t("profile.title"), icon: Eye },
                   ]).map((tb) => (
@@ -687,6 +689,11 @@ export function MyClients() {
                       </div>
                     )}
                   </div>
+                )}
+
+                {/* Sheets tab */}
+                {tab === "sheets" && selectedClient && (
+                  <ClientSpreadsheets clientId={selectedClient.id} clientName={selectedClient.full_name || t("pro.unnamedClient")} />
                 )}
 
                 {/* Progress tab with diet/workout sub-tabs */}
