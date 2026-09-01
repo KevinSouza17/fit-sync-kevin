@@ -65,6 +65,7 @@ export function Messages() {
   const [sendingAudio, setSendingAudio] = useState(false);
   const [recordTime, setRecordTime] = useState(0);
   const [otherTyping, setOtherTyping] = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -467,7 +468,7 @@ export function Messages() {
                     <div key={m.id} className={`group flex ${isMine ? "justify-end" : "justify-start"}`}>
                       <div className={`relative max-w-[75%] break-words text-sm leading-relaxed ${isMine ? "bg-primary-600 text-white" : "bg-white text-slate-700"} ${m.content && (m.media_type === "image" || m.media_type === "video" || m.media_type === "file") ? "rounded-2xl" : "rounded-2xl px-4 py-2.5 shadow-sm"} ${isMine && m.content && (m.media_type === "image" || m.media_type === "video" || m.media_type === "file") ? "rounded-br-md" : isMine ? "rounded-br-md" : "rounded-bl-md"} ${!m.content && (m.media_type === "image" || m.media_type === "video") ? "overflow-hidden" : ""}`}>
                         {m.media_type === "image" && m.media_url && (
-                          <img src={m.media_url} alt="" className="block max-h-60 w-full rounded-2xl object-cover" />
+                          <img src={m.media_url} alt="" className="block max-h-60 w-full cursor-zoom-in rounded-2xl object-cover" onClick={() => setLightboxUrl(m.media_url)} />
                         )}
                         {m.media_type === "video" && m.media_url && (
                           <video src={m.media_url} controls playsInline className="block max-h-60 w-full rounded-2xl" />
@@ -606,6 +607,26 @@ export function Messages() {
         </section>
       )}
       <InviteModal open={inviteOpen} onClose={() => setInviteOpen(false)} />
+
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4"
+          onClick={() => setLightboxUrl(null)}
+        >
+          <button
+            onClick={() => setLightboxUrl(null)}
+            className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+          >
+            <X className="h-5 w-5" />
+          </button>
+          <img
+            src={lightboxUrl}
+            alt=""
+            className="max-h-full max-w-full rounded-lg object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   );
 }
