@@ -14,6 +14,8 @@ interface Subscription {
   status: string;
   current_period_end: string | null;
   cancel_at_period_end: boolean;
+  past_due_since: string | null;
+  locked_at: string | null;
 }
 
 interface ToggleProps {
@@ -64,28 +66,40 @@ export function Settings() {
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutMsg, setCheckoutMsg] = useState<"success" | "cancelled" | null>(null);
+  const [subLocked, setSubLocked] = useState(false);
 
   const isProfessional = profile?.is_professional ?? false;
 
-  useEffect(() => {
-    if (searchParams.get("checkout") === "success") {
-      setCheckoutMsg("success");
-      searchParams.delete("checkout");
-    } else if (searchParams.get("checkout") === "cancelled") {
-      setCheckoutMsg("cancelled");
-    }
-  }, [searchParams]);
+  const checkoutParam = searchParams.get("checkout");
+  const subscriptionParam = searchParams.get("subscription");
 
   useEffect(() => {
-    if (!isProfessional) return;
+    if (checkoutParam === "success") {
+      setCheckoutMsg("success");
+    } else if (checkoutParam === "cancelled") {
+      setCheckoutMsg("cancelled");
+    }
+  }, [checkoutParam]);
+
+  useEffect(() => {
+    if (subscriptionParam === "locked") setSubLocked(true);
+  }, [subscriptionParam]);
+
+  useEffect(() => {
+    if (!isProfessional || !profile?.id) return;
+    let cancelled = false;
     (async () => {
       const { data } = await supabase
         .from("subscriptions")
-        .select("id, status, current_period_end, cancel_at_period_end")
-        .eq("user_id", profile!.id)
+        .select("id, status, current_period_end, cancel_at_period_end, past_due_since, locked_at")
+        .eq("user_id", profile.id)
         .maybeSingle();
-      if (data) setSubscription(data as Subscription);
+      if (!cancelled && data) {
+        setSubscription(data as Subscription);
+        if ((data as Subscription).locked_at) setSubLocked(true);
+      }
     })();
+    return () => { cancelled = true; };
   }, [isProfessional, profile]);
 
   async function handleCheckout() {
@@ -292,6 +306,20 @@ export function Settings() {
             {checkoutMsg === "cancelled" && (
               <div className="mb-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
                 Checkout cancelado. Você pode tentar novamente a qualquer momento.
+              </div>
+            )}
+
+            {subLocked && (
+              <div className="mb-4 space-y-3 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
+                <p className="flex items-center gap-2 font-semibold">
+                  <Lock className="h-4 w-4" />
+                  Assinatura bloqueada
+                </p>
+                <p>O pagamento da sua assinatura está em atraso e o período de tolerância terminou. Suas funcionalidades profissionais estão bloqueadas até que o pagamento seja regularizado.</p>
+                <Button className="w-full gap-2 bg-emerald-600 hover:bg-emerald-700" onClick={handleCheckout} disabled={checkoutLoading}>
+                  {checkoutLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}
+                  {checkoutLoading ? "Redirecionando..." : "Regularizar pagamento"}
+                </Button>
               </div>
             )}
 

@@ -544,6 +544,8 @@ export type Subscription = {
   status: string;
   current_period_end: string | null;
   cancel_at_period_end: boolean;
+  past_due_since: string | null;
+  locked_at: string | null;
   created_at: string;
   updated_at: string;
 };

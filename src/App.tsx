@@ -57,10 +57,21 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 function ProfessionalRoute({ children }: { children: React.ReactNode }) {
   const { user, profile, loading } = useAuth();
+  const [subLocked, setSubLocked] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!user || !profile?.is_professional) return;
+    supabase.rpc("is_pro_locked", { p_user: user.id }).then(({ data }) => {
+      setSubLocked(!!data);
+    });
+  }, [user, profile?.is_professional]);
+
   if (loading) return <PageLoader />;
   if (!user) return <Navigate to="/login" replace />;
   if (profile?.is_banned) return <Navigate to="/login" replace />;
   if (!profile?.is_professional) return <Navigate to="/dashboard" replace />;
+  if (subLocked === null) return <PageLoader />;
+  if (subLocked) return <Navigate to="/settings?subscription=locked" replace />;
   return <>{children}</>;
 }
 

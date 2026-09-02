@@ -17,8 +17,9 @@ const supabase = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
 );
 
-const PRICE_ID = Deno.env.get("STRIPE_PRICE_ID") ?? "";
+const PRODUCT_ID = Deno.env.get("STRIPE_PRODUCT_ID") ?? "prod_VBdzApsh34hvDI";
 const TRIAL_DAYS = 7;
+const MONTHLY_AMOUNT_BRL = 2500; // R$ 25.00 in cents
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -61,11 +62,19 @@ Deno.serve(async (req) => {
       customerId = customer.id;
     }
 
-    // Create checkout session
+    // Create checkout session with inline pricing from product
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: "subscription",
-      line_items: [{ price: PRICE_ID, quantity: 1 }],
+      line_items: [{
+        price_data: {
+          currency: "brl",
+          product: PRODUCT_ID,
+          unit_amount: MONTHLY_AMOUNT_BRL,
+          recurring: { interval: "month" },
+        },
+        quantity: 1,
+      }],
       subscription_data: {
         trial_period_days: TRIAL_DAYS,
         metadata: { supabase_uid: user.id },
@@ -80,7 +89,7 @@ Deno.serve(async (req) => {
       user_id: user.id,
       stripe_customer_id: customerId,
       status: session.status ?? "incomplete",
-      stripe_price_id: PRICE_ID,
+      stripe_price_id: null,
     }, { onConflict: "user_id" });
 
     return new Response(JSON.stringify({ url: session.url }), {
