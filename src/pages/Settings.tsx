@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Bell, Shield, Moon, Globe, Key, Check, Loader2, Eye, EyeOff, Smartphone, QrCode, Lock, Trash2, AlertTriangle } from "lucide-react";
+import { Bell, Shield, Moon, Globe, Key, Check, Loader2, Eye, EyeOff, Smartphone, QrCode, Lock, Trash2, AlertTriangle, CreditCard, Crown, Calendar, ExternalLink } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -7,7 +7,14 @@ import { useTheme } from "../context/ThemeContext";
 import { useI18n, type Lang } from "../context/I18nContext";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+
+interface Subscription {
+  id: string;
+  status: string;
+  current_period_end: string | null;
+  cancel_at_period_end: boolean;
+}
 
 interface ToggleProps {
   enabled: boolean;
@@ -43,6 +50,8 @@ const notifItems = [
 export function Settings() {
   const { darkMode, reducedMotion, toggleDarkMode, toggleReducedMotion } = useTheme();
   const { t, lang, setLang } = useI18n();
+  const { profile } = useAuth();
+  const [searchParams] = useSearchParams();
   const [notifToggles, setNotifToggles] = useState<Record<string, boolean>>({
     mealReminders: true,
     waterAlerts: true,
@@ -52,6 +61,55 @@ export function Settings() {
   const [activeModal, setActiveModal] = useState<"password" | "twofactor" | "delete" | null>(null);
   const [mfaEnabled, setMfaEnabled] = useState(false);
   const [mfaLoading, setMfaLoading] = useState(true);
+  const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [checkoutMsg, setCheckoutMsg] = useState<"success" | "cancelled" | null>(null);
+
+  const isProfessional = profile?.is_professional ?? false;
+
+  useEffect(() => {
+    if (searchParams.get("checkout") === "success") {
+      setCheckoutMsg("success");
+      searchParams.delete("checkout");
+    } else if (searchParams.get("checkout") === "cancelled") {
+      setCheckoutMsg("cancelled");
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!isProfessional) return;
+    (async () => {
+      const { data } = await supabase
+        .from("subscriptions")
+        .select("id, status, current_period_end, cancel_at_period_end")
+        .eq("user_id", profile!.id)
+        .maybeSingle();
+      if (data) setSubscription(data as Subscription);
+    })();
+  }, [isProfessional, profile]);
+
+  async function handleCheckout() {
+    setCheckoutLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stripe-checkout`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${session.access_token}`,
+          "Content-Type": "application/json",
+        },
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    } catch {
+      // ignore
+    } finally {
+      setCheckoutLoading(false);
+    }
+  }
 
   const langOptions: { value: Lang; label: string }[] = [
     { value: "pt", label: "Português (Brasil)" },
@@ -210,6 +268,79 @@ export function Settings() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Professional billing */}
+      {isProfessional && (
+        <Card className="border-emerald-200 dark:border-emerald-800">
+          <CardContent className="p-5">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-900/20">
+                <Crown className="h-5 w-5 text-emerald-600" />
+              </div>
+              <div>
+                <h2 className="text-base font-semibold text-content-strong">Assinatura Profissional</h2>
+                <p className="text-xs text-content-muted">Plano PRO · R$ 25/mês</p>
+              </div>
+            </div>
+
+            {checkoutMsg === "success" && (
+              <div className="mb-4 flex items-center gap-2 rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400">
+                <Check className="h-4 w-4" />
+                Assinatura ativada! Seus 7 dias de teste começaram.
+              </div>
+            )}
+            {checkoutMsg === "cancelled" && (
+              <div className="mb-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
+                Checkout cancelado. Você pode tentar novamente a qualquer momento.
+              </div>
+            )}
+
+            {subscription && (subscription.status === "active" || subscription.status === "trialing") ? (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 rounded-xl bg-emerald-50 px-4 py-3 dark:bg-emerald-900/20">
+                  <Check className="h-5 w-5 text-emerald-600" />
+                  <div>
+                    <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">
+                      {subscription.status === "trialing" ? "Período de teste ativo" : "Assinatura ativa"}
+                    </p>
+                    {subscription.current_period_end && (
+                      <p className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-500">
+                        <Calendar className="h-3 w-3" />
+                        {subscription.cancel_at_period_end ? "Cancela em" : "Renova em"}{" "}
+                        {new Date(subscription.current_period_end).toLocaleDateString("pt-BR")}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <Button variant="outline" className="gap-2" disabled>
+                  <CreditCard className="h-4 w-4" />
+                  Gerenciar no Stripe
+                  <ExternalLink className="h-3 w-3" />
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="rounded-xl bg-surface-subtle p-4">
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-2xl font-bold text-content-strong">R$ 25</span>
+                    <span className="text-sm text-content-muted">/mês</span>
+                  </div>
+                  <ul className="mt-3 space-y-1.5 text-sm text-content-body">
+                    <li className="flex items-center gap-2"><Check className="h-4 w-4 text-emerald-600" /> Clientes ilimitados</li>
+                    <li className="flex items-center gap-2"><Check className="h-4 w-4 text-emerald-600" /> Planos alimentares e de treino</li>
+                    <li className="flex items-center gap-2"><Check className="h-4 w-4 text-emerald-600" /> Agendamento de consultas</li>
+                    <li className="flex items-center gap-2"><Check className="h-4 w-4 text-emerald-600" /> 7 dias grátis · Cancele quando quiser</li>
+                  </ul>
+                </div>
+                <Button className="w-full gap-2 bg-emerald-600 hover:bg-emerald-700" onClick={handleCheckout} disabled={checkoutLoading}>
+                  {checkoutLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}
+                  {checkoutLoading ? "Redirecionando..." : "Assinar agora"}
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Danger zone */}
       <Card className="border-red-200">
