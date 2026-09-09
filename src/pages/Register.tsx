@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Mail, Lock, Eye, EyeOff, User, Briefcase, GraduationCap, Award, MapPin, Building2, AtSign, Activity, TrendingUp, Users, DollarSign, Check } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, User, Briefcase, GraduationCap, Award, MapPin, Building2, AtSign, Activity, Check } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { FitSyncLogo } from "../components/FitSyncLogo";
@@ -31,18 +31,6 @@ const specialties = [
   "Outro",
 ];
 
-const userBenefits = [
-  { icon: TrendingUp, title: "Acompanhe metas", desc: "Calorias, treinos e progresso" },
-  { icon: Users, title: "Conecte-se", desc: "Encontre profissionais qualificados" },
-  { icon: Activity, title: "Comunidade", desc: "Compartilhe receitas e dicas" },
-];
-
-const proBenefits = [
-  { icon: Users, title: "Gerencie clientes", desc: "Planos alimentares e de treino" },
-  { icon: TrendingUp, title: "Amplie alcance", desc: "Conecte-se com novos alunos" },
-  { icon: DollarSign, title: "Agende consultas", desc: "Calendário integrado" },
-];
-
 export function Register() {
   const [accountType, setAccountType] = useState<"user" | "professional">("user");
   const [showPassword, setShowPassword] = useState(false);
@@ -53,6 +41,7 @@ export function Register() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -73,6 +62,10 @@ export function Register() {
     setError("");
     if (password !== confirm) {
       setError(t("register.passwordMismatch"));
+      return;
+    }
+    if (!acceptedTerms) {
+      setError("Você precisa aceitar os Termos de Uso e a Política de Privacidade para criar uma conta.");
       return;
     }
     if (password.length < 6) {
@@ -128,79 +121,13 @@ export function Register() {
   }
 
   const isPro = accountType === "professional";
-  const benefits = isPro ? proBenefits : userBenefits;
-  const accentColor = isPro ? "emerald" : "primary";
 
   return (
-    <div className="flex min-h-screen">
-      {/* Left brand panel */}
-      <div className={`relative hidden w-1/2 flex-col justify-between overflow-hidden p-12 transition-colors duration-500 lg:flex ${
-        isPro
-          ? "bg-gradient-to-br from-emerald-700 via-emerald-600 to-emerald-800"
-          : "bg-gradient-to-br from-primary-700 via-primary-600 to-primary-800"
-      }`}>
-        {/* Decorative background pattern */}
-        <div className="pointer-events-none absolute inset-0 opacity-10">
-          <div className="absolute -right-20 -top-20 h-72 w-72 rounded-full bg-white blur-3xl" />
-          <div className="absolute bottom-10 -left-10 h-64 w-64 rounded-full bg-white blur-3xl" />
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 via-white to-primary-50/40 px-4 py-12 dark:from-slate-950 dark:via-slate-900 dark:to-primary-900/10 sm:px-8">
+      <div className="mx-auto w-full max-w-md">
+        <div className="mb-6 flex justify-center">
+          <FitSyncLogo size="md" />
         </div>
-
-        <FitSyncLogo size="sm" textClassName="text-white" />
-
-        <div className="relative space-y-8">
-          <div className="space-y-3">
-            <h2 className="text-4xl font-bold leading-tight text-white">
-              {isPro ? (
-                <>Conecte-se com<br />seus clientes.</>
-              ) : (
-                <>Comece sua jornada<br />hoje mesmo.</>
-              )}
-            </h2>
-            <p className={`text-base leading-relaxed ${isPro ? "text-emerald-100" : "text-primary-100"}`}>
-              {isPro
-                ? "Gerencie pacientes, crie planos alimentares e de treino, e amplie seu alcance como profissional de saúde e fitness."
-                : "Defina suas metas, acompanhe seu progresso e transforme seus hábitos com o suporte de nossa comunidade."}
-            </p>
-          </div>
-
-          <div className="space-y-4">
-            {benefits.map((b, i) => (
-              <div key={i} className="flex items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/15 backdrop-blur-sm">
-                  <b.icon className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-white">{b.title}</p>
-                  <p className={`text-xs ${isPro ? "text-emerald-100" : "text-primary-100"}`}>{b.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {isPro && (
-            <div className="rounded-2xl border border-white/20 bg-white/10 p-4 backdrop-blur-sm">
-              <div className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5 text-white" />
-                <p className="text-sm font-semibold text-white">Plano Profissional</p>
-              </div>
-              <p className="mt-1 text-xs text-emerald-100">
-                R$ 25/mês · Cancele quando quiser · Primeiros 7 dias grátis
-              </p>
-            </div>
-          )}
-        </div>
-
-        <p className={`relative text-sm ${isPro ? "text-emerald-200" : "text-primary-200"}`}>
-          © 2026 FitSync. Todos os direitos reservados.
-        </p>
-      </div>
-
-      {/* Right form panel */}
-      <div className="flex w-full flex-col justify-center bg-gradient-to-br from-slate-50 via-white to-primary-50/40 px-8 py-12 dark:from-slate-950 dark:via-slate-900 dark:to-primary-900/10 lg:w-1/2 lg:px-16">
-        <div className="mx-auto w-full max-w-md">
-          <div className="mb-6 lg:hidden">
-            <FitSyncLogo size="md" />
-          </div>
 
           <div className="mb-7">
             <div className={`mb-3 flex h-12 w-12 items-center justify-center rounded-2xl transition-colors ${
@@ -498,6 +425,24 @@ export function Register() {
               </div>
             )}
 
+            {/* Terms checkbox */}
+            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-edge-base p-4 transition-colors hover:bg-surface-subtle">
+              <button
+                type="button"
+                role="checkbox"
+                aria-checked={acceptedTerms}
+                onClick={() => setAcceptedTerms(!acceptedTerms)}
+                className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-colors ${
+                  acceptedTerms ? "border-primary-600 bg-primary-600" : "border-slate-300"
+                }`}
+              >
+                {acceptedTerms && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
+              </button>
+              <span className="text-xs text-content-body">
+                Li e aceito os <Link to="/terms" className="font-semibold text-primary-600 hover:text-primary-700">Termos de Uso</Link> e a <Link to="/terms" className="font-semibold text-primary-600 hover:text-primary-700">Política de Privacidade</Link>
+              </span>
+            </label>
+
             <Button
               type="submit"
               className={`w-full transition-all ${isPro ? "bg-emerald-600 hover:bg-emerald-700" : ""}`}
@@ -526,7 +471,6 @@ export function Register() {
             </Link>
           </p>
         </div>
-      </div>
     </div>
   );
 }

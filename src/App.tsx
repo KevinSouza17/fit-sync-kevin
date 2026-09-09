@@ -30,6 +30,7 @@ import { MyProfile } from "./pages/MyProfile";
 import { Moderation } from "./pages/Moderation";
 import { Onboarding } from "./pages/Onboarding";
 import { ResetPassword } from "./pages/ResetPassword";
+import { TermsAcceptance } from "./pages/TermsAcceptance";
 import { DashboardLayout } from "./components/layout/DashboardLayout";
 import { PageLoader, SplashScreen } from "./components/PageLoader";
 
@@ -47,6 +48,14 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (loading) return <PageLoader />;
   if (!user) return <Navigate to="/login" replace />;
   if (profile?.is_banned) return <Navigate to="/login" replace />;
+  const isTerms = window.location.pathname === "/terms";
+  if (!isTerms && !profile?.terms_accepted_at) {
+    return <Navigate to="/terms" replace />;
+  }
+  if (isTerms && profile?.terms_accepted_at) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  if (isTerms) return <>{children}</>;
   const isOnboarding = window.location.pathname === "/onboarding";
   if (!isOnboarding && onboardingDue === true) {
     return <Navigate to="/onboarding" replace />;
@@ -141,6 +150,7 @@ export default function App() {
           <Route path="/my-clients" element={<ProfessionalRoute><MyClients /></ProfessionalRoute>} />
           <Route path="/my-clients/:clientId/spreadsheets" element={<ProfessionalRoute><ClientSpreadsheetsPage /></ProfessionalRoute>} />
         </Route>
+        <Route path="/terms" element={<ProtectedRoute><TermsAcceptance /></ProtectedRoute>} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>

@@ -1,18 +1,12 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Mail, Lock, Eye, EyeOff, ArrowLeft, CheckCircle, Activity, TrendingUp, Users, Heart } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, ArrowLeft, CheckCircle, Activity } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { FitSyncLogo } from "../components/FitSyncLogo";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
 import { supabase } from "../lib/supabase";
-
-const brandFeatures = [
-  { icon: TrendingUp, title: "Acompanhe seu progresso", desc: "Metas, peso, treinos e nutrição em um só lugar" },
-  { icon: Users, title: "Conecte-se com profissionais", desc: "Encontre nutricionistas e personal trainers" },
-  { icon: Heart, title: "Comunidade ativa", desc: "Compartilhe receitas, dicas e conquistas" },
-];
 
 export function Login() {
   const [showPassword, setShowPassword] = useState(false);
@@ -59,48 +53,9 @@ export function Login() {
 
   return (
     <div className="flex min-h-screen">
-      {/* Left brand panel */}
-      <div className="relative hidden w-1/2 flex-col justify-between overflow-hidden bg-gradient-to-br from-primary-700 via-primary-600 to-primary-800 p-12 lg:flex">
-        {/* Decorative background pattern */}
-        <div className="pointer-events-none absolute inset-0 opacity-10">
-          <div className="absolute -right-20 -top-20 h-72 w-72 rounded-full bg-white blur-3xl" />
-          <div className="absolute bottom-10 -left-10 h-64 w-64 rounded-full bg-white blur-3xl" />
-        </div>
-
-        <FitSyncLogo size="sm" textClassName="text-white" />
-
-        <div className="relative space-y-8">
-          <div className="space-y-3">
-            <h2 className="text-4xl font-bold leading-tight text-white">
-              Sua jornada<br />de saúde começa aqui.
-            </h2>
-            <p className="text-base leading-relaxed text-primary-100">
-              Acompanhe metas, treinos, nutrição e conecte-se com profissionais — tudo em uma plataforma.
-            </p>
-          </div>
-
-          <div className="space-y-4">
-            {brandFeatures.map((f, i) => (
-              <div key={i} className="flex items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/15 backdrop-blur-sm">
-                  <f.icon className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-white">{f.title}</p>
-                  <p className="text-xs text-primary-100">{f.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <p className="relative text-sm text-primary-200">© 2026 FitSync. Todos os direitos reservados.</p>
-      </div>
-
-      {/* Right form panel */}
-      <div className="flex w-full flex-col justify-center bg-gradient-to-br from-slate-50 via-white to-primary-50/40 px-8 py-12 dark:from-slate-950 dark:via-slate-900 dark:to-primary-900/10 lg:w-1/2 lg:px-16">
+      <div className="flex w-full flex-col justify-center bg-gradient-to-br from-slate-50 via-white to-primary-50/40 px-4 py-12 dark:from-slate-950 dark:via-slate-900 dark:to-primary-900/10 sm:px-8">
         <div className="mx-auto w-full max-w-md">
-          <div className="mb-8 lg:hidden">
+          <div className="mb-8 flex justify-center">
             <FitSyncLogo size="md" />
           </div>
 

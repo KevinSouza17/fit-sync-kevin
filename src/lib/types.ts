@@ -36,6 +36,7 @@ export interface Database {
           macro_protein_pct: number;
           macro_carbs_pct: number;
           macro_fat_pct: number;
+          terms_accepted_at: string | null;
           created_at: string;
           updated_at: string;
         };
