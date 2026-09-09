@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Camera, Save, Check, Briefcase, GraduationCap, Award, MapPin, Loader2, Building2, ShieldCheck, ShieldAlert, User } from "lucide-react";
+import { Camera, Save, Check, Briefcase, GraduationCap, Award, MapPin, Loader2, Building2, ShieldCheck, ShieldAlert, User, Lock, Unlock, AtSign, CreditCard } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -7,6 +7,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "../components/ui/avatar";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
+import { AutoTextarea } from "../components/ui/textarea";
 
 const healthGoals = [
   "Perda de Peso",
@@ -43,6 +44,8 @@ interface FormState {
   available_for_booking: boolean;
   registration_type: "autonomo" | "empresa";
   document_number: string;
+  is_private: boolean;
+  handle: string;
 }
 
 const professionalRoles = [
@@ -93,6 +96,8 @@ export function EditProfile() {
     available_for_booking: false,
     registration_type: "autonomo",
     document_number: "",
+    is_private: false,
+    handle: "",
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -136,6 +141,8 @@ export function EditProfile() {
         available_for_booking: profile.available_for_booking ?? false,
         registration_type: (profile.registration_type as "autonomo" | "empresa") ?? "autonomo",
         document_number: profile.document_number ?? "",
+        is_private: profile.is_private ?? false,
+        handle: profile.handle ?? "",
       });
       setAvatarUrl(profile.avatar_url ?? null);
     }
@@ -185,6 +192,25 @@ export function EditProfile() {
   async function handleSave() {
     if (!user) return;
     setError("");
+
+    const cleanHandle = form.handle.trim().toLowerCase().replace(/[^a-z0-9_]/g, "");
+    if (cleanHandle && cleanHandle.length < 3) {
+      setError("O @ deve ter pelo menos 3 caracteres (apenas letras, números e _).");
+      return;
+    }
+    if (cleanHandle) {
+      const { data: existing } = await supabase
+        .from("profiles")
+        .select("id")
+        .ilike("handle", cleanHandle)
+        .neq("id", user.id)
+        .maybeSingle();
+      if (existing) {
+        setError("Este @ já está em uso. Escolha outro.");
+        return;
+      }
+    }
+
     setSaving(true);
     const payload = {
       full_name: form.full_name,
@@ -204,11 +230,14 @@ export function EditProfile() {
       available_for_booking: form.is_professional ? form.available_for_booking : false,
       registration_type: form.is_professional ? form.registration_type : "autonomo",
       document_number: form.is_professional ? form.document_number : null,
+      is_private: form.is_private,
+      handle: cleanHandle || null,
       updated_at: new Date().toISOString(),
     };
     const { error: err } = await supabase
       .from("profiles")
-      .upsert({ id: user.id, ...payload });
+      .update(payload)
+      .eq("id", user.id);
     if (err) {
       setError("Erro ao salvar. Tente novamente.");
     } else {
@@ -347,6 +376,21 @@ export function EditProfile() {
                     placeholder="Seu nome completo"
                   />
                 </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-sm font-medium text-content-body">@ (usuário)</label>
+                  <div className="relative">
+                    <AtSign className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <Input
+                      type="text"
+                      value={form.handle}
+                      onChange={(e) => setField("handle", e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
+                      placeholder="seunome"
+                      className="pl-9"
+                      maxLength={20}
+                    />
+                  </div>
+                  <p className="text-xs text-content-muted">Apenas letras, números e _. Seu link: /@seunome</p>
+                </div>
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium text-content-body">E-mail</label>
                   <Input type="email" value={user?.email ?? ""} disabled className="bg-surface-subtle text-content-muted" />
@@ -360,6 +404,38 @@ export function EditProfile() {
                     className="bg-surface-subtle text-content-muted"
                   />
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="flex items-center gap-2 text-base font-semibold text-content-strong">
+                    {form.is_private ? <Lock className="h-5 w-5 text-amber-500" /> : <Unlock className="h-5 w-5 text-emerald-500" />}
+                    Perfil Privado
+                  </h2>
+                  <p className="mt-1 text-sm text-content-muted">
+                    {form.is_private
+                      ? "Apenas seus seguidores podem ver suas postagens."
+                      : "Qualquer pessoa pode ver suas postagens e informações."}
+                  </p>
+                </div>
+                <button
+                  role="switch"
+                  aria-checked={form.is_private}
+                  onClick={() => setField("is_private", !form.is_private)}
+                  className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+                    form.is_private ? "bg-amber-500" : "bg-slate-200"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      form.is_private ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                </button>
               </div>
             </CardContent>
           </Card>
@@ -413,28 +489,39 @@ export function EditProfile() {
                   <Briefcase className="h-5 w-5 text-emerald-600" />
                   Conta Profissional
                 </h2>
-                <label className="flex cursor-pointer items-center gap-2">
-                  <span className="text-sm text-content-body">Ativar</span>
-                  <button
-                    role="switch"
-                    aria-checked={form.is_professional}
-                    onClick={() => setField("is_professional", !form.is_professional)}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      form.is_professional ? "bg-primary-600" : "bg-slate-200"
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        form.is_professional ? "translate-x-6" : "translate-x-1"
-                      }`}
-                    />
-                  </button>
-                </label>
               </div>
               {!form.is_professional ? (
                 <div className="rounded-xl border border-dashed border-edge-base p-6 text-center">
                   <Briefcase className="mx-auto mb-2 h-8 w-8 text-slate-300" />
                   <p className="text-sm text-content-muted">Ative sua conta profissional para oferecer serviços e aparecer na busca de profissionais</p>
+                  <div className="mt-4 rounded-lg bg-emerald-50 p-4 text-left dark:bg-emerald-900/20">
+                    <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">Plano Profissional — R$ 25/mês</p>
+                    <p className="mt-1 text-xs text-emerald-600 dark:text-emerald-500">7 dias de teste grátis · Cancele quando quiser</p>
+                    <p className="mt-2 text-xs text-content-muted">Para ativar sua conta profissional, é necessário assinar o plano mensal. Após o pagamento, as funcionalidades profissionais serão liberadas.</p>
+                    <Button
+                      className="mt-3 w-full bg-emerald-600 hover:bg-emerald-700"
+                      onClick={async () => {
+                        try {
+                          const { data: { session } } = await supabase.auth.getSession();
+                          if (!session) return;
+                          const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stripe-checkout`, {
+                            method: "POST",
+                            headers: {
+                              "Authorization": `Bearer ${session.access_token}`,
+                              "Content-Type": "application/json",
+                            },
+                          });
+                          const data = await res.json();
+                          if (data.url) window.location.href = data.url;
+                        } catch {
+                          setError("Erro ao iniciar pagamento. Tente novamente.");
+                        }
+                      }}
+                    >
+                      <CreditCard className="h-4 w-4" />
+                      Assinar R$ 25/mês
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -553,8 +640,8 @@ export function EditProfile() {
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-sm font-medium text-content-body">Bio Profissional</label>
-                    <textarea
-                      rows={3}
+                    <AutoTextarea
+                      minRows={3}
                       placeholder="Descreva sua experiência e abordagem profissional..."
                       value={form.bio}
                       onChange={(e) => setField("bio", e.target.value)}
