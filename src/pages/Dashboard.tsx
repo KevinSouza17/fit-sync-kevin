@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { Droplets, Flame, Scale, Plus, X, Search, UtensilsCrossed, Coffee, Sun, Moon, Cookie } from "lucide-react";
+import { Droplets, Flame, Scale, Plus, X, Search, UtensilsCrossed, Coffee, Sun, Moon, Cookie, Trash2, SlidersHorizontal } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";
 import { Progress } from "../components/ui/progress";
 import { Button } from "../components/ui/button";
@@ -35,6 +35,7 @@ interface MealForm {
   protein_g: string;
   carbs_g: string;
   fat_g: string;
+  fiber_g: string;
 }
 
 const emptyForm: MealForm = {
@@ -44,6 +45,7 @@ const emptyForm: MealForm = {
   protein_g: "",
   carbs_g: "",
   fat_g: "",
+  fiber_g: "",
 };
 
 export function Dashboard() {
@@ -66,7 +68,13 @@ export function Dashboard() {
   const [searching, setSearching] = useState(false);
   const [selectedFood, setSelectedFood] = useState<Food | null>(null);
   const [servings, setServings] = useState("1");
+  const [unitMode, setUnitMode] = useState<"portions" | "grams">("portions");
+  const [grams, setGrams] = useState("100");
   const [customEntry, setCustomEntry] = useState(false);
+  const [showMacroModal, setShowMacroModal] = useState(false);
+  const [macroProtein, setMacroProtein] = useState(30);
+  const [macroCarbs, setMacroCarbs] = useState(45);
+  const [macroFat, setMacroFat] = useState(25);
   const searchRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
@@ -85,9 +93,14 @@ export function Dashboard() {
   ];
 
   const [dietPlan, setDietPlan] = useState<ClientPlan | null>(null);
+  const [streak, setStreak] = useState<{ current_streak: number; longest_streak: number } | null>(null);
+  const [recommendedMeals, setRecommendedMeals] = useState<{ meal: string; items: string; calories: number; protein: number }[] | null>(null);
 
   const calGoal = dietPlan?.target_calories ?? profile?.daily_calorie_goal ?? 2400;
   const waterGoal = profile?.daily_water_goal_liters ?? 2.5;
+  const pPct = profile?.macro_protein_pct ?? 30;
+  const cPct = profile?.macro_carbs_pct ?? 45;
+  const fPct = profile?.macro_fat_pct ?? 25;
 
   useEffect(() => {
     loadData();
@@ -125,11 +138,13 @@ export function Dashboard() {
 
   async function loadData() {
     setLoading(true);
-    const [mealsRes, waterRes, weightRes, planRes] = await Promise.all([
+    const [mealsRes, waterRes, weightRes, planRes, streakRes, onboardingRes] = await Promise.all([
       supabase.from("meals").select("*").eq("logged_date", today).order("created_at"),
       supabase.from("water_logs").select("amount_liters").eq("logged_date", today),
       supabase.from("weight_logs").select("weight_kg, logged_date").order("logged_date", { ascending: false }).limit(1),
       supabase.from("client_plans").select("*").eq("client_id", user?.id ?? "").eq("plan_type", "diet").eq("active", true).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+      supabase.from("diet_streaks").select("current_streak, longest_streak").eq("user_id", user?.id ?? "").maybeSingle(),
+      supabase.from("onboarding_answers").select("*").eq("user_id", user?.id ?? "").maybeSingle(),
     ]);
     if (mealsRes.data) setMeals(mealsRes.data);
     if (waterRes.data) {
@@ -137,6 +152,26 @@ export function Dashboard() {
     }
     if (weightRes.data?.[0]) setLatestWeight(Number(weightRes.data[0].weight_kg));
     if (planRes.data) setDietPlan(planRes.data as ClientPlan);
+    if (streakRes.data) setStreak(streakRes.data as { current_streak: number; longest_streak: number });
+    // Generate personalized diet recommendation from onboarding answers if no pro plan and not dismissed
+    if (!planRes.data && onboardingRes.data && !(onboardingRes.data as { recommendation_dismissed?: boolean }).recommendation_dismissed) {
+      const oa = onboardingRes.data as {
+        goal: string; experience_level: string; workout_days: number;
+        diet_preference: string; allergies: string[] | null; equipment: string[] | null;
+      };
+      const { generateDietPlan } = await import("../lib/recommendations");
+      const meals = generateDietPlan({
+        goal: oa.goal as never,
+        experience: oa.experience_level as never,
+        workout_days: oa.workout_days,
+        diet: oa.diet_preference as never,
+        allergies: oa.allergies,
+        equipment: oa.equipment ?? [],
+      }, latestWeight ?? profile?.weight_kg ?? 75);
+      setRecommendedMeals(meals);
+    } else {
+      setRecommendedMeals(null);
+    }
     setLoading(false);
   }
 
@@ -165,13 +200,10 @@ export function Dashboard() {
     debounceRef.current = setTimeout(() => searchFoods(value), 250);
   }
 
-  function selectFood(food: Food) {
-    setSelectedFood(food);
-    setFoodSearch(food.name);
-    setFoodResults([]);
-    setServings("1");
-    setCustomEntry(false);
-    const n = parseFloat(servings) || 1;
+  function computeFromFood(food: Food, mode: "portions" | "grams", amount: string) {
+    const n = mode === "grams"
+      ? (parseFloat(amount) || 100) / 100
+      : parseFloat(amount) || 1;
     setForm({
       ...form,
       name: food.name,
@@ -179,21 +211,31 @@ export function Dashboard() {
       protein_g: String((Number(food.protein_g) * n).toFixed(1)),
       carbs_g: String((Number(food.carbs_g) * n).toFixed(1)),
       fat_g: String((Number(food.fat_g) * n).toFixed(1)),
+      fiber_g: String((Number(food.fiber_g) * n).toFixed(1)),
     });
   }
 
-  function updateServings(value: string) {
-    setServings(value);
+  function selectFood(food: Food) {
+    setSelectedFood(food);
+    setFoodSearch(food.name);
+    setFoodResults([]);
+    setServings("1");
+    setGrams("100");
+    setCustomEntry(false);
+    computeFromFood(food, unitMode, unitMode === "grams" ? "100" : "1");
+  }
+
+  function updateAmount(value: string) {
+    if (unitMode === "grams") setGrams(value);
+    else setServings(value);
     if (!selectedFood) return;
-    const n = parseFloat(value) || 1;
-    setForm({
-      ...form,
-      name: selectedFood.name,
-      calories: String(Math.round(selectedFood.calories * n)),
-      protein_g: String((Number(selectedFood.protein_g) * n).toFixed(1)),
-      carbs_g: String((Number(selectedFood.carbs_g) * n).toFixed(1)),
-      fat_g: String((Number(selectedFood.fat_g) * n).toFixed(1)),
-    });
+    computeFromFood(selectedFood, unitMode, value);
+  }
+
+  function switchUnitMode(mode: "portions" | "grams") {
+    setUnitMode(mode);
+    if (!selectedFood) return;
+    computeFromFood(selectedFood, mode, mode === "grams" ? grams : servings);
   }
 
   function openMealModal() {
@@ -202,6 +244,8 @@ export function Dashboard() {
     setFoodResults([]);
     setSelectedFood(null);
     setServings("1");
+    setGrams("100");
+    setUnitMode("portions");
     setCustomEntry(false);
     setShowMealModal(true);
   }
@@ -224,10 +268,11 @@ export function Dashboard() {
   const totalProtein = meals.reduce((s, m) => s + Number(m.protein_g), 0);
   const totalCarbs = meals.reduce((s, m) => s + Number(m.carbs_g), 0);
   const totalFat = meals.reduce((s, m) => s + Number(m.fat_g), 0);
+  const totalFiber = meals.reduce((s, m) => s + Number(m.fiber_g ?? 0), 0);
 
-  const proteinGoal = dietPlan?.target_protein_g != null ? Math.round(Number(dietPlan.target_protein_g)) : Math.round(calGoal * 0.3 / 4);
-  const carbsGoal = dietPlan?.target_carbs_g != null ? Math.round(Number(dietPlan.target_carbs_g)) : Math.round(calGoal * 0.45 / 4);
-  const fatGoal = dietPlan?.target_fat_g != null ? Math.round(Number(dietPlan.target_fat_g)) : Math.round(calGoal * 0.25 / 9);
+  const proteinGoal = dietPlan?.target_protein_g != null ? Math.round(Number(dietPlan.target_protein_g)) : Math.round(calGoal * pPct / 100 / 4);
+  const carbsGoal = dietPlan?.target_carbs_g != null ? Math.round(Number(dietPlan.target_carbs_g)) : Math.round(calGoal * cPct / 100 / 4);
+  const fatGoal = dietPlan?.target_fat_g != null ? Math.round(Number(dietPlan.target_fat_g)) : Math.round(calGoal * fPct / 100 / 9);
 
   const calPct = Math.min(100, Math.round((totalCalories / calGoal) * 100));
   const radius = 80;
@@ -246,11 +291,22 @@ export function Dashboard() {
         protein_g: parseFloat(form.protein_g) || 0,
         carbs_g: parseFloat(form.carbs_g) || 0,
         fat_g: parseFloat(form.fat_g) || 0,
+        fiber_g: parseFloat(form.fiber_g) || 0,
         logged_date: today,
       })
       .select()
       .single();
     if (data) setMeals((prev) => [...prev, data]);
+    // Update streak
+    if (user) {
+      const { data: streakData } = await supabase.rpc("upsert_diet_streak", { p_user: user.id, p_log_date: today });
+      if (streakData !== null) {
+        setStreak((prev) => ({
+          current_streak: streakData as number,
+          longest_streak: Math.max(prev?.longest_streak ?? 0, streakData as number),
+        }));
+      }
+    }
     setForm(emptyForm);
     setShowMealModal(false);
     setSaving(false);
@@ -259,6 +315,36 @@ export function Dashboard() {
   async function deleteMeal(id: string) {
     await supabase.from("meals").delete().eq("id", id);
     setMeals((prev) => prev.filter((m) => m.id !== id));
+  }
+
+  async function deleteDietPlan() {
+    if (!dietPlan) return;
+    if (!confirm("Excluir o plano alimentar recebido?")) return;
+    const { error } = await supabase.from("client_plans").delete().eq("id", dietPlan.id);
+    if (error) {
+      alert("Erro ao excluir plano: " + error.message);
+    } else {
+      setDietPlan(null);
+    }
+  }
+
+  async function saveMacros() {
+    setSaving(true);
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        macro_protein_pct: macroProtein,
+        macro_carbs_pct: macroCarbs,
+        macro_fat_pct: macroFat,
+      })
+      .eq("id", user?.id ?? "");
+    if (error) {
+      alert("Erro ao salvar macros: " + error.message);
+    } else {
+      setShowMacroModal(false);
+      window.location.reload();
+    }
+    setSaving(false);
   }
 
   async function logWater() {
@@ -313,10 +399,12 @@ export function Dashboard() {
     },
   ];
 
+  const fiberGoal = 25;
   const macros = [
     { name: t("dashboard.protein"), current: totalProtein, goal: proteinGoal, unit: "g", color: "bg-primary-500" },
     { name: t("dashboard.carbs"), current: totalCarbs, goal: carbsGoal, unit: "g", color: "bg-orange-400" },
     { name: t("dashboard.fat"), current: totalFat, goal: fatGoal, unit: "g", color: "bg-violet-500" },
+    { name: t("foods.fiber"), current: totalFiber, goal: fiberGoal, unit: "g", color: "bg-green-500" },
   ];
 
   return (
@@ -340,6 +428,19 @@ export function Dashboard() {
         </div>
       ) : (
         <>
+          {/* Streak banner */}
+          {streak && streak.current_streak > 0 && (
+            <div className="flex items-center gap-3 rounded-xl border border-orange-200 bg-gradient-to-r from-orange-50 to-amber-50 p-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-100">
+                <Flame className="h-5 w-5 text-orange-500" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-orange-700">Sequência de {streak.current_streak} {streak.current_streak === 1 ? "dia" : "dias"}!</p>
+                <p className="text-xs text-orange-600">Continue registrando suas refeições para manter o pego. Recorde: {streak.longest_streak} dias</p>
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             {summaryCards.map((card) => (
               <Card
@@ -383,7 +484,23 @@ export function Dashboard() {
                   </div>
                 </div>
                 <div className="flex flex-1 flex-col gap-5">
-                  <h3 className="text-lg font-semibold text-content-strong">{t("dashboard.macros")}</h3>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-content-strong">{t("dashboard.macros")}</h3>
+                    {!dietPlan && (
+                      <button
+                        onClick={() => {
+                          setMacroProtein(pPct);
+                          setMacroCarbs(cPct);
+                          setMacroFat(fPct);
+                          setShowMacroModal(true);
+                        }}
+                        className="rounded-lg p-1.5 text-content-muted transition-colors hover:bg-surface-base hover:text-primary-600"
+                        title="Ajustar divisão de macros"
+                      >
+                        <SlidersHorizontal className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
                   {macros.map((m) => (
                     <div key={m.name} className="flex flex-col gap-2">
                       <div className="flex items-center justify-between">
@@ -439,7 +556,7 @@ export function Dashboard() {
                               <div>
                                 <p className="text-sm font-medium text-content-strong">{meal.name}</p>
                                 <p className="mt-0.5 text-xs text-content-muted">
-                                  P:{Math.round(Number(meal.protein_g))}g C:{Math.round(Number(meal.carbs_g))}g G:{Math.round(Number(meal.fat_g))}g
+                                  P:{Math.round(Number(meal.protein_g))}g C:{Math.round(Number(meal.carbs_g))}g G:{Math.round(Number(meal.fat_g))}g F:{Math.round(Number(meal.fiber_g ?? 0))}g
                                 </p>
                               </div>
                               <div className="flex items-center gap-2">
@@ -464,9 +581,14 @@ export function Dashboard() {
             {dietPlan && (dietPlan.content as DietPlanContent)?.meals?.length ? (
               <Card>
                 <CardContent className="p-5">
-                  <div className="mb-3 flex items-center gap-2">
-                    <UtensilsCrossed className="h-4 w-4 text-primary-600" />
-                    <h3 className="text-base font-semibold text-content-strong">{dietPlan.title}</h3>
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <UtensilsCrossed className="h-4 w-4 text-primary-600" />
+                      <h3 className="text-base font-semibold text-content-strong">{dietPlan.title}</h3>
+                    </div>
+                    <button onClick={deleteDietPlan} className="rounded-lg p-1.5 text-content-muted transition-colors hover:bg-red-50 hover:text-red-600" title="Excluir plano alimentar">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
                   </div>
                   {dietPlan.description && <p className="mb-3 text-xs text-content-muted">{dietPlan.description}</p>}
                   <div className="flex flex-col gap-2">
@@ -474,6 +596,33 @@ export function Dashboard() {
                       <div key={i} className="rounded-xl border border-edge-base bg-surface-subtle p-3">
                         <p className="text-sm font-semibold text-content-strong">{m.name}</p>
                         {m.items && <p className="mt-1 text-xs text-content-body whitespace-pre-line">{m.items}</p>}
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            ) : recommendedMeals && recommendedMeals.length > 0 ? (
+              <Card>
+                <CardContent className="p-5">
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <UtensilsCrossed className="h-4 w-4 text-primary-600" />
+                      <h3 className="text-base font-semibold text-content-strong">Plano alimentar recomendado</h3>
+                    </div>
+                    <button onClick={async () => { setRecommendedMeals(null); await supabase.from("onboarding_answers").update({ recommendation_dismissed: true }).eq("user_id", user?.id ?? ""); }} className="rounded-lg p-1.5 text-content-muted transition-colors hover:bg-red-50 hover:text-red-600" title="Remover recomendação">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <p className="mb-3 text-xs text-content-muted">Personalizado para voce com base no seu questionario inicial</p>
+                  <div className="flex flex-col gap-2">
+                    {recommendedMeals.map((m, i) => (
+                      <div key={i} className="rounded-xl border border-edge-base bg-surface-subtle p-3">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-semibold text-content-strong">{m.meal}</p>
+                          <span className="text-xs font-medium text-primary-600">{m.calories} kcal</span>
+                        </div>
+                        <p className="mt-1 text-xs text-content-body">{m.items}</p>
+                        <p className="mt-1 text-[11px] text-content-muted">~{m.protein}g proteina</p>
                       </div>
                     ))}
                   </div>
@@ -555,7 +704,7 @@ export function Dashboard() {
                           <div className="shrink-0 text-right">
                             <p className="text-sm font-semibold text-content-body">{food.calories} kcal</p>
                             <p className="text-[10px] text-content-muted">
-                              P:{food.protein_g}g C:{food.carbs_g}g G:{food.fat_g}g
+                              P:{food.protein_g}g C:{food.carbs_g}g G:{food.fat_g}g F:{food.fiber_g}g
                             </p>
                           </div>
                         </button>
@@ -584,17 +733,31 @@ export function Dashboard() {
                     </button>
                   </div>
                   <div className="mt-2 flex items-center gap-2">
-                    <label className="text-xs font-medium text-content-body">{t("dashboard.portions")}</label>
+                    <div className="flex rounded-lg border border-primary-200 bg-surface-card p-0.5">
+                      <button
+                        onClick={() => switchUnitMode("portions")}
+                        className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${unitMode === "portions" ? "bg-primary-500 text-white" : "text-content-muted hover:text-content-body"}`}
+                      >
+                        Porções
+                      </button>
+                      <button
+                        onClick={() => switchUnitMode("grams")}
+                        className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${unitMode === "grams" ? "bg-primary-500 text-white" : "text-content-muted hover:text-content-body"}`}
+                      >
+                        Gramas
+                      </button>
+                    </div>
                     <input
                       type="number"
-                      step="0.5"
-                      min="0.25"
-                      value={servings}
-                      onChange={(e) => updateServings(e.target.value)}
-                      className="w-20 rounded-lg border border-primary-300 bg-surface-card px-2 py-1 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-200"
+                      step={unitMode === "grams" ? "5" : "0.5"}
+                      min={unitMode === "grams" ? "1" : "0.25"}
+                      value={unitMode === "grams" ? grams : servings}
+                      onChange={(e) => updateAmount(e.target.value)}
+                      className="w-24 rounded-lg border border-primary-300 bg-surface-card px-2 py-1 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-200"
                     />
+                    <span className="text-xs text-content-muted">{unitMode === "grams" ? "g" : "porção(ões)"}</span>
                   </div>
-                  <div className="mt-2 grid grid-cols-4 gap-2 text-center">
+                  <div className="mt-2 grid grid-cols-5 gap-2 text-center">
                     <div className="rounded-lg bg-surface-card px-2 py-1">
                       <p className="text-sm font-bold text-content-strong">{form.calories}</p>
                       <p className="text-[10px] text-content-muted">kcal</p>
@@ -610,6 +773,10 @@ export function Dashboard() {
                     <div className="rounded-lg bg-surface-card px-2 py-1">
                       <p className="text-sm font-bold text-amber-600">{form.fat_g}</p>
                       <p className="text-[10px] text-content-muted">Gord (g)</p>
+                    </div>
+                    <div className="rounded-lg bg-surface-card px-2 py-1">
+                      <p className="text-sm font-bold text-green-600">{form.fiber_g || "0"}</p>
+                      <p className="text-[10px] text-content-muted">Fibra (g)</p>
                     </div>
                   </div>
                 </div>
@@ -657,6 +824,10 @@ export function Dashboard() {
                     <div>
                       <label className="text-sm font-medium text-content-body">{t("dashboard.fat")}</label>
                       <Input className="mt-1" type="number" placeholder="0" value={form.fat_g} onChange={(e) => setForm({ ...form, fat_g: e.target.value })} />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-content-body">{t("foods.fiber")}</label>
+                      <Input className="mt-1" type="number" placeholder="0" value={form.fiber_g} onChange={(e) => setForm({ ...form, fiber_g: e.target.value })} />
                     </div>
                   </div>
                 </>
@@ -750,6 +921,76 @@ export function Dashboard() {
               <Button variant="outline" className="flex-1" onClick={() => setShowWeightModal(false)}>{t("cancel")}</Button>
               <Button className="flex-1" onClick={logWeight} disabled={saving || !newWeight}>
                 {saving ? t("saving") : t("dashboard.register")}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Macro Editor Modal */}
+      {showMacroModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-surface-card p-6 shadow-xl">
+            <div className="mb-5 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-content-strong">Ajustar Macros</h2>
+              <button onClick={() => setShowMacroModal(false)} className="text-content-muted hover:text-content-body">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <p className="mb-4 text-xs text-content-muted">
+              Defina a porcentagem de cada macronutriente. A soma deve ser 100%. As metas em gramas sao calculadas a partir de {calGoal} kcal.
+            </p>
+            <div className="space-y-4">
+              <div>
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-content-body">Proteina</label>
+                  <span className="text-sm font-semibold text-primary-600">{macroProtein}% = {Math.round(calGoal * macroProtein / 100 / 4)}g</span>
+                </div>
+                <input type="range" min="5" max="60" value={macroProtein}
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value);
+                    setMacroProtein(v);
+                    setMacroFat(100 - v - macroCarbs);
+                  }}
+                  className="mt-2 w-full accent-primary-600"
+                />
+              </div>
+              <div>
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-content-body">Carboidratos</label>
+                  <span className="text-sm font-semibold text-orange-600">{macroCarbs}% = {Math.round(calGoal * macroCarbs / 100 / 4)}g</span>
+                </div>
+                <input type="range" min="5" max="70" value={macroCarbs}
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value);
+                    setMacroCarbs(v);
+                    setMacroFat(100 - v - macroProtein);
+                  }}
+                  className="mt-2 w-full accent-orange-500"
+                />
+              </div>
+              <div>
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-content-body">Gorduras</label>
+                  <span className="text-sm font-semibold text-amber-600">{macroFat}% = {Math.round(calGoal * macroFat / 100 / 9)}g</span>
+                </div>
+                <input type="range" min="5" max="60" value={macroFat}
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value);
+                    setMacroFat(v);
+                    setMacroCarbs(100 - v - macroProtein);
+                  }}
+                  className="mt-2 w-full accent-amber-500"
+                />
+              </div>
+              <div className={`rounded-lg p-3 text-center text-sm font-semibold ${macroProtein + macroCarbs + macroFat === 100 ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
+                Total: {macroProtein + macroCarbs + macroFat}%
+              </div>
+            </div>
+            <div className="mt-5 flex gap-3">
+              <Button variant="outline" className="flex-1" onClick={() => setShowMacroModal(false)}>Cancelar</Button>
+              <Button className="flex-1" onClick={saveMacros} disabled={saving || macroProtein + macroCarbs + macroFat !== 100}>
+                {saving ? "Salvando..." : "Salvar"}
               </Button>
             </div>
           </div>

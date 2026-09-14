@@ -9,6 +9,7 @@ import { useAuth } from "../context/AuthContext";
 import { useNotifications } from "../context/NotificationsContext";
 import { InviteModal } from "../components/InviteModal";
 import { useI18n } from "../context/I18nContext";
+import { AutoTextarea } from "../components/ui/textarea";
 
 interface Professional {
   id: string;
@@ -316,7 +317,7 @@ export function Team() {
                 </div>
                 <div>
                   <label className="text-sm font-medium text-content-body">{t("appointments.notes")}</label>
-                  <textarea rows={3} placeholder={t("appointments.notesPlaceholder")} value={bookingForm.notes} onChange={(e) => setBookingForm({ ...bookingForm, notes: e.target.value })} className="mt-1 flex w-full rounded-lg border border-edge-base bg-surface-card px-3 py-2 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100" />
+                  <AutoTextarea minRows={3} placeholder={t("appointments.notesPlaceholder")} value={bookingForm.notes} onChange={(e) => setBookingForm({ ...bookingForm, notes: e.target.value })} className="mt-1 flex w-full rounded-lg border border-edge-base bg-surface-card px-3 py-2 text-sm text-content-strong focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100" />
                 </div>
                 <div className="flex gap-3">
                   <Button variant="outline" className="flex-1" onClick={() => setBookingTarget(null)}>{t("cancel")}</Button>

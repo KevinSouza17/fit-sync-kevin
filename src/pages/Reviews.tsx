@@ -6,6 +6,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "../components/ui/avatar";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
 import { supabase } from "../lib/supabase";
+import { AutoTextarea } from "../components/ui/textarea";
 import type { SiteReview } from "../lib/types";
 import { cn } from "../lib/utils";
 
@@ -115,7 +116,7 @@ export function Reviews() {
   const taCls = "w-full rounded-xl border border-edge-base bg-surface-base px-4 py-3 text-sm text-content-strong placeholder:text-content-muted focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100";
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 px-4 py-6 sm:px-6">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 sm:p-6 lg:p-8">
       <header>
         <h1 className="text-2xl font-bold text-content-strong">{t("reviews.title")}</h1>
         <p className="mt-0.5 text-sm text-content-muted">{t("reviews.subtitle")}</p>
@@ -165,11 +166,11 @@ export function Reviews() {
             )}
           </div>
           <StarRow value={rating} onChange={setRating} />
-          <textarea
+          <AutoTextarea
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             placeholder={t("reviews.commentPlaceholder")}
-            rows={3}
+            minRows={3}
             className={taCls}
           />
           {error && <p className="text-sm text-red-500">{error}</p>}
