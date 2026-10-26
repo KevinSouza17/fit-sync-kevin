@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Mail, Lock, Eye, EyeOff, User, Briefcase, GraduationCap, Award, MapPin, Building2, AtSign, Activity, Check } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, User, Briefcase, GraduationCap, Award, MapPin, Building2, AtSign, Check } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { FitSyncLogo } from "../components/FitSyncLogo";
@@ -130,11 +130,6 @@ export function Register() {
         </div>
 
           <div className="mb-7">
-            <div className={`mb-3 flex h-12 w-12 items-center justify-center rounded-2xl transition-colors ${
-              isPro ? "bg-emerald-50 dark:bg-emerald-900/20" : "bg-primary-50 dark:bg-primary-900/20"
-            }`}>
-              <Activity className={`h-6 w-6 ${isPro ? "text-emerald-600" : "text-primary-600"}`} />
-            </div>
             <h1 className="text-2xl font-bold text-content-strong">Criar uma conta</h1>
             <p className="mt-1.5 text-sm text-content-muted">Comece sua jornada de saúde hoje mesmo</p>
           </div>
