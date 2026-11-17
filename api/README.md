@@ -45,6 +45,18 @@ Onde `<slug>` é o nome da função (ex.: `send-invite`).
 - `postman/` — coleção do Postman pronta para importar
 - `examples/` — exemplos de requisição (curl) e resposta
 
+## Como testar no Swagger
+
+1. Uma especificação OpenAPI está disponível em `public/fitsync-openapi.json`
+   (acessível em `/fitsync-openapi.json` no app publicado).
+2. Para testar visualmente no navegador, o app tem uma página integrada em
+   `/api-tester` (visível no menu lateral para administradores). Ela carrega o
+   token JWT da sessão automaticamente e permite enviar requisições reais para
+   cada endpoint, exibindo status e corpo da resposta.
+3. Alternativamente, importe `fitsync-openapi.json` em qualquer leitor Swagger
+   (ex.: editor.swagger.io, Postman também aceita OpenAPI) usando a URL do
+   arquivo ou o conteúdo colado.
+
 ## Como testar no Postman
 
 1. Importe o arquivo `api/postman/fitsync-api.postman_collection.json` no Postman.

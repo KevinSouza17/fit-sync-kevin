@@ -32,6 +32,7 @@ import { Onboarding } from "./pages/Onboarding";
 import { ResetPassword } from "./pages/ResetPassword";
 import { TermsAcceptance } from "./pages/TermsAcceptance";
 import { Welcome } from "./pages/Welcome";
+import ApiTester from "./pages/ApiTester";
 import { DashboardLayout } from "./components/layout/DashboardLayout";
 import { PageLoader, SplashScreen } from "./components/PageLoader";
 
@@ -154,6 +155,7 @@ export default function App() {
         </Route>
         <Route path="/terms" element={<ProtectedRoute><TermsAcceptance /></ProtectedRoute>} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/api-tester" element={<ApiTester />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </BrowserRouter>

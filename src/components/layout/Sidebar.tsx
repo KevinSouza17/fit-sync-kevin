@@ -23,6 +23,7 @@ import {
   Star,
   Trophy,
   Video,
+  PlayCircle,
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { Avatar, AvatarImage, AvatarFallback } from "../ui/avatar";
@@ -83,6 +84,7 @@ const navSections: NavSection[] = [
       { to: "/achievements", key: "nav.achievements", icon: Trophy },
       { to: "/notifications", key: "nav.notifications", icon: Bell },
       { to: "/settings", key: "nav.settings", icon: Settings },
+      { to: "/api-tester", key: "nav.apiTester", icon: PlayCircle, ownerOnly: true },
     ],
   },
 ];

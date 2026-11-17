@@ -1,0 +1,343 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "FitSync API",
+    "description": "APIs (Edge Functions) do FitSync. As rotas autenticadas exigem um JWT de sessão do Supabase Auth no header `Authorization: Bearer <token>`.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://ryqzwvmzysohgqxbwtoj.supabase.co/functions/v1",
+      "description": "Supabase Edge Functions"
+    }
+  ],
+  "tags": [
+    { "name": "notify-message", "description": "Notifica o destinatário de uma conversa sobre uma nova mensagem" },
+    { "name": "send-invite", "description": "Envia um convite (com código de 6 dígitos) para outro usuário via e-mail" },
+    { "name": "stripe-checkout", "description": "Cria uma sessão de checkout do Stripe para a assinatura PRO" },
+    { "name": "stripe-webhook", "description": "Recebe eventos do Stripe e atualiza assinaturas (chamada pelo Stripe)" }
+  ],
+  "paths": {
+    "/notify-message": {
+      "post": {
+        "tags": ["notify-message"],
+        "summary": "Notificar nova mensagem",
+        "description": "Valida o JWT do remetente, busca a conversa pelo `conversationId`, determina o destinatário e registra a notificação.",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/NotifyMessageRequest" },
+              "examples": {
+                "exemplo": {
+                  "value": {
+                    "conversationId": "11111111-1111-1111-1111-111111111111",
+                    "content": "Olá, tudo bem?"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/OkResponse" },
+                "example": { "ok": true }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": {
+            "description": "Conversa não encontrada",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "example": { "error": "Conversa não encontrada." }
+              }
+            }
+          },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/send-invite": {
+      "post": {
+        "tags": ["send-invite"],
+        "summary": "Enviar convite para conversar",
+        "description": "Procura o usuário pelo e-mail, impede autoconvite, gera um código de 6 dígitos e cria uma notificação no app do convidado.",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SendInviteRequest" },
+              "examples": {
+                "exemplo": {
+                  "value": { "email": "amigo@exemplo.com" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/OkResponse" },
+                "example": { "ok": true }
+              }
+            }
+          },
+          "400": {
+            "description": "E-mail faltando, autoconvite ou e-mail não corresponde ao usuário",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "examples": {
+                  "email_faltando": { "value": { "error": "E-mail é obrigatório." } },
+                  "autoconvite": { "value": { "error": "Você não pode convidar a si mesmo." } },
+                  "email_incorreto": { "value": { "error": "Este e-mail não pertence à pessoa selecionada." } }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": {
+            "description": "E-mail não tem conta no FitSync",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "example": { "error": "Este e-mail ainda não tem conta no FitSync. Peça para a pessoa se cadastrar primeiro." }
+              }
+            }
+          },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/stripe-checkout": {
+      "post": {
+        "tags": ["stripe-checkout"],
+        "summary": "Criar sessão de checkout Stripe (assinatura PRO)",
+        "description": "Identifica o usuário pelo JWT, cria (ou reutiliza) o cliente Stripe e cria uma sessão de checkout de assinatura mensal (R$ 25,00/mês, 7 dias de teste grátis). Retorna a URL de checkout.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "description": "Usado para montar as URLs de sucesso/cancelamento do checkout",
+            "schema": { "type": "string" },
+            "example": "https://meu-app.com"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": { "type": "object", "nullable": true },
+              "example": {}
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "URL do checkout criada",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CheckoutResponse" },
+                "example": { "url": "https://checkout.stripe.com/c/pay/cs_test_..." }
+              }
+            }
+          },
+          "401": {
+            "description": "Não autenticado",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "example": { "error": "Unauthorized" }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "example": { "error": "Mensagem do erro" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stripe-webhook": {
+      "post": {
+        "tags": ["stripe-webhook"],
+        "summary": "Webhook do Stripe",
+        "description": "Recebe eventos do Stripe (checkout concluído, assinatura atualizada/cancelada, pagamento falho/sucedido) e atualiza o estado das assinaturas no banco. Não usa JWT — a validação é feita via header `stripe-signature`.",
+        "security": [],
+        "parameters": [
+          {
+            "name": "stripe-signature",
+            "in": "header",
+            "required": true,
+            "description": "Assinatura do evento enviada pelo Stripe",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/StripeEvent" },
+              "examples": {
+                "checkout_completo": {
+                  "summary": "checkout.session.completed",
+                  "value": {
+                    "id": "evt_1",
+                    "object": "event",
+                    "type": "checkout.session.completed",
+                    "data": {
+                      "object": {
+                        "object": "checkout.session",
+                        "id": "cs_test_...",
+                        "customer": "cus_...",
+                        "subscription": "sub_...",
+                        "metadata": { "userId": "11111111-1111-1111-1111-111111111111" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Evento recebido e processado",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ReceivedResponse" },
+                "example": { "received": true }
+              }
+            }
+          },
+          "400": {
+            "description": "Assinatura inválida ou ausente",
+            "content": {
+              "text/plain": {
+                "schema": { "type": "string" },
+                "example": "Missing signature"
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "example": { "error": "Mensagem do erro" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Token de sessão do Supabase Auth. Faça login no app para obter o access_token."
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Requisição inválida",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+            "example": { "error": "conversationId e content são obrigatórios." }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Não autenticado",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+            "example": { "error": "Não autenticado." }
+          }
+        }
+      },
+      "ServerError": {
+        "description": "Erro interno do servidor",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+            "example": { "error": "Erro interno." }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "NotifyMessageRequest": {
+        "type": "object",
+        "required": ["conversationId", "content"],
+        "properties": {
+          "conversationId": { "type": "string", "format": "uuid", "description": "ID da conversa" },
+          "content": { "type": "string", "description": "Conteúdo da mensagem" }
+        }
+      },
+      "SendInviteRequest": {
+        "type": "object",
+        "required": ["email"],
+        "properties": {
+          "email": { "type": "string", "format": "email", "description": "E-mail do usuário convidado" },
+          "expectedUserId": { "type": "string", "format": "uuid", "description": "ID esperado do convidado (validação extra)" }
+        }
+      },
+      "OkResponse": {
+        "type": "object",
+        "properties": { "ok": { "type": "boolean" } }
+      },
+      "CheckoutResponse": {
+        "type": "object",
+        "required": ["url"],
+        "properties": { "url": { "type": "string", "description": "URL do Stripe Checkout" } }
+      },
+      "ReceivedResponse": {
+        "type": "object",
+        "properties": { "received": { "type": "boolean" } }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": { "error": { "type": "string" } }
+      },
+      "StripeEvent": {
+        "type": "object",
+        "required": ["id", "type"],
+        "properties": {
+          "id": { "type": "string" },
+          "object": { "type": "string", "default": "event" },
+          "type": { "type": "string", "description": "Tipo do evento, ex. checkout.session.completed" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "object": { "type": "object", "description": "Payload do objeto relacionado ao evento" }
+            }
+          }
+        }
+      }
+    }
+  }
+}
