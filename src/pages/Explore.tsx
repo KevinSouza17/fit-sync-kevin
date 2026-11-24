@@ -206,7 +206,7 @@ export function Explore() {
     score: number,
     reason: string | null,
   ) {
-    const name = post.full_name || "Usuario";
+    const name = post.full_name || "Usuário";
     const isLiked = likedPosts.has(post.id);
     const likes = likeCounts[post.id] || 0;
     const comments = commentCounts[post.id] || 0;
@@ -312,7 +312,7 @@ export function Explore() {
               {tabKey === "trending" ? (
                 <><Flame className="h-4 w-4" /> Em alta</>
               ) : (
-                <><Sparkles className="h-4 w-4" /> Para voce</>
+                <><Sparkles className="h-4 w-4" /> Para você</>
               )}
               {tab === tabKey && <span className="absolute inset-x-0 bottom-0 h-1 rounded-full bg-primary-500" />}
             </button>
@@ -334,7 +334,7 @@ export function Explore() {
                   <Eye className="h-4 w-4 text-primary-600" />
                   <h3 className="text-sm font-semibold text-content-strong">Seus interesses</h3>
                 </div>
-                <p className="mb-3 text-xs text-content-muted">Com base nas postagens que voce curte e comenta</p>
+                <p className="mb-3 text-xs text-content-muted">Com base nas postagens que você curte e comenta</p>
                 <div className="flex flex-wrap gap-2">
                   {userInterests.slice(0, 8).map((interest) => (
                     <button
@@ -358,7 +358,7 @@ export function Explore() {
               <div className="rounded-xl border border-edge-base bg-surface-card p-4">
                 <div className="mb-2 flex items-center gap-2">
                   <TrendingUp className="h-4 w-4 text-primary-600" />
-                  <h3 className="text-sm font-semibold text-content-strong">Trending topics</h3>
+                  <h3 className="text-sm font-semibold text-content-strong">Assuntos em alta</h3>
                 </div>
                 <div className="flex flex-col gap-1.5">
                   {trendingTags.slice(0, 8).map((tag, i) => (
@@ -374,7 +374,7 @@ export function Explore() {
                           {tag.tag}
                         </p>
                         <p className="text-xs text-content-muted">
-                          {tag.posts_24h} posts hoje · {tag.likes_24h} curtidas · {tag.comments_24h} comentarios
+                          {tag.posts_24h} postagens hoje · {tag.likes_24h} curtidas · {tag.comments_24h} comentários
                         </p>
                       </div>
                       <span className="flex items-center gap-1 text-[11px] font-bold text-orange-500">
@@ -421,12 +421,12 @@ export function Explore() {
                 <Card><CardContent className="flex flex-col items-center py-16 text-center">
                   <Sparkles className="mb-3 h-12 w-12 text-slate-200" />
                   <h3 className="text-base font-semibold text-content-body">
-                    {tab === "trending" ? "Nada em alta agora" : "Nenhuma recomendacao ainda"}
+                    {tab === "trending" ? "Nada em alta agora" : "Nenhuma recomendação ainda"}
                   </h3>
                   <p className="mt-1 text-sm text-content-muted">
                     {tab === "trending"
-                      ? "As postagens mais populares das ultimas 24h aparecerão aqui."
-                      : "Curta e comente postagens para recebermos recomendacoes personalizadas."}
+                      ? "As postagens mais populares das últimas 24h aparecerão aqui."
+                      : "Curta e comente postagens para recebermos recomendações personalizadas."}
                   </p>
                 </CardContent></Card>
               ) : (
@@ -456,7 +456,7 @@ export function Explore() {
         open={!!sharePost}
         onClose={() => setSharePost(null)}
         shareUrl={`${window.location.origin}/profile/${sharePost?.user_id}`}
-        shareText={sharePost?.content || "Confira este post no FitSync!"}
+        shareText={sharePost?.content || "Confira esta postagem no FitSync!"}
         mediaUrl={sharePost?.video_url || sharePost?.image_url}
         mediaType={sharePost?.video_url ? "video" : "image"}
       />
