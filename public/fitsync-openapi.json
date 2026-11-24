@@ -17979,6 +17979,47 @@
         "bearerFormat": "JWT",
         "description": "Access token de uma sessão autenticada do app. Cole somente o JWT, sem escrever “Bearer”."
       }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Requisição inválida",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "error": "Campos obrigatórios faltando."
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Não autenticado",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "error": "Não autenticado."
+            }
+          }
+        }
+      },
+      "ServerError": {
+        "description": "Erro interno do servidor",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "error": "Erro interno."
+            }
+          }
+        }
+      }
     }
   },
   "x-generated-from": "Supabase live schema metadata + project OpenAPI 2026-11-23; public data rows were not read."
