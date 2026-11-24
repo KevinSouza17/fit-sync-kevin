@@ -135,7 +135,7 @@ export function Moderation() {
           onClick={() => setTab("users")}
           className={`px-4 py-2.5 text-sm font-semibold transition-colors ${tab === "users" ? "border-b-2 border-primary-600 text-primary-600" : "text-content-muted hover:text-content-strong"}`}
         >
-          Usuarios ({users.length})
+          Usuários ({users.length})
         </button>
         <button
           onClick={() => setTab("posts")}

@@ -115,7 +115,7 @@ export function StoryViewer({ group, index, onIndexChange, onClose, allGroups, o
   }, [index, group]);
 
   if (!story) return null;
-  const name = story.profiles?.full_name || "Usuario";
+  const name = story.profiles?.full_name || "Usuário";
 
   function storyTimeAgo(dateStr: string) {
     const diff = Date.now() - new Date(dateStr).getTime();

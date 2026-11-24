@@ -436,7 +436,7 @@ export function Dashboard() {
               </div>
               <div>
                 <p className="text-sm font-bold text-orange-700">Sequência de {streak.current_streak} {streak.current_streak === 1 ? "dia" : "dias"}!</p>
-                <p className="text-xs text-orange-600">Continue registrando suas refeições para manter o pego. Recorde: {streak.longest_streak} dias</p>
+                <p className="text-xs text-orange-600">Continue registrando suas refeições para manter o pique. Recorde: {streak.longest_streak} dias</p>
               </div>
             </div>
           )}
@@ -613,7 +613,7 @@ export function Dashboard() {
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
-                  <p className="mb-3 text-xs text-content-muted">Personalizado para voce com base no seu questionario inicial</p>
+                  <p className="mb-3 text-xs text-content-muted">Personalizado para você com base no seu questionário inicial</p>
                   <div className="flex flex-col gap-2">
                     {recommendedMeals.map((m, i) => (
                       <div key={i} className="rounded-xl border border-edge-base bg-surface-subtle p-3">
@@ -622,7 +622,7 @@ export function Dashboard() {
                           <span className="text-xs font-medium text-primary-600">{m.calories} kcal</span>
                         </div>
                         <p className="mt-1 text-xs text-content-body">{m.items}</p>
-                        <p className="mt-1 text-[11px] text-content-muted">~{m.protein}g proteina</p>
+                        <p className="mt-1 text-[11px] text-content-muted">~{m.protein}g proteína</p>
                       </div>
                     ))}
                   </div>
@@ -943,7 +943,7 @@ export function Dashboard() {
             <div className="space-y-4">
               <div>
                 <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium text-content-body">Proteina</label>
+                  <label className="text-sm font-medium text-content-body">Proteína</label>
                   <span className="text-sm font-semibold text-primary-600">{macroProtein}% = {Math.round(calGoal * macroProtein / 100 / 4)}g</span>
                 </div>
                 <input type="range" min="5" max="60" value={macroProtein}

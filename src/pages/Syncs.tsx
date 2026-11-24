@@ -501,9 +501,9 @@ export function Syncs() {
             {/* Bottom info */}
             <div className="absolute bottom-24 left-3 right-20 z-10 sm:bottom-28 sm:left-4 sm:right-24">
               <div className="mb-3 flex items-center gap-3">
-                <AvatarPreview src={sync.profiles?.avatar_url} name={sync.profiles?.full_name || "Usuario"} userId={sync.user_id} size="sm" />
+                <AvatarPreview src={sync.profiles?.avatar_url} name={sync.profiles?.full_name || "Usuário"} userId={sync.user_id} size="sm" />
                 <button onClick={() => navigate(`/profile/${sync.user_id}`)} className="text-left">
-                  <p className="text-sm font-bold text-white hover:underline">{sync.profiles?.full_name || "Usuario"}</p>
+                  <p className="text-sm font-bold text-white hover:underline">{sync.profiles?.full_name || "Usuário"}</p>
                 </button>
                 <span className="text-xs text-white/60">{timeAgo(sync.created_at)}</span>
               </div>
@@ -579,10 +579,10 @@ export function Syncs() {
                 <div className="flex flex-col gap-3">
                   {(comments[currentSync.id] || []).map((c) => (
                     <div key={c.id} className="flex gap-3">
-                      <AvatarPreview src={c.profiles?.avatar_url} name={c.profiles?.full_name || "Usuario"} userId={c.user_id} size="sm" />
+                      <AvatarPreview src={c.profiles?.avatar_url} name={c.profiles?.full_name || "Usuário"} userId={c.user_id} size="sm" />
                       <div>
                         <p className="text-sm">
-                          <span className="font-semibold text-content-strong">{c.profiles?.full_name || "Usuario"}</span>{" "}
+                          <span className="font-semibold text-content-strong">{c.profiles?.full_name || "Usuário"}</span>{" "}
                           <span className="text-content-body">{c.content}</span>
                         </p>
                         <p className="text-xs text-content-muted">{timeAgo(c.created_at)}</p>

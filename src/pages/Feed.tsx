@@ -662,7 +662,7 @@ export function Feed() {
   const activeLoading = feedTab === "following" ? followingLoading : loading;
 
   function renderPostCard(post: PostWithProfile) {
-    const name = post.profiles?.full_name || "Usuario";
+    const name = post.profiles?.full_name || "Usuário";
     const isOwn = post.user_id === user?.id;
     const followStatus = followStatuses[post.user_id];
     const showComments = expandedComments.has(post.id);
@@ -825,7 +825,7 @@ export function Feed() {
                 <p className="text-xs text-content-muted">{t("feed.noComments")}</p>
               ) : (
                 (commentsByPost[post.id] || []).map((c) => {
-                  const cName = c.profiles?.full_name || "Usuario";
+                  const cName = c.profiles?.full_name || "Usuário";
                   const cIsOwn = c.user_id === user?.id;
                   return (
                     <div key={c.id} className="flex items-start gap-2">
@@ -993,7 +993,7 @@ export function Feed() {
 
           {Object.entries(storiesByUser).map(([uid, userStories]) => {
             const first = userStories[0];
-            const name = first.profiles?.full_name || "Usuario";
+            const name = first.profiles?.full_name || "Usuário";
             const isOwn = uid === user?.id;
             return (
               <div key={uid} className="flex flex-col items-center gap-1.5">
@@ -1012,7 +1012,7 @@ export function Feed() {
                   )}
                 </button>
                 <span className="max-w-[64px] truncate text-[10px] font-medium text-content-muted">
-                  {isOwn ? "Voce" : name.split(" ")[0]}
+                  {isOwn ? "Você" : name.split(" ")[0]}
                 </span>
               </div>
             );
@@ -1253,7 +1253,7 @@ export function Feed() {
                   </p>
                 ) : (
                   searchResults.map((person) => {
-                    const name = person.full_name || "Usuario";
+                    const name = person.full_name || "Usuário";
                     const handle = person.handle ? `@${person.handle}` : "";
                     return (
                       <button
@@ -1282,7 +1282,7 @@ export function Feed() {
         open={!!sharePost}
         onClose={() => setSharePost(null)}
         shareUrl={`${window.location.origin}/profile/${sharePost?.user_id}`}
-        shareText={sharePost?.content || "Confira este post no FitSync!"}
+        shareText={sharePost?.content || "Confira esta postagem no FitSync!"}
         mediaUrl={sharePost?.video_url || sharePost?.image_url}
         mediaType={sharePost?.video_url ? "video" : "image"}
       />

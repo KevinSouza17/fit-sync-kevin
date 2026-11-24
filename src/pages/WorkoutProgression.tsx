@@ -186,7 +186,7 @@ export function WorkoutProgression() {
                         <span className="inline-flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5" />{t("workout.lastSession")}</span>
                       </th>
                       <th className="pb-3 px-4 font-medium">{t("workout.weightKg")}</th>
-                      <th className="pb-3 px-4 font-medium">Sets</th>
+                      <th className="pb-3 px-4 font-medium">Séries</th>
                       <th className="pb-3 pl-4 font-medium">Reps</th>
                     </tr>
                   </thead>

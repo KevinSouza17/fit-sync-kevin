@@ -870,7 +870,7 @@ export function MyClients() {
                                 <p className="mt-1 text-2xl font-bold text-content-strong">
                                   {clientWorkoutLogs.reduce((s, w) => s + Number(w.weight_kg) * Number(w.sets_completed), 0).toFixed(0)}
                                 </p>
-                                <p className="text-xs text-content-muted">kg·sets</p>
+                                <p className="text-xs text-content-muted">kg·séries</p>
                               </CardContent>
                             </Card>
                             <Card className="bg-surface-card">
@@ -886,11 +886,11 @@ export function MyClients() {
                             </Card>
                             <Card className="bg-surface-card">
                               <CardContent className="p-4">
-                                <div className="flex items-center gap-2 text-content-muted"><Target className="h-4 w-4" /><span className="text-xs">Sets totais</span></div>
+                                <div className="flex items-center gap-2 text-content-muted"><Target className="h-4 w-4" /><span className="text-xs">Séries totais</span></div>
                                 <p className="mt-1 text-2xl font-bold text-content-strong">
                                   {clientWorkoutLogs.reduce((s, w) => s + Number(w.sets_completed), 0)}
                                 </p>
-                                <p className="text-xs text-content-muted">sets</p>
+                                <p className="text-xs text-content-muted">séries</p>
                               </CardContent>
                             </Card>
                           </div>
@@ -903,7 +903,7 @@ export function MyClients() {
                                 <h3 className="text-sm font-bold text-content-strong">Volume de treino por sessão</h3>
                               </div>
                               {workoutChartData.length >= 2 ? (
-                                <BarChartSVG data={workoutChartData} color="#06b6d4" unit="kg·sets" />
+                                <BarChartSVG data={workoutChartData} color="#06b6d4" unit="kg·séries" />
                               ) : (
                                 <p className="py-8 text-center text-sm text-content-muted">{t("progress.noWorkouts")}</p>
                               )}
@@ -922,7 +922,7 @@ export function MyClients() {
                                     <div key={w.id} className="flex items-center justify-between rounded-lg px-3 py-2 hover:bg-surface-base">
                                       <div>
                                         <p className="text-sm font-medium text-content-strong">{w.exercise_name}</p>
-                                        <p className="text-xs text-content-muted">{w.sets_completed} sets · {new Date(w.logged_date).toLocaleDateString(undefined, { day: "numeric", month: "short" })}</p>
+                                        <p className="text-xs text-content-muted">{w.sets_completed} séries · {new Date(w.logged_date).toLocaleDateString(undefined, { day: "numeric", month: "short" })}</p>
                                       </div>
                                       <span className="text-xs font-medium text-content-body">{w.weight_kg} kg</span>
                                     </div>

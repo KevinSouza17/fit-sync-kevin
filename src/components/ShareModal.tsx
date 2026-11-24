@@ -145,8 +145,8 @@ export function ShareModal({ open, onClose, shareUrl, shareText, mediaUrl, media
                   disabled={shareLoading !== null}
                   className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-surface-subtle disabled:opacity-50"
                 >
-                  <AvatarPreview src={friend.avatar_url} name={friend.full_name || "Usuario"} userId={friend.user_id} size="sm" />
-                  <span className="flex-1 text-sm font-medium text-content-strong">{friend.full_name || "Usuario"}</span>
+                  <AvatarPreview src={friend.avatar_url} name={friend.full_name || "Usuário"} userId={friend.user_id} size="sm" />
+                  <span className="flex-1 text-sm font-medium text-content-strong">{friend.full_name || "Usuário"}</span>
                   {sharedFriendId === friend.user_id ? (
                     <span className="text-xs font-semibold text-green-600">Enviado!</span>
                   ) : shareLoading === friend.user_id ? (

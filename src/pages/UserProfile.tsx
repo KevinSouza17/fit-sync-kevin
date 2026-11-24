@@ -226,7 +226,7 @@ export function UserProfile() {
     );
   }
 
-  const name = profileData?.full_name || "Usuario";
+  const name = profileData?.full_name || "Usuário";
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 sm:p-6 lg:p-8">
@@ -398,7 +398,7 @@ export function UserProfile() {
         open={!!sharePost}
         onClose={() => setSharePost(null)}
         shareUrl={`${window.location.origin}/profile/${sharePost?.user_id}`}
-        shareText={sharePost?.content || "Confira este post no FitSync!"}
+        shareText={sharePost?.content || "Confira esta postagem no FitSync!"}
         mediaUrl={sharePost?.image_url}
         mediaType="image"
       />

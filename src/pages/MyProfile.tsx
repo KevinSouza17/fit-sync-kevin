@@ -98,7 +98,7 @@ export function MyProfile() {
 
   useEffect(() => { loadProfileData(); }, [loadProfileData]);
 
-  const name = profile?.full_name || user?.email?.split("@")[0] || "Usuario";
+  const name = profile?.full_name || user?.email?.split("@")[0] || "Usuário";
   const handle = profile?.handle ? `@${profile.handle}` : `@${name.toLowerCase().replace(/[^a-z0-9]+/g, "").slice(0, 24) || "fitsync"}`;
   const visiblePosts = activeTab === "media" ? posts.filter((post) => post.image_url || post.video_url) : posts;
   const filteredSuggestions = suggested.filter((person) => (person.full_name ?? "").toLowerCase().includes(search.toLowerCase()));
@@ -242,7 +242,7 @@ export function MyProfile() {
             <h3 className="mb-3 text-base font-bold text-content-strong">Pessoas sugeridas</h3>
             <div className="flex flex-col gap-1">
               {filteredSuggestions.map((person) => {
-                const personName = person.full_name || "Usuario";
+                const personName = person.full_name || "Usuário";
                 return (
                   <button
                     key={person.id}
