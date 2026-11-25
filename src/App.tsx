@@ -155,7 +155,18 @@ export default function App() {
         </Route>
         <Route path="/terms" element={<ProtectedRoute><TermsAcceptance /></ProtectedRoute>} />
         <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="/api-tester" element={<ApiTester />} />
+        <Route
+          path="/api-tester"
+          element={
+            import.meta.env.DEV ? (
+              <OwnerRoute>
+                <ApiTester />
+              </OwnerRoute>
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </BrowserRouter>

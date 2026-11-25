@@ -38,6 +38,7 @@ interface NavItem {
   icon: typeof LayoutDashboard;
   proOnly?: boolean;
   ownerOnly?: boolean;
+  devOnly?: boolean;
 }
 
 interface NavSection {
@@ -84,7 +85,7 @@ const navSections: NavSection[] = [
       { to: "/achievements", key: "nav.achievements", icon: Trophy },
       { to: "/notifications", key: "nav.notifications", icon: Bell },
       { to: "/settings", key: "nav.settings", icon: Settings },
-      { to: "/api-tester", key: "nav.apiTester", icon: PlayCircle, ownerOnly: true },
+      { to: "/api-tester", key: "nav.apiTester", icon: PlayCircle, ownerOnly: true, devOnly: true },
     ],
   },
 ];
@@ -108,7 +109,7 @@ export function Sidebar() {
   const visibleSections = navSections
     .map((section) => ({
       ...section,
-      items: section.items.filter((item) => (!item.proOnly || isPro) && (!item.ownerOnly || isOwner)),
+      items: section.items.filter((item) => (!item.proOnly || isPro) && (!item.ownerOnly || isOwner) && (!item.devOnly || import.meta.env.DEV)),
     }))
     .filter((section) => section.items.length > 0);
 
