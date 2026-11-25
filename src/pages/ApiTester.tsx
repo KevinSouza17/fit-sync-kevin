@@ -25,7 +25,7 @@ const BASE_URL = "https://ryqzwvmzysohgqxbwtoj.supabase.co/functions/v1";
 const ENDPOINTS: Endpoint[] = [
   {
     path: "/notify-message",
-    name: "notify-message",
+    name: "Notificar mensagem",
     description: "Notifica o destinatário de uma conversa sobre uma nova mensagem.",
     auth: "jwt",
     requiresBody: true,
@@ -37,7 +37,7 @@ const ENDPOINTS: Endpoint[] = [
   },
   {
     path: "/send-invite",
-    name: "send-invite",
+    name: "Enviar convite",
     description: "Envia um convite (com código de 6 dígitos) para outro usuário via e-mail.",
     auth: "jwt",
     requiresBody: true,
@@ -45,7 +45,7 @@ const ENDPOINTS: Endpoint[] = [
   },
   {
     path: "/stripe-checkout",
-    name: "stripe-checkout",
+    name: "Checkout Stripe",
     description:
       "Cria uma sessão de checkout do Stripe para a assinatura PRO e retorna a URL de pagamento.",
     auth: "jwt",
@@ -61,7 +61,7 @@ const ENDPOINTS: Endpoint[] = [
   },
   {
     path: "/stripe-webhook",
-    name: "stripe-webhook",
+    name: "Webhook Stripe",
     description:
       "Recebe eventos do Stripe e atualiza assinaturas. Chamada pelo Stripe — não usa JWT.",
     auth: "stripe",

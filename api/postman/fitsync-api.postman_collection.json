@@ -12,7 +12,7 @@
   ],
   "item": [
     {
-      "name": "notify-message",
+      "name": "Notificar mensagem",
       "request": {
         "method": "POST",
         "header": [
@@ -53,7 +53,7 @@
       ]
     },
     {
-      "name": "send-invite",
+      "name": "Enviar convite",
       "request": {
         "method": "POST",
         "header": [
@@ -94,7 +94,7 @@
       ]
     },
     {
-      "name": "stripe-checkout",
+      "name": "Checkout Stripe",
       "request": {
         "method": "POST",
         "header": [
@@ -130,7 +130,7 @@
       ]
     },
     {
-      "name": "stripe-webhook",
+      "name": "Webhook Stripe",
       "request": {
         "method": "POST",
         "header": [
